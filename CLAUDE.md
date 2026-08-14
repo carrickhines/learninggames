@@ -402,5 +402,6 @@ step — the same files that run from `file://` are what get served.
 - Live: https://carrickhines.github.io/learninggames/
 
 The three original repos (`mathrpg`, `languagerpg`, `storyquest`) hold the
-history of how each game was built and now redirect here, so old bookmarks
-keep working.
+history of how each game was built. They're still live and unchanged; once
+this site is confirmed working on the kids' iPads, each gets a one-line
+meta-refresh redirect here so the old bookmarks keep working.
