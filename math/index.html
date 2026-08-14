@@ -395,10 +395,20 @@
   // ---------- Config ----------
   // total = full time bar; fast = answer within this for a SUPER double hit;
   // penalty = does running out of time let the foe counterattack?
+  /* Per-question timing. NOTE: milliseconds here; Language RPG's MODES are in
+     seconds. Watch that when copying values between the two.
+
+     `total` is the whole bar, `fast` the gold double-hit window at the start,
+     `penalty` whether running out lets the foe hit back.
+
+     These are generous on purpose. The timer exists to reward quick recall,
+     not to rush a child who is working something out — and on the blocks
+     tracks he is physically counting, which takes as long as it takes. Easy
+     never punishes a timeout at all. */
   const MODES = {
-    easy:   { total: 15000, fast: 5000, penalty: false, label: "Easy" },
-    normal: { total: 14000, fast: 5000, penalty: true,  label: "Normal" },
-    expert: { total: 9000,  fast: 3500, penalty: true,  label: "Expert" },
+    easy:   { total: 50000, fast: 15000, penalty: false, label: "Easy" },
+    normal: { total: 35000, fast: 11000, penalty: true,  label: "Normal" },
+    expert: { total: 20000, fast: 6000,  penalty: true,  label: "Expert" },
   };
 
   // scale evens out how much of the em-box each emoji actually fills, so a

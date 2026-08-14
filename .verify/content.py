@@ -133,6 +133,37 @@ try:
     missing = [p for p in phrases if ("'%s'" % p) not in rec]
     check("record.html: every game phrase can be recorded", not missing, str(missing))
 
+    # ---- the difficulty ladder ----
+    # Easy was 15s and Normal 14s: two modes that felt identical, then Expert
+    # fell off a cliff. Each rung must be a real step down from the last.
+    for game, path, unit in (("math", "math/index.html", 1000.0),
+                             ("language", "language/index.html", 1.0)):
+        d.get("file://" + os.path.join(ROOT, path))
+        time.sleep(0.9)
+        modes = js("TEST.MODES")
+        secs = {k: modes[k]["total"] / unit for k in ("easy", "normal", "expert")}
+        fast = {k: modes[k]["fast"] / unit for k in ("easy", "normal", "expert")}
+
+        check("%s: each mode gives less time than the last" % game,
+              secs["easy"] > secs["normal"] > secs["expert"],
+              str(secs))
+        # a rung has to be a real step, not a rounding error
+        check("%s: the steps between modes are meaningful" % game,
+              secs["normal"] <= secs["easy"] * 0.85 and
+              secs["expert"] <= secs["normal"] * 0.85,
+              str(secs))
+        check("%s: even Expert leaves time to think" % game,
+              secs["expert"] >= 15, "%.0fs" % secs["expert"])
+        check("%s: Normal is not a race" % game,
+              secs["normal"] >= 30, "%.0fs" % secs["normal"])
+        check("%s: the fast zone is a bonus, not the whole bar" % game,
+              all(0.15 <= fast[k] / secs[k] <= 0.45 for k in secs),
+              str({k: round(fast[k] / secs[k], 2) for k in secs}))
+        check("%s: Easy never punishes a slow answer" % game,
+              modes["easy"]["penalty"] is False)
+        check("%s: Normal and Expert do" % game,
+              modes["normal"]["penalty"] and modes["expert"]["penalty"])
+
     # =================== Story Quest ===================
     print("\nStory Quest")
     d.get("file://" + os.path.join(ROOT, "story/index.html"))

@@ -420,8 +420,25 @@ Both run `MINI_ROUNDS` rounds and share the hearts, panel, and end screens.
 # Difficulty modes
 
 Three modes in the two battle games, distinguished by **time pressure**:
-Easy (long, relaxed), Normal (moderate), Expert (short). Per-mode timing lives
-in `MODES` (`total`, `fast`, `penalty`).
+
+| Mode | Math | Language |
+|---|---|---|
+| Easy | 50s | 70s |
+| Normal | 35s | 48s |
+| Expert | 20s | 26s |
+
+Per-mode timing lives in `MODES` (`total`, `fast`, `penalty`). **Math's are in
+milliseconds and Language's in seconds** — watch that when copying values
+between them.
+
+These are generous on purpose. The timer exists to reward quick recall, not to
+rush a child who is working something out — and on the number-block tracks he
+is physically counting, which takes as long as it takes.
+
+`content.py` enforces the ladder: each mode must be a real step down from the
+last (at least 15%), Normal must leave at least 30 seconds, and even Expert at
+least 15. This exists because Easy was once 15s and Normal 14s — two modes that
+felt identical, with Expert falling off a cliff after them.
 
 **Easy stays pressure-free:** the timer and the double-hit bonus are shown, but
 running out of time does not let the foe attack (`penalty: false`). The timer

@@ -1155,10 +1155,16 @@ let GEAR = Save.loadout();
 
 // Modes: `total` = seconds on the bar, `fast` = double-hit window,
 // `penalty` = does timing out let the foe attack? (never on Easy)
+/* Per-question timing. NOTE: seconds here; Math RPG's MODES are in
+   milliseconds. Watch that when copying values between the two.
+
+   Generous on purpose: reading a sentence to find its mistake, or building a
+   word chunk by chunk, is slower than recalling 7x8. The timer rewards quick
+   recall; it must not rush a child who is working something out. */
 const MODES = {
-  easy:   { total: 45, fast: 12, penalty: false },
-  normal: { total: 25, fast: 8,  penalty: true  },
-  expert: { total: 15, fast: 5,  penalty: true  },
+  easy:   { total: 70, fast: 18, penalty: false },
+  normal: { total: 48, fast: 13, penalty: true  },
+  expert: { total: 26, fast: 8,  penalty: true  },
 };
 
 const BASE_PLAYER_HP = 5;   // armor raises this; see GEAR.maxHp
