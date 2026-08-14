@@ -1027,6 +1027,7 @@ const state = {
   busy: false,
   goldAtStart: 0,     // so the win screen can show what this quest paid
   shownAt: 0,         // when the current scene went up
+  node: null,         // the map stop being played, if any
   mode: 'quest',      // 'quest' | 'order' | 'finish'
   round: 0,           // little-hero games run rounds, not scenes
   item: null,         // the current round's set or story
@@ -1070,6 +1071,9 @@ QUESTS.forEach((q, i) => {
 
 $('startBtn').addEventListener('click', () => {
   Sound.unlock(); Sound.click();
+  // starting from the menu is free play, even if a map stop brought us here
+  state.node = null;
+  Save.clearNode();
   startQuest();
 });
 
@@ -1077,6 +1081,8 @@ $('startBtn').addEventListener('click', () => {
 document.querySelectorAll('#miniRow .choice[data-mini]').forEach(btn => {
   btn.addEventListener('click', () => {
     Sound.unlock(); Sound.click();
+    state.node = null;
+    Save.clearNode();
     startMini(btn.dataset.mini);
   });
 });
@@ -1286,6 +1292,7 @@ function pickFinish(el, choice) {
 }
 
 function miniComplete() {
+  const node = state.node ? Save.completeNode() : null;
   const card = state.mode === 'order' ? MINI_CARDS.order : MINI_CARDS.finish;
   const drop = Save.awardCard(card.id, true);   // a finished game always pays
   Save.recordRunWon('story');
@@ -1488,6 +1495,7 @@ function nextScene() {
    Win / lose + the iPad-time reward timer
    ================================================================== */
 function questComplete() {
+  const node = state.node ? Save.completeNode() : null;
   Save.recordQuestDone(state.questIdx);
   Save.recordRunWon('story');
   const bonus = Save.awardEvent('questDone');
@@ -1526,7 +1534,22 @@ function questFailed() {
   showScreen('lose');
 }
 
-$('winAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+$('winAgainBtn').addEventListener('click', () => {
+  Sound.click();
+  state.node = null;        // back to the menu is free play again
+  Save.clearNode();
+  showScreen('menu');
+});
+// Arrived from a map stop? Play exactly that, and skip the menu.
+(function fromMap() {
+  const node = Save.activeNode();
+  if (!node || node.g !== 'story') return;
+  state.node = node;
+  if (node.mini) return startMini(node.mini);
+  state.questIdx = node.quest;
+  startQuest();
+})();
+
 // Test seam: .verify/ scripts drive the real game and need to know which
 // choice is the right one. Costs nothing in play.
 window.TEST = { state, scene, quest, QUESTS, startQuest, showEarnings,

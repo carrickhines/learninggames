@@ -423,6 +423,92 @@ try {
   ok('uncaught monsters read zero',
      cards.filter(function (c) { return c.id === 'l-titan'; })[0].count === 0);
 
+  /* ---------- the map ---------- */
+  fresh();
+  ok('both trails have stops',
+     Save.MAP.little.length > 10 && Save.MAP.big.length > 10);
+  ok('a new hero starts at the beginning of both trails',
+     Save.mapAt('little') === 0 && Save.mapAt('big') === 0);
+
+  ok('the first stop is playable', Save.nodeState('little', 0) === 'next');
+  ok('the second is locked', Save.nodeState('little', 1) === 'locked');
+  ok('a far stop is locked', Save.nodeState('little', 5) === 'locked');
+
+  ok('a locked stop cannot be started', Save.startNode('little', 3) === false);
+  ok('nothing is armed after a refused start', Save.activeNode() === null);
+
+  ok('the next stop can be started', Save.startNode('little', 0) === true);
+  var node = Save.activeNode();
+  ok('the armed stop knows its game', !!node && !!node.g);
+  ok('the armed stop knows where it is', node.i === 0 && node.trail === 'little');
+  ok('the armed stop carries its label', !!node.label);
+
+  var res = Save.completeNode();
+  ok('winning a stop advances the trail', res.advanced === true);
+  ok('the trail moved on', Save.mapAt('little') === 1);
+  ok('nothing stays armed after completing', Save.activeNode() === null);
+  ok('the beaten stop reads as done', Save.nodeState('little', 0) === 'done');
+  ok('the next one opened up', Save.nodeState('little', 1) === 'next');
+
+  /* Replaying a stop you've already beaten is allowed, but must not walk the
+     trail forward twice. */
+  ok('a beaten stop can be replayed', Save.startNode('little', 0) === false);
+  ok('replaying is refused because it is no longer "next"',
+     Save.nodeState('little', 0) === 'done');
+
+  Save.startNode('little', 1);
+  Save.completeNode();
+  ok('the trail advances again', Save.mapAt('little') === 2);
+
+  /* completing with nothing armed must be a no-op, not a crash */
+  ok('completing nothing is harmless', Save.completeNode() === null);
+  ok('the trail did not move', Save.mapAt('little') === 2);
+
+  /* the two trails are independent */
+  ok('the other trail is untouched', Save.mapAt('big') === 0);
+  Save.startNode('big', 0);
+  Save.completeNode();
+  ok('each trail advances on its own',
+     Save.mapAt('big') === 1 && Save.mapAt('little') === 2);
+
+  /* clearing */
+  Save.startNode('little', 2);
+  ok('a stop is armed', Save.activeNode() !== null);
+  Save.clearNode();
+  ok('clearing disarms it', Save.activeNode() === null);
+  ok('clearing did not advance the trail', Save.mapAt('little') === 2);
+
+  /* a stop that needs a world stays shut until it is bought */
+  fresh();
+  var gate = null, gateTrail = null;
+  ['little', 'big'].forEach(function (tr) {
+    Save.MAP[tr].forEach(function (n, i) {
+      if (!gate && n.needs) { gate = i; gateTrail = tr; }
+    });
+  });
+  ok('some stop needs a world', gate !== null);
+  Save.update(function (p) { p.progress.map[gateTrail] = gate; });
+  ok('a stop needing an unbought world reads as needing it',
+     Save.nodeState(gateTrail, gate) === 'needs');
+  ok('it cannot be started', Save.startNode(gateTrail, gate) === false);
+  Save.award(100000, 0);
+  Save.buy('world-' + Save.MAP[gateTrail][gate].needs);
+  ok('buying the world opens it', Save.nodeState(gateTrail, gate) === 'next');
+  ok('now it can be started', Save.startNode(gateTrail, gate) === true);
+
+  /* every stop must point at a real game, track and mode */
+  ['little', 'big'].forEach(function (tr) {
+    var bad = Save.MAP[tr].filter(function (n) {
+      if (['math', 'language', 'story'].indexOf(n.g) === -1) return true;
+      if (n.g === 'story') return n.quest === undefined && !n.mini;
+      return !n.t || !n.m;
+    });
+    ok(tr + ' trail: every stop names a real game and track', bad.length === 0,
+       JSON.stringify(bad.slice(0, 2)));
+    var noLabel = Save.MAP[tr].filter(function (n) { return !n.label; });
+    ok(tr + ' trail: every stop has a label', noLabel.length === 0);
+  });
+
   /* ---------- progress bookkeeping ---------- */
   fresh();
   Save.recordRunWon('math');

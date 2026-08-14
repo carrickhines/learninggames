@@ -179,6 +179,27 @@ try:
     time.sleep(0.3)
     shot("hub-parent-missed")
 
+    # the map, a few stops in
+    load("index.html")
+    d.execute_script("""
+        Save.update(function (p) { p.progress.map = { little: 7, big: 3 }; });
+        document.getElementById('mapBtn').click();
+    """)
+    time.sleep(0.7)
+    d.execute_script(NO_ANIM)
+    shot("hub-map")
+    d.execute_script("document.querySelector('[data-trail=\"big\"]').click();")
+    time.sleep(0.5)
+    shot("hub-map-big")
+
+    # a game playing a map stop
+    load("index.html")
+    d.execute_script("Save.startNode('little', 7);")
+    load("story/index.html")
+    time.sleep(1.0)
+    d.execute_script(NO_ANIM)
+    shot("story-map-stop")
+
     # the collection, part-caught
     load("index.html")
     d.execute_script("""

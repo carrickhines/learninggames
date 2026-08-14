@@ -262,6 +262,165 @@ var Save = (function () {
       sub: '5–10 minutes, redeem any time' }
   ];
 
+  /* ---------- The map -----------------------------------------------------
+     A visible route through everything, so playing feels like going
+     somewhere rather than picking from a list.
+
+     Two trails, not one. The five-year-old and the eight-year-old play
+     genuinely different content, so a single linear path would strand the
+     younger one at the first Algebra node. Each trail has its own progress on
+     each profile; a kid taps whichever one is theirs.
+
+     A node names a game, a track and a mode. Tapping it starts exactly that,
+     and winning advances the trail. `boss` marks a harder step and gets a
+     bigger node; `needs` requires a world to have been bought, which is how
+     the map and the shop pull on each other without either blocking the
+     other. Free play is always still there — the map is a route, not a gate.
+
+     Nodes are positioned by the renderer, not stored here: they lay out as a
+     serpentine, so inserting one is a one-line change with nothing to
+     re-position. */
+
+  var MAP = {
+    little: [
+      { g: 'math',     t: 'next',      m: 'easy',   label: 'Count to 30' },
+      { g: 'story',    mini: 'order',               label: 'Put it in order' },
+      { g: 'math',     t: 'oneless',   m: 'easy',   label: 'One more, one less' },
+      { g: 'language', t: 'letters',   m: 'easy',   label: 'Find the letter' },
+      { g: 'math',     t: 'count',     m: 'easy',   label: 'Count on' },
+      { g: 'language', t: 'sounds',    m: 'easy',   label: 'Beginning sounds' },
+      { g: 'math',     t: 'add',       m: 'easy',   label: 'Adding blocks' },
+      { g: 'story',    mini: 'finish',              label: 'What happens next?', boss: true },
+
+      { g: 'language', t: 'sight',     m: 'easy',   label: 'Sight words' },
+      { g: 'math',     t: 'pattern',   m: 'easy',   label: 'Patterns' },
+      { g: 'language', t: 'builder',   m: 'easy',   label: 'Build a word' },
+      { g: 'math',     t: 'sub',       m: 'easy',   label: 'Taking away' },
+      { g: 'language', t: 'rhyme',     m: 'easy',   label: 'Rhyme time' },
+      { g: 'math',     t: 'skip',      m: 'easy',   label: 'Skip counting' },
+      { g: 'language', t: 'opposites', m: 'easy',   label: 'Opposites' },
+      { g: 'math',     t: 'sort',      m: 'easy',   label: "What doesn't belong", boss: true },
+
+      { g: 'language', t: 'read',      m: 'easy',   label: 'Read it yourself' },
+      { g: 'math',     t: 'add',       m: 'normal', label: 'Adding, faster' },
+      { g: 'language', t: 'past',      m: 'easy',   label: 'Time machine' },
+      { g: 'math',     t: 'count',     m: 'normal', label: 'Counting on, faster' },
+      { g: 'story',    mini: 'order',               label: 'Order it again' },
+      { g: 'math',     t: 'sub',       m: 'normal', label: 'Taking away, faster' },
+      { g: 'math',     t: 'skip',      m: 'normal', label: 'Skip counting, faster' },
+      { g: 'math',     t: 'add',       m: 'normal', label: 'The Crystal Cave',
+        boss: true, needs: 'cave' }
+    ],
+
+    big: [
+      { g: 'math',     t: 'mul',       m: 'normal', label: 'Times tables' },
+      { g: 'story',    quest: 0,                    label: 'The Troll Bridge' },
+      { g: 'math',     t: 'div',       m: 'normal', label: 'Division' },
+      { g: 'language', t: 'fixit',     m: 'normal', label: 'Fix the mistake' },
+      { g: 'math',     t: 'rule',      m: 'normal', label: 'Find the rule' },
+      { g: 'story',    quest: 1,                    label: "The Dragon's Library" },
+      { g: 'language', t: 'forge',     m: 'normal', label: 'Word forge' },
+      { g: 'math',     t: 'mul',       m: 'expert', label: 'Times tables, fast', boss: true },
+
+      { g: 'language', t: 'grammar',   m: 'normal', label: 'Grammar hunt' },
+      { g: 'story',    quest: 2,                    label: 'The Ghost Ship' },
+      { g: 'math',     t: 'alg',       m: 'normal', label: 'Solve for x' },
+      { g: 'language', t: 'syllable',  m: 'normal', label: 'Syllable smith' },
+      { g: 'story',    quest: 3,                    label: "The Wizard's Maze" },
+      { g: 'language', t: 'twins',     m: 'normal', label: 'Word twins' },
+      { g: 'math',     t: 'rule',      m: 'normal', label: 'Rules, harder' },
+      { g: 'math',     t: 'div',       m: 'expert', label: 'The Crystal Cave',
+        boss: true, needs: 'cave' },
+
+      { g: 'language', t: 'marks',     m: 'normal', label: 'Mark it' },
+      { g: 'story',    quest: 4,                    label: 'The Robot Bakery' },
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'Algebra, fast' },
+      { g: 'story',    quest: 5,                    label: "The Yeti's Birthday" },
+      { g: 'language', t: 'fixit',     m: 'expert', label: 'Proofread, fast' },
+      { g: 'story',    quest: 6,                    label: 'The Moon Rescue' },
+      { g: 'language', t: 'forge',     m: 'expert', label: 'Forge, fast' },
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'The Sky Castle',
+        boss: true, needs: 'sky' }
+    ]
+  };
+
+  /* The little emblem on each node — the game it belongs to. */
+  var MAP_EMOJI = { math: '🔢', language: '🔤', story: '📖' };
+
+  function mapTrail(trail) {
+    return (MAP[trail] || []).map(function (n, i) { 
+      var out = {};
+      for (var k in n) out[k] = n[k];
+      out.i = i;
+      out.trail = trail;
+      out.emoji = MAP_EMOJI[n.g] || '⭐';
+      return out;
+    });
+  }
+
+  /* How far along a trail this hero is: the index of the next node to play. */
+  function mapAt(trail) {
+    var p = me();
+    return (p && p.progress.map && p.progress.map[trail]) || 0;
+  }
+
+  /* A node is playable if it's the next one and any world it needs is owned. */
+  function nodeState(trail, i) {
+    var at = mapAt(trail);
+    if (i < at) return 'done';
+    if (i > at) return 'locked';
+    var node = MAP[trail][i];
+    if (node && node.needs) {
+      var p = me();
+      if (!p || p.progress.unlockedWorlds.indexOf(node.needs) === -1) return 'needs';
+    }
+    return 'next';
+  }
+
+  /* Begin a node: the game reads this on load and locks itself to it. */
+  function startNode(trail, i) {
+    var p = me();
+    if (!p || nodeState(trail, i) !== 'next') return false;
+    p.progress.activeNode = { trail: trail, i: i };
+    write();
+    return true;
+  }
+
+  /* The node being played, with its spec — or null for free play. */
+  function activeNode() {
+    var p = me();
+    var a = p && p.progress.activeNode;
+    if (!a || !MAP[a.trail] || !MAP[a.trail][a.i]) return null;
+    var node = mapTrail(a.trail)[a.i];
+    node.last = a.i === MAP[a.trail].length - 1;
+    return node;
+  }
+
+  function clearNode() {
+    var p = me();
+    if (!p || !p.progress.activeNode) return;
+    p.progress.activeNode = null;
+    write();
+  }
+
+  /* Won the node that was being played. Advances the trail once — replaying a
+     node you've already beaten is fine, it just doesn't move you twice. */
+  function completeNode() {
+    var p = me();
+    var a = p && p.progress.activeNode;
+    if (!a) return null;
+    if (!p.progress.map) p.progress.map = { little: 0, big: 0 };
+    var advanced = false;
+    if (a.i === (p.progress.map[a.trail] || 0)) {
+      p.progress.map[a.trail] = a.i + 1;
+      advanced = true;
+    }
+    p.progress.activeNode = null;
+    write();
+    return { trail: a.trail, i: a.i, advanced: advanced,
+             done: (p.progress.map[a.trail] >= MAP[a.trail].length) };
+  }
+
   var AVATARS = ['🦸', '🦹', '🧙', '🧝', '🦊', '🐯', '🐸', '🦖', '🐙', '🦄', '🐧', '🤖'];
 
   /* ---------- Storage ---------------------------------------------------- */
@@ -284,6 +443,8 @@ var Save = (function () {
       cards: {},                     // card id -> copies held (foils included)
       foils: {},                     // card id -> how many of those are shiny
       progress: {
+        map: { little: 0, big: 0 },  // how far along each map trail
+        activeNode: null,            // the map node being played, if any
         world: 'meadow',
         unlockedWorlds: ['meadow'],
         runsWon: {},                 // game id -> wins
@@ -339,6 +500,8 @@ var Save = (function () {
         if (!p.progress) p.progress = {};
         if (p.progress.koSinceCard === undefined) p.progress.koSinceCard = 0;
         if (!p.foils) p.foils = {};
+        if (!p.progress.map) p.progress.map = { little: 0, big: 0 };
+        if (p.progress.activeNode === undefined) p.progress.activeNode = null;
       });
     }
 
@@ -995,6 +1158,15 @@ var Save = (function () {
     world: world,
     setWorld: setWorld,
     foesFor: foesFor,
+
+    MAP: MAP,
+    mapTrail: mapTrail,
+    mapAt: mapAt,
+    nodeState: nodeState,
+    startNode: startNode,
+    activeNode: activeNode,
+    clearNode: clearNode,
+    completeNode: completeNode,
 
     recordRunWon: recordRunWon,
     recordQuestDone: recordQuestDone,

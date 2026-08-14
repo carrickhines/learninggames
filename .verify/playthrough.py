@@ -62,6 +62,14 @@ def errs():
     return d.execute_script("return window.__errs || []")
 
 
+def text(sel):
+    """textContent rather than Selenium's .text, which reads empty for an
+    element the driver thinks isn't visible yet."""
+    return d.execute_script(
+        "var e = document.querySelector(arguments[0]);"
+        "return e ? e.textContent.trim() : '';", sel)
+
+
 def showing(screen_id):
     return d.execute_script(
         "var s = document.getElementById(arguments[0]);"
@@ -324,6 +332,88 @@ try:
               all(m["gave"] for m in missed))
         check("the review list keeps the question itself",
               all(m["q"] for m in missed))
+
+    print("\nThe map")
+    fresh_hero("MapRunner")
+    load("index.html")
+    d.execute_script("document.getElementById('mapBtn').click();")
+    time.sleep(0.6)
+    check("map: the trail is drawn",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode")) ==
+          d.execute_script("return Save.MAP.little.length;"))
+    check("map: exactly one stop is playable",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next")) == 1)
+    check("map: the rest are locked",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.locked")) ==
+          d.execute_script("return Save.MAP.little.length;") - 1)
+    check("map: the hero is standing on the next stop",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next .you")) == 1)
+
+    # a locked stop refuses, and arms nothing
+    d.execute_script("document.querySelectorAll('.mapnode.locked')[3].click();")
+    time.sleep(0.3)
+    check("map: a locked stop refuses", "Beat the stop before" in text("#mapFlash"),
+          text("#mapFlash"))
+    check("map: the refusal armed nothing",
+          d.execute_script("return Save.activeNode();") is None)
+
+    # play the first stop for real
+    first = d.execute_script("return Save.MAP.little[0];")
+    d.execute_script("document.querySelector('.mapnode.next').click();")
+    time.sleep(1.6)
+    check("map: tapping a stop opens its game",
+          first["g"] in d.current_url, d.current_url)
+    check("map: the game locked itself to the stop's track",
+          d.execute_script("return TEST.state.track;") == first["t"])
+    check("map: the game says which stop this is",
+          "Stop 1" in d.execute_script(
+              "var b = document.getElementById('nodeBar');"
+              "return b ? b.textContent : '';"))
+
+    for _ in range(120):
+        if showing("endScreen"):
+            break
+        d.execute_script("""
+            if (TEST.state.busy) return;
+            if (TEST.state.choices) {
+                var t = document.querySelectorAll('#tiles .tile');
+                for (var i = 0; i < t.length; i++)
+                    if (t[i].textContent === String(TEST.state.answer)) { t[i].click(); return; }
+            } else {
+                document.getElementById('answer').value = String(TEST.state.answer);
+                document.getElementById('attackBtn').click();
+            }
+        """)
+        time.sleep(0.7)
+    check("map: the stop can be beaten", showing("endScreen"))
+    check("map: beating it advanced the trail",
+          d.execute_script("return Save.mapAt('little');") == 1)
+    check("map: nothing is left armed",
+          d.execute_script("return Save.activeNode();") is None)
+
+    load("index.html")
+    d.execute_script("document.getElementById('mapBtn').click();")
+    time.sleep(0.6)
+    check("map: the beaten stop now shows as done",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.done")) == 1)
+    check("map: the next stop opened up",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next")) == 1)
+    check("map: the other trail is untouched",
+          d.execute_script("return Save.mapAt('big');") == 0)
+
+    # free play must be unaffected by the map
+    load("math/index.html")
+    check("map: free play shows the menu, not a stop", showing("menu"))
+    check("map: free play has no stop banner", d.execute_script(
+        "var b = document.getElementById('nodeBar');"
+        "return !b || b.classList.contains('hidden');"))
+    click('[data-track="mul"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.2)
+    check("map: free play still starts a normal battle", showing("battle"))
+    check("map: free play arms no stop",
+          d.execute_script("return Save.activeNode();") is None)
 
     print("\nProgress survives")
     before = gold()

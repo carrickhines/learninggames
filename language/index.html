@@ -246,6 +246,8 @@
 
   <!-- ================= GAME ================= -->
   <section class="screen" id="game">
+    <div class="nodebar hidden" id="nodeBar"></div>
+
     <div class="topbar">
       <div class="fighter-info player">
         <div class="name">🦸 You</div>
@@ -1238,6 +1240,7 @@ const state = {
   draw: null,              // deck function for current track
   goldAtStart: 0,          // so the win screen can show what this run paid
   askedAt: 0,              // when the current question went up
+  node: null,              // the map stop being played, if any
 };
 
 // The hero chip, and the gate: no hero picked means back to the hub.
@@ -1304,6 +1307,9 @@ $('startBtn').addEventListener('click', () => {
   Sound.unlock(); Sound.click();
   Voice.unlock();
   Speech.init();
+  // starting from the menu is free play, even if a map stop brought us here
+  state.node = null;
+  Save.clearNode();
   startGame();
 });
 
@@ -1332,6 +1338,10 @@ function startGame() {
   state.shield = GEAR.shield;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
   state.draw = makeDeck(track(state.track).pool());
+  $('nodeBar').classList.toggle('hidden', !state.node);
+  if (state.node) {
+    $('nodeBar').textContent = `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
+  }
   showScreen('game');
   spawnFoe();
 }
@@ -2090,6 +2100,11 @@ function stopTimer() {
    ================================================================== */
 function winGame() {
   stopTimer();
+  const node = state.node ? Save.completeNode() : null;
+  if (node && node.advanced) {
+    $('win').querySelector('.subtitle').textContent =
+      'Stop ' + (node.i + 1) + ' beaten! The path goes on.';
+  }
   Save.recordRunWon('language');
   const bonus = Save.awardEvent('runWon');
   Sound.victory();
@@ -2123,8 +2138,25 @@ function gameOver() {
   showScreen('lose');
 }
 
-$('winAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+$('winAgainBtn').addEventListener('click', () => {
+  Sound.click();
+  state.node = null;        // back to the menu is free play again
+  Save.clearNode();
+  showScreen('menu');
+});
 $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+
+// Arrived from a map stop? Play exactly that, and skip the menu.
+(function fromMap() {
+  const node = Save.activeNode();
+  if (!node || node.g !== 'language') return;
+  state.track = node.t;
+  state.mode = node.m;
+  state.node = node;
+  Voice.unlock();
+  Speech.init();
+  startGame();
+})();
 
 // Test seam: .verify/ scripts drive the real game and need to read the
 // current question and run state. Costs nothing in play.

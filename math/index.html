@@ -300,6 +300,8 @@
 
   <!-- BATTLE -->
   <section id="battle" class="screen">
+    <div class="nodebar hidden" id="nodeBar"></div>
+
     <div class="topbar">
       <div class="fighter-info player">
         <div class="name">🦸 You</div>
@@ -439,6 +441,7 @@
     timerId: null,
     timerStart: 0,
     busy: false,
+    node: null,          // the map stop being played, if any
     shield: 0,           // one free hit, if a pet is equipped
     goldAtStart: 0,      // so the win screen can show what this run paid
   };
@@ -456,7 +459,7 @@
     fastMarker: $("fastMarker"), superLabel: $("superLabel"),
     question: $("question"), answer: $("answer"), attackBtn: $("attackBtn"),
     keypad: $("keypad"), backBtn: $("backBtn"),
-    answerRow: $("answerRow"), tiles: $("tiles"),
+    answerRow: $("answerRow"), tiles: $("tiles"), nodeBar: $("nodeBar"),
     flashOverlay: $("flashOverlay"),
     blocksArea: $("blocksArea"), towerA: $("towerA"), towerB: $("towerB"),
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
@@ -1263,19 +1266,26 @@
     setupFoe();
     renderHp();
     el.battle.classList.toggle("with-blocks", BLOCK_TRACKS.indexOf(state.track) !== -1);
+    el.nodeBar.classList.toggle("hidden", !state.node);
+    if (state.node) {
+      el.nodeBar.textContent = `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
+    }
     showScreen("battle");
     newProblem();
   }
 
   function win() {
     stopTimer();
+    const node = state.node ? Save.completeNode() : null;
     Save.recordRunWon("math");
     // beating a whole run of skip counting unlocks the harder step sizes
     if (state.track === "skip") Save.update((p) => { p.progress.skipMastered = true; });
     const bonus = Save.awardEvent("runWon");
     el.endEmoji.textContent = "🏆";
     el.endTitle.textContent = "Victory!";
-    el.endText.textContent = "You defeated every monster. You're a math hero!";
+    el.endText.textContent = node && node.advanced
+      ? "Stop " + (node.i + 1) + " beaten! The path goes on."
+      : "You defeated every monster. You're a math hero!";
     showEarnings();
     Sound.win();
     Log.endSession({ won: true, gold: earnedThisRun() });
@@ -1325,8 +1335,19 @@
   }
 
   // ---------- Events ----------
-  el.startBtn.addEventListener("click", startGame);
-  el.playAgainBtn.addEventListener("click", () => { Sound.click(); showScreen("menu"); });
+  el.startBtn.addEventListener("click", () => {
+    // starting from the menu is free play, even if a map stop brought us here
+    state.node = null;
+    Save.clearNode();
+    startGame();
+  });
+  el.playAgainBtn.addEventListener("click", () => {
+    Sound.click();
+    // back to the menu is free play again
+    state.node = null;
+    Save.clearNode();
+    showScreen("menu");
+  });
   el.attackBtn.addEventListener("click", playerAttack);
   el.keypad.addEventListener("click", (e) => {
     const b = e.target.closest("button.key");
@@ -1347,7 +1368,15 @@
   attachDrag(el.towerA);
   attachDrag(el.towerB);
 
-  showScreen("menu");
+  // Arrived from a map stop? Play exactly that, and skip the menu.
+  (function fromMap() {
+    const node = Save.activeNode();
+    if (!node || node.g !== "math") return showScreen("menu");
+    state.track = node.t;
+    state.mode = node.m;
+    state.node = node;
+    startGame();
+  })();
 
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.

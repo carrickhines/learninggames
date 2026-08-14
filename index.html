@@ -188,6 +188,113 @@
   .shop-item.setlocked { opacity: .6; border-color: rgba(255,210,63,.35); }
   .shop-item.setlocked .price { color: var(--accent); }
 
+  /* ---------- The map ----------
+     A serpentine of stops. Every other row runs right-to-left and the
+     connectors are drawn between nodes, so the route reads as a winding path
+     rather than a list. */
+  .trail-pick { min-width: 168px; }
+  .trail-pick .emoji { font-size: 30px; }
+
+  #mapBoard { max-width: 720px; margin: 14px auto 0; }
+  .maprow {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 0;
+    /* hug the nodes so the turn connector can be positioned against the row's
+       own edge rather than the board's */
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+  }
+  .maprow.flip { flex-direction: row-reverse; }
+
+  .mapnode {
+    position: relative;
+    width: 122px;
+    padding: 10px 6px 8px;
+    margin: 0;
+    border-radius: 18px;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 4px 0 rgba(0,0,0,.3);
+    color: #fff;
+    font-family: var(--body);
+    font-size: 11.5px;
+    line-height: 1.2;
+  }
+  /* the path between stops */
+  .mapnode + .mapnode::before {
+    content: "";
+    position: absolute;
+    top: 34px;
+    left: -14px;
+    width: 14px;
+    height: 5px;
+    background: rgba(255,255,255,.18);
+  }
+  .maprow.flip .mapnode + .mapnode::before { left: auto; right: -14px; }
+  /* The drop between rows, at the end where the path actually turns: the
+     right for a left-to-right row, the left for a flipped one. */
+  .maprow + .maprow { margin-top: 18px; }
+  .maprow:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: -18px;
+    width: 5px;
+    height: 18px;
+    background: rgba(255,255,255,.18);
+    right: 58px;
+  }
+  .maprow.flip:not(:last-child)::after { right: auto; left: 58px; }
+
+  .mapnode .num {
+    display: block;
+    font-family: var(--display);
+    font-size: 11px;
+    opacity: .5;
+  }
+  .mapnode .face { display: block; font-size: 30px; line-height: 1.1; }
+  .mapnode .lbl { display: block; margin-top: 2px; }
+  .mapnode .you {
+    position: absolute;
+    top: -14px; right: -6px;
+    font-size: 26px;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.5));
+  }
+
+  .mapnode.done { border-color: rgba(255,210,63,.45); }
+  .mapnode.done .face { filter: drop-shadow(0 0 8px rgba(255,210,63,.6)); }
+  .mapnode.done .lbl { opacity: .7; }
+  /* the one to play next */
+  .mapnode.next {
+    background: linear-gradient(180deg, rgba(255,226,122,.22), rgba(255,210,63,.10));
+    border-color: var(--accent);
+    box-shadow: 0 4px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.25);
+    font-weight: bold;
+  }
+  .mapnode.locked { opacity: .4; }
+  .mapnode.locked .face { filter: grayscale(1); }
+  /* unlocked by the path, but you don't own the world it's in */
+  .mapnode.needs { opacity: .75; border-color: rgba(255,210,63,.35); }
+  .mapnode.needs .face::after { content: " 🔒"; font-size: 15px; }
+  .mapnode.boss { width: 138px; }
+  .mapnode.boss .face { font-size: 38px; }
+  .mapnode.boss .num::after { content: " ⚔"; color: var(--bad); }
+
+  /* the banner a game shows when it's playing a map stop */
+  .nodebar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--display);
+    font-size: 15px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
   /* ---------- Monster cards ---------- */
   .shelf {
     display: grid;
@@ -402,7 +509,11 @@
         <span class="swap">🔄</span>
       </button>
 
-      <div class="group-label">Choose your adventure</div>
+      <div class="btn-row" style="margin-top:4px">
+        <button id="mapBtn">🗺️ The Map</button>
+      </div>
+
+      <div class="group-label">Or just play</div>
       <div class="games">
         <a class="game-card" href="math/index.html">
           <span class="emoji">🔢</span>Math RPG
@@ -426,6 +537,33 @@
         <button id="cardsBtn">🃏 Cards</button>
         <button id="redeemBtn" style="display:none">🎟️ iPad time</button>
         <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= THE MAP ================= -->
+  <section class="screen scrolls" id="map">
+    <div class="screen-inner">
+      <h1>The Map</h1>
+      <div class="subtitle" id="mapSub">Follow the path. Win a stop to open the next one.</div>
+
+      <div class="btn-row" id="trailPick">
+        <button class="choice trail-pick sel" data-trail="little">
+          <span class="emoji">🐣</span>Little Hero Trail
+          <span class="sub" id="littleAt">0 of 24</span>
+        </button>
+        <button class="choice trail-pick" data-trail="big">
+          <span class="emoji">🦸</span>Big Hero Trail
+          <span class="sub" id="bigAt">0 of 24</span>
+        </button>
+      </div>
+
+      <div id="mapBoard"></div>
+
+      <div class="flash" id="mapFlash"></div>
+
+      <div class="btn-row back-row">
+        <button id="mapBackBtn" class="ghost-btn">Back</button>
       </div>
     </div>
   </section>
@@ -861,6 +999,105 @@ $('shopBtn').addEventListener('click', () => {
   showScreen('shop');
 });
 $('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
+
+/* ---------- The map ----------
+   The nodes lay out as a serpentine: rows of five, every other row running
+   right-to-left, so the path visibly winds rather than reading as a list.
+   Positions aren't stored — inserting a node is a one-line data change. */
+const PER_ROW = 5;
+let mapTrail = 'little';
+
+function renderMap() {
+  const me = Save.me();
+  if (!me) return;
+
+  $('littleAt').textContent = `${Save.mapAt('little')} of ${Save.MAP.little.length}`;
+  $('bigAt').textContent = `${Save.mapAt('big')} of ${Save.MAP.big.length}`;
+  document.querySelectorAll('.trail-pick').forEach(b =>
+    b.classList.toggle('sel', b.dataset.trail === mapTrail));
+
+  const nodes = Save.mapTrail(mapTrail);
+  const at = Save.mapAt(mapTrail);
+  const board = $('mapBoard');
+  board.innerHTML = '';
+
+  for (let r = 0; r * PER_ROW < nodes.length; r++) {
+    const row = document.createElement('div');
+    row.className = 'maprow' + (r % 2 ? ' flip' : '');
+    nodes.slice(r * PER_ROW, r * PER_ROW + PER_ROW).forEach(n => {
+      row.appendChild(mapNode(n, Save.nodeState(mapTrail, n.i), at));
+    });
+    board.appendChild(row);
+  }
+
+  $('mapSub').textContent = at >= nodes.length
+    ? 'Every stop beaten. The whole trail is yours.'
+    : `Stop ${at + 1}: ${nodes[at].label}`;
+}
+
+function mapNode(n, state, at) {
+  const b = document.createElement('button');
+  b.className = 'mapnode ' + state + (n.boss ? ' boss' : '');
+  b.innerHTML =
+    `<span class="num">${n.i + 1}</span>` +
+    `<span class="face">${state === 'done' ? '⭐' : n.emoji}</span>` +
+    `<span class="lbl"></span>` +
+    (n.i === at ? `<span class="you">${Save.me().avatar}</span>` : '');
+  b.querySelector('.lbl').textContent = n.label;
+  b.title = n.label + (n.needs ? ` — needs ${Save.world(n.needs).name}` : '');
+  b.addEventListener('click', () => tapNode(n, state));
+  return b;
+}
+
+function tapNode(n, state) {
+  Sound.unlock();
+  if (state === 'locked') {
+    Sound.denied();
+    mapFlash('Beat the stop before it first!', true);
+    return;
+  }
+  if (state === 'needs') {
+    Sound.denied();
+    const w = Save.world(n.needs);
+    mapFlash(`${w.emoji} Buy the ${w.name} in the shop to reach this one.`, true);
+    return;
+  }
+  Sound.click();
+  // replaying a beaten stop is fine — it just doesn't move you on twice
+  Save.startNode(n.trail, n.i);
+  location.href = n.g + '/index.html';
+}
+
+function mapFlash(msg, bad) {
+  const f = $('mapFlash');
+  f.textContent = msg;
+  f.classList.toggle('bad', !!bad);
+}
+
+$('mapBtn').addEventListener('click', () => {
+  Sound.click();
+  Save.clearNode();          // opening the map is not the same as being on a node
+  mapFlash('');
+  // start on whichever trail this hero has actually been walking
+  if (Save.mapAt('big') > Save.mapAt('little')) mapTrail = 'big';
+  renderMap();
+  showScreen('map');
+});
+$('mapBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
+document.querySelectorAll('.trail-pick').forEach(b => {
+  b.addEventListener('click', () => {
+    Sound.click();
+    mapTrail = b.dataset.trail;
+    mapFlash('');
+    renderMap();
+  });
+});
+
+/* Tapping a game card is free play, so it must not leave a node armed. */
+document.querySelectorAll('.game-card').forEach(a => {
+  a.addEventListener('click', () => Save.clearNode());
+});
+
 
 /* ---------- Monster cards ---------- */
 function renderCards() {
