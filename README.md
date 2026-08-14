@@ -8,10 +8,17 @@ Three browser games for two kids, sharing one hero.
 - **🔤 Language RPG** — letters, spelling, grammar, word play
 - **📖 Story Quest** — reading comprehension as an adventure
 
-Pick a hero on the hub and every game feeds the same character: right answers
-earn gold and XP, gold buys swords, armor, pets, new worlds to fight in, and
-iPad game time. Beaten monsters drop collectible cards. All of it persists
-between sessions, per kid.
+Pick a hero on the hub and every game feeds the same character. There's a
+**map** — a winding trail of stops that open as you beat them, one for each
+kid. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
+new worlds to fight in, and iPad game time, priced so the best gear takes
+months. Beaten monsters rarely drop a collectible card, sometimes shiny;
+spares trade at the Card Trader, and finishing a world's set is the only way
+to the top tier of each gear slot. All of it persists between sessions, per kid.
+
+**For parents:** Settings → Progress report shows what was played and when,
+accuracy per track, and a review list of the questions being missed with what
+was answered instead. Exportable as CSV.
 
 ## Running it
 

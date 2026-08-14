@@ -26,13 +26,15 @@ into the other's tracks.
 ## Layout
 
 ```
-index.html          the hub: who's playing, the hero card, shop, cards, settings
+index.html          the hub: who's playing, the map, shop, cards, trader,
+                    the grown-ups' progress report, settings
 shared/
   tokens.css        design tokens — the one place colors and fonts are set
   ui.css            app frame, screens, buttons, HP pips, reward panel
   battle.css        arena, attack animations, timer bar (math + language only)
   sound.js          every sound effect, synthesized
-  save.js           profiles, economy, shop, worlds, cards — all persistence
+  save.js           profiles, economy, shop, worlds, cards, the map — all persistence
+  log.js            the play record: sessions, questions, what was missed
   reward.js         the iPad-time countdown
   hud.js            the hero chip each game wears, and the gold/level-up feedback
 math/index.html
@@ -44,10 +46,35 @@ story/index.html
 Shared files load with plain `<script src>` and `<link>`, so there is still
 no build step and the games still open straight from `file://`.
 
+## The map
+
+The hub's map is the visible route through everything: a winding trail of
+stops, each naming a concrete challenge, opening the next when beaten.
+
+**Two trails, deliberately.** The five-year-old and the eight-year-old play
+genuinely different content, so a single linear path would strand the younger
+one at the first Algebra stop. `MAP.little` and `MAP.big` are 24 stops each,
+with independent progress per profile.
+
+Tapping a stop calls `Save.startNode()`, opens that game, and the game locks
+itself to the stop's track and mode (skipping its menu). Winning calls
+`Save.completeNode()`, which walks the trail forward once — replaying a beaten
+stop is fine and doesn't double-advance. Some stops carry `needs: '<world>'`
+and stay shut until that world is bought.
+
+**Free play is not gated by the map.** Starting from a game's own menu clears
+any armed stop. A kid who wants to drill times tables today just can.
+
+Stop positions are not stored — the hub lays them out as a serpentine, so
+adding a stop is a one-line change to the `MAP` data with nothing to
+re-position.
+
 ## The hero, and why everything persists
 
 `shared/save.js` owns one localStorage key (`lg_save_v1`) holding every
-profile. This is the layer everything else hangs off:
+profile. The key name is fixed; the schema version lives *inside* the blob as
+`v`, so a migration never orphans an existing save. (`shared/log.js` owns a
+second key, `lg_log_v1` — see below for why.) This is the layer everything else hangs off:
 
 - **Profiles** — a "who's playing?" picker on the hub. Each kid has his own
   level, gold, gear, cards, and progress, so sharing an iPad is fine.
@@ -60,6 +87,12 @@ profile. This is the layer everything else hangs off:
 
 Every write is wrapped in try/catch. A full or disabled localStorage must
 leave the games playable and merely forgetful — never broken.
+
+**Migrations.** `Save.load()` brings older saves forward once and stamps the
+new version, so a hero can't be paid a migration bonus twice. v1 → v2 scaled
+everyone's gold by the same factor prices moved in the rebalance, so it
+neither stranded a saver nor made anyone instantly rich. Add to `migrate()`
+when the schema changes; the idempotence is tested.
 
 **Tuning lives in one place.** `ECONOMY` in `save.js` holds every payout;
 `SHOP` holds every item and its effect; `WORLDS` holds every foe. Watch the
@@ -80,32 +113,95 @@ kids play, then change those numbers — nothing else needs touching.
 **Wrong answers never cost gold.** A lost heart is punishment enough, and the
 games are meant to stay encouraging. Progress only ever goes up.
 
+Gold is then multiplied by **where you're fighting** and **what you're
+wearing**: each world has a `gold` multiplier (1× in the Meadow up to 3× on
+Ember Peak) and trinkets add a percentage. `Save.setContext(game)` decides
+whether the world multiplier applies — Story Quest has no world, so parking in
+Ember Peak can't inflate its payouts.
+
+### The shape of the curve
+
+Roughly 475 gold a day at 30 minutes of play. Against the price table that
+means: worlds unlocking on days 3, 11, 27 and 55; every tier-4 item by day 82;
+everything by day 129. **This is enforced, not hoped for** — `content.py`
+simulates a day of play against the real prices and fails if the top gear
+becomes reachable in a week, or if the set-gated tier turns into a second gold
+wall on top of the collection.
+
 ## The shop
 
-Bought on the hub, applied at the start of the next run via `Save.loadout()`:
+Five tiers per slot, each roughly 3× the last, so something is always
+affordable soon and something is always a long way off. Bought on the hub,
+applied at the start of the next run via `Save.loadout()`:
 
-- **Weapons** — a chance at a crit; the Flame Blade makes double hits do 3.
-  The equipped weapon is also the slash effect you see.
-- **Armor** — +1 and +2 hearts.
-- **Pets** — a companion in the arena, plus one passive (extra thinking time,
-  or one blocked hit per run).
-- **Worlds** — Crystal Cave and Sky Castle, each a whole new foe lineup and a
-  new set of cards.
+- **Weapons** — crit chance, and the top tiers raise double-hit damage. The
+  equipped weapon is also the slash effect you see.
+- **Armor** — up to +5 hearts.
+- **Pets** — a companion in the arena, plus a passive (thinking time, or
+  blocked hits per run).
+- **Trinkets** — the fourth slot, with effects that never touch damage: gold
+  bonus, card luck, a wider DOUBLE window.
+- **Worlds** — five in total, each a new foe lineup, a new card set, and a
+  better gold multiplier.
 - **🎟️ iPad Time Token** — see below.
+
+**The top tier of every slot needs a completed card set** (`set: '<world>'` in
+`SHOP`), so the best gear is a collection problem rather than just a big
+number. `buy()` returns `'noset'` for those until the set is held.
 
 **Keep the buffs mild.** Owning something that grows is the point; making the
 math easy is not.
 
 ## Monster cards
 
-35 cards: every foe in all three worlds across both battle games, plus one per
-Story Quest quest and one per little-hero game. The first time you beat a
-monster its card always drops; after that it drops half the time and
-duplicates stack. The hub's Cards screen shows the whole set with uncaught
-monsters as silhouettes, so the shape of what's left is visible.
+55 cards: every foe across five worlds and both battle games, plus one per
+Story Quest quest and one per little-hero game.
+
+**Cards are rare on purpose** — a collection you finish in a week isn't a
+collection. A beaten monster rolls `cardChance` (12%), scaled down by the
+foe's rarity, so most fights pay nothing.
+
+- **Three rarities.** Every world's last foe is legendary. Rarity sets both
+  the drop odds and the trade-in value.
+- **Foils.** ~5% of drops come back shiny, worth triple in trade — the reason
+  a duplicate you already own is still exciting.
+- **A pity counter.** 30 monsters with nothing and the next one is certain.
+  Rare must never become miserable.
+- **Story Quest's cards stay guaranteed** (`awardCard(id, true)`). Finishing a
+  twelve-scene quest and being told the dice said no would be miserable;
+  rarity is for monsters you can re-fight in a minute.
+
+**The Card Trader** turns spares into something: gold by rarity, or 12 spares
+for any card you're missing — so a collection can always be finished by
+playing rather than only by luck. Finishing a world's set grants a permanent
+perk (`SET_PERKS`) and unlocks that world's tier-5 gear.
+
+At ~22 monsters a day that's about 1.9 cards a day, and one world's nine-card
+set takes a median of 17 days. `content.py` guards the drops-per-day so a
+tweak can't quietly make it a week again.
 
 Card ids must be unique across the entire site — `.verify/content.py` checks
 this, because a collision would silently merge two monsters into one card.
+
+## The record, for grown-ups
+
+`shared/log.js` records every session and every question: what was asked, what
+came back, whether it was right, and how long it took. Settings → **Progress
+report** shows the headline numbers, accuracy per track (weakest first), the
+**review list** of most-missed questions with what was answered instead, the
+recent sessions with times of day, and a CSV export.
+
+**It lives in its own storage key on purpose.** `Save.write()` re-serializes
+the whole save blob on every correct answer; a few thousand question records
+in there would mean stringifying hundreds of KB per answer on an iPad. So the
+log buffers in memory and writes at the end of a run — a test asserts that
+fifty answers cause zero writes — and flushes on `visibilitychange` and
+`pagehide` so closing the iPad mid-battle doesn't lose the morning.
+
+Capped at 3,000 answers per hero, oldest dropped first. If storage fills
+anyway it halves itself and retries. **Nothing in the module may throw:** a
+parent losing a record is a shame, a child losing a battle to a storage error
+is not acceptable.
 
 ## Win reward — iPad game time
 
@@ -370,14 +466,16 @@ geckodriver), then:
 | Command | What it checks |
 |---|---|
 | `.verify/venv/bin/python .verify/smoke.py` | every page loads, styles resolve, each game starts and pays for one answer, the shop and cards and token flows work |
-| `.verify/venv/bin/python .verify/run-save-test.py` | 81 assertions over `save.js` — profiles, level rollover, buying, cards, import round-trip, corrupt save, storage-throws |
+| `.verify/venv/bin/python .verify/run-save-test.py` | 230 assertions over `save.js` and `log.js` — profiles, level rollover, buying, set gating, card rarity and pity as *statistics* over thousands of rolls, the trader's arithmetic, the map trails, the log's buffering and cap, import round-trip, corrupt saves, storage-throws |
 | `.verify/venv/bin/python .verify/tracks.py` | generates hundreds of problems per math track and re-derives every answer |
 | `.verify/venv/bin/python .verify/content.py` | the authoring rules above, across all three games |
 | `.verify/venv/bin/python .verify/playthrough.py` | plays every game to its win screen and checks the gold, cards, and progress that resulted |
 | `.verify/venv/bin/python .verify/shots.py` | screenshots every screen to `.verify/shots/` |
 
-Run `smoke.py` after any change. Run `content.py` after touching content and
-`tracks.py` after touching a generator.
+Run `smoke.py` after any change. Run `content.py` after touching content,
+prices, or card odds — it simulates the economy and the drop rates and fails
+if either drifts out of the intended range. Run `tracks.py` after touching a
+generator.
 
 **Two traps worth knowing about**, both already handled:
 
