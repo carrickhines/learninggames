@@ -127,6 +127,23 @@ try:
     time.sleep(0.6)
     shot("hub-settings")
 
+    # the collection, part-caught
+    load("index.html")
+    d.execute_script("""
+        ['m-slime','m-bat','m-dragon','l-imp','l-ghost','s-troll','s-ghost','m-crab']
+            .forEach(function (id) { Save.awardCard(id); });
+        Save.update(function (p) { p.cards['m-slime'] = 4; p.cards['l-imp'] = 2; });
+        document.getElementById('cardsBtn').click();
+    """)
+    time.sleep(0.6)
+    shot("hub-cards")
+
+    # the card-drop moment
+    load("math/index.html")
+    d.execute_script("Hud.cardDrop({emoji:'🐉', name:'The Big Dragon'}, 'new');")
+    time.sleep(0.5)
+    shot("math-card-drop")
+
     # the shop, mid-progression: some gear owned and worn, some out of reach
     load("index.html")
     d.execute_script("""

@@ -192,6 +192,24 @@ try:
     check("shop: the gold was spent", d.execute_script("return Save.me().gold;") == 1000 - 80)
     check("shop: no JS errors", errs() == [], str(errs()))
 
+    print("\nCollection")
+    click("#shopBackBtn")
+    click("#cardsBtn")
+    time.sleep(0.5)
+    total = d.execute_script("return Save.allCards().length;")
+    check("cards: every card has a slot",
+          len(d.find_elements(By.CSS_SELECTOR, ".mcard")) == total, "%d slots" % total)
+    check("cards: uncaught monsters are locked",
+          len(d.find_elements(By.CSS_SELECTOR, ".mcard.locked")) == total)
+    check("cards: the count reads zero", text("#cardCount") == "0 of %d" % total)
+    d.execute_script("Save.awardCard('m-slime'); Save.awardCard('m-slime'); renderCards();")
+    time.sleep(0.3)
+    check("cards: a caught monster unlocks its slot",
+          len(d.find_elements(By.CSS_SELECTOR, ".mcard.locked")) == total - 1)
+    check("cards: the caught count went up", text("#cardCount") == "1 of %d" % total)
+    check("cards: no JS errors", errs() == [], str(errs()))
+    click("#cardsBackBtn")
+
     print("\nMath RPG")
     battle_smoke("math/index.html", "mul", "normal", "math/mul")
     # the armor bought above must actually be worn in the fight

@@ -1118,6 +1118,9 @@ function questComplete() {
   Save.recordQuestDone(state.questIdx);
   Save.recordRunWon('story');
   const bonus = Save.awardEvent('questDone');
+  // each quest has its own character card, in QUESTS order
+  const card = Save.STORY_CARDS[state.questIdx];
+  const drop = card && Save.awardCard(card.id);
   Sound.victory();
   const total = quest().scenes.filter(s => s.chest).length;
   $('winText').textContent =
@@ -1126,6 +1129,7 @@ function questComplete() {
   Reward.offer(state.earnedMins);
   showScreen('win');
   Hud.applied(bonus);
+  if (drop) later(() => Hud.cardDrop(card, drop), 1400);
 }
 
 function questFailed() {

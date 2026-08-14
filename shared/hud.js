@@ -50,6 +50,10 @@ var Hud = (function () {
       'box-shadow:0 10px 0 var(--accent-2),0 20px 40px rgba(0,0,0,.5);animation:luPop .5s ease}',
       '.levelup .big{font-size:52px;line-height:1}',
       '.levelup .small{font-size:19px;margin-top:4px}',
+      '.levelup .cardget{padding:18px 34px}',
+      '.levelup .cardget .mon{font-size:70px;line-height:1;filter:drop-shadow(0 6px 8px rgba(0,0,0,.35))}',
+      '.levelup .cardget .small{font-size:16px;letter-spacing:2px;text-transform:uppercase;opacity:.85}',
+      '.levelup .cardget .big2{font-size:28px;line-height:1.1}',
       '@keyframes luPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}'
     ].join('');
     document.head.appendChild(s);
@@ -92,6 +96,21 @@ var Hud = (function () {
     setTimeout(function () { f.remove(); }, 1100);
   }
 
+  /* "You caught a card!" — the drop moment. `how` is 'new' or 'dupe'. */
+  function cardDrop(card, how) {
+    if (!card || !how) return;
+    Sound.cardGet();
+    var box = document.createElement('div');
+    box.className = 'levelup';
+    box.innerHTML = '<div class="card cardget">' +
+      '<div class="mon">' + card.emoji + '</div>' +
+      '<div class="small">' + (how === 'new' ? 'NEW CARD!' : 'Another one!') + '</div>' +
+      '<div class="big2"></div></div>';
+    box.querySelector('.big2').textContent = card.name;
+    document.getElementById('app').appendChild(box);
+    setTimeout(function () { box.remove(); }, 1800);
+  }
+
   /* A full-screen "LEVEL 4!" moment. Brief, and it blocks nothing. */
   function levelUp(level) {
     render();
@@ -118,6 +137,7 @@ var Hud = (function () {
     render: render,
     gained: gained,
     levelUp: levelUp,
+    cardDrop: cardDrop,
     applied: applied
   };
 })();

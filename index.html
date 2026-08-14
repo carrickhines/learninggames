@@ -185,6 +185,45 @@
   .shop-item.broke { opacity: .5; }
   .shop-item.broke .price { color: rgba(255,255,255,.55); }
 
+  /* ---------- Monster cards ---------- */
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 11px;
+    max-width: 660px;
+    margin: 0 auto;
+  }
+  .mcard {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px;
+    padding: 10px 6px 8px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.3);
+    position: relative;
+  }
+  .mcard .mon { font-size: 40px; line-height: 1.1; filter: drop-shadow(0 4px 5px rgba(0,0,0,.4)); }
+  .mcard .nm {
+    font-family: var(--display);
+    font-size: 13px;
+    margin-top: 4px;
+    line-height: 1.15;
+  }
+  .mcard .dupe {
+    position: absolute;
+    top: -7px; right: -7px;
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 13px;
+    border-radius: 999px;
+    padding: 3px 8px;
+    box-shadow: 0 3px 0 var(--accent-2);
+  }
+  /* not caught yet: a silhouette, so the shape of the goal is visible */
+  .mcard.locked { opacity: .45; }
+  .mcard.locked .mon { filter: brightness(0) saturate(0) opacity(.55); }
+  .mcard.locked .nm { color: rgba(255,255,255,.5); }
+
   /* ---------- Settings ---------- */
   .setting-note {
     font-size: 14px;
@@ -279,7 +318,23 @@
 
       <div class="btn-row" style="margin-top:22px">
         <button id="shopBtn">🛒 Shop</button>
+        <button id="cardsBtn">🃏 Cards</button>
         <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COLLECTION ================= -->
+  <section class="screen scrolls" id="cards">
+    <div class="screen-inner">
+      <h1>Monster Cards</h1>
+      <div class="purse-big" id="cardCount">0 of 0</div>
+      <div class="subtitle">Beat a monster and it might leave its card behind.</div>
+
+      <div id="cardShelves"></div>
+
+      <div class="btn-row back-row">
+        <button id="cardsBackBtn" class="ghost-btn">Back</button>
       </div>
     </div>
   </section>
@@ -573,6 +628,49 @@ $('shopBtn').addEventListener('click', () => {
   showScreen('shop');
 });
 $('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
+
+/* ---------- Monster cards ---------- */
+function renderCards() {
+  const all = Save.allCards();
+  const caught = all.filter(c => c.count > 0).length;
+  $('cardCount').textContent = `${caught} of ${all.length}`;
+
+  // group by where they came from, in the order allCards() lists them
+  const shelves = $('cardShelves');
+  shelves.innerHTML = '';
+  const order = [];
+  const byPlace = {};
+  all.forEach(c => {
+    if (!byPlace[c.from]) { byPlace[c.from] = []; order.push(c.from); }
+    byPlace[c.from].push(c);
+  });
+
+  order.forEach(place => {
+    const heading = document.createElement('div');
+    heading.className = 'group-label';
+    heading.textContent = place;
+    shelves.appendChild(heading);
+
+    const grid = document.createElement('div');
+    grid.className = 'shelf';
+    byPlace[place].forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'mcard' + (c.count ? '' : ' locked');
+      d.innerHTML = `<div class="mon">${c.emoji}</div><div class="nm"></div>` +
+        (c.count > 1 ? `<div class="dupe">×${c.count}</div>` : '');
+      d.querySelector('.nm').textContent = c.count ? c.name : '???';
+      grid.appendChild(d);
+    });
+    shelves.appendChild(grid);
+  });
+}
+
+$('cardsBtn').addEventListener('click', () => {
+  Sound.click();
+  renderCards();
+  showScreen('cards');
+});
+$('cardsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 
 $('settingsBtn').addEventListener('click', () => { Sound.click(); flash(''); showScreen('settings'); });
 $('settingsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
