@@ -144,6 +144,14 @@ try:
     time.sleep(0.5)
     shot("math-card-drop")
 
+    # redeeming an iPad Time Token, in each of its three states
+    load("index.html")
+    d.execute_script("Save.award(200,0); Save.buy('ipad'); renderHome();")
+    time.sleep(0.3)
+    d.execute_script("document.getElementById('redeemBtn').click();")
+    time.sleep(0.5)
+    reward_states("hub-token")
+
     # the shop, mid-progression: some gear owned and worn, some out of reach
     load("index.html")
     d.execute_script("""
@@ -196,16 +204,18 @@ try:
     time.sleep(2.0)
     shot("math-battle-sub-taken")
 
-    # end screens
+    # end screen: what the run paid
     d.execute_script("""
         document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
         document.getElementById('endScreen').classList.add('show');
         document.getElementById('endEmoji').textContent='🏆';
         document.getElementById('endTitle').textContent='Victory!';
         document.getElementById('endText').textContent="You defeated every monster. You're a math hero!";
+        TEST.state.goldAtStart = Save.me().gold - 68;
+        TEST.showEarnings();
     """)
-    time.sleep(1.2)
-    reward_states("math-win")
+    time.sleep(0.6)
+    shot("math-win")
 
     # ---------- Language RPG ----------
     load("language/index.html")
@@ -218,9 +228,11 @@ try:
     d.execute_script("""
         document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
         document.getElementById('win').classList.add('show');
+        TEST.state.goldAtStart = Save.me().gold - 74;
+        TEST.showEarnings();
     """)
-    time.sleep(1.0)
-    reward_states("lang-win")
+    time.sleep(0.6)
+    shot("lang-win")
 
     # ---------- Story Quest ----------
     load("story/index.html")
@@ -233,8 +245,10 @@ try:
         document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
         document.getElementById('win').classList.add('show');
         document.getElementById('winText').textContent='You finished The Troll Bridge with 5 of 6 gems!';
+        TEST.state.goldAtStart = Save.me().gold - 52;
+        TEST.showEarnings();
     """)
-    time.sleep(1.0)
-    reward_states("story-win")
+    time.sleep(0.6)
+    shot("story-win")
 finally:
     d.quit()

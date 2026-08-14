@@ -168,8 +168,8 @@
     <h1>Quest Complete!</h1>
     <div class="subtitle" id="winText">You finished the quest!</div>
 
-    <!-- shared/reward.js renders and drives this panel. -->
-    <div id="reward" class="reward"></div>
+    <!-- What this quest paid. iPad time is bought in the hub shop now. -->
+    <div id="earned" class="reward"></div>
 
     <button id="winAgainBtn" class="ghost-btn">Back to quests</button>
   </section>
@@ -191,7 +191,6 @@
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
 <script src="../shared/hud.js"></script>
-<script src="../shared/reward.js"></script>
 <script>
 'use strict';
 
@@ -884,10 +883,9 @@ const state = {
   order: [],        // this scene's shuffled choice order
   tried: new Set(), // wrong choices already tried this scene
   busy: false,
-  earnedMins: 0,
+  goldAtStart: 0,     // so the win screen can show what this quest paid
 };
 
-Reward.mount($('reward'));
 // The hero chip, and the gate: no hero picked means back to the hub.
 Hud.mount({ home: '../index.html' });
 
@@ -942,8 +940,8 @@ renderMute();
    Quest flow
    ================================================================== */
 function startQuest() {
-  Reward.clear();
   state.sceneIdx = 0;
+  state.goldAtStart = (Save.me() || { gold: 0 }).gold;
   state.hearts = MAX_HEARTS;
   state.gems = 0;
   state.busy = false;
@@ -1125,11 +1123,22 @@ function questComplete() {
   const total = quest().scenes.filter(s => s.chest).length;
   $('winText').textContent =
     `You finished ${quest().title} with ${state.gems} of ${total} gems!`;
-  state.earnedMins = rand(5, 10);
-  Reward.offer(state.earnedMins);
+  showEarnings();
   showScreen('win');
   Hud.applied(bonus);
   if (drop) later(() => Hud.cardDrop(card, drop), 1400);
+}
+
+// What this quest put in the purse. Gold is the reward now — iPad time is
+// bought with it back at the hub.
+function showEarnings() {
+  const now = (Save.me() || { gold: 0 }).gold;
+  const won = Math.max(0, now - state.goldAtStart);
+  $('earned').innerHTML =
+    '<div class="reward-line">\u{1FA99} You earned <b></b> gold on this quest!</div>' +
+    '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +
+    'new worlds, and iPad game time.</div>';
+  $('earned').querySelector('b').textContent = won;
 }
 
 function questFailed() {
@@ -1137,10 +1146,10 @@ function questFailed() {
   showScreen('lose');
 }
 
-$('winAgainBtn').addEventListener('click', () => { Sound.click(); Reward.clear(); showScreen('menu'); });
+$('winAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 // Test seam: .verify/ scripts drive the real game and need to know which
 // choice is the right one. Costs nothing in play.
-window.TEST = { state, scene, quest, QUESTS, startQuest };
+window.TEST = { state, scene, quest, QUESTS, startQuest, showEarnings };
 
 $('retryBtn').addEventListener('click', () => { Sound.click(); startQuest(); });
 $('loseMenuBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });

@@ -93,7 +93,7 @@ def earns_smoke(label, *steps):
 
 
 def reward_smoke(label):
-    """shared/reward.js: offer -> start -> countdown ticks -> ring -> alarm."""
+    """shared/reward.js: offer -> start -> countdown ticks -> cancel."""
     d.execute_script("Reward.offer(8);")
     check(label + ": reward offers the earned minutes",
           d.execute_script("return document.querySelector('.r-mins').textContent") == "8")
@@ -209,6 +209,28 @@ try:
     check("cards: the caught count went up", text("#cardCount") == "1 of %d" % total)
     check("cards: no JS errors", errs() == [], str(errs()))
     click("#cardsBackBtn")
+    time.sleep(0.5)
+
+    print("\niPad time token")
+    check("hub: no redeem button without a token",
+          not d.find_element(By.ID, "redeemBtn").is_displayed())
+    bought = d.execute_script("return [Save.buy('ipad'), Save.me().gold, Save.me().inventory.tokens];")
+    d.execute_script("renderHome();")
+    time.sleep(0.3)
+    check("hub: buying a token reveals the redeem button",
+          d.find_element(By.ID, "redeemBtn").is_displayed(), str(bought))
+    click("#redeemBtn")
+    time.sleep(0.5)
+    check("token: redeeming opens the countdown screen", d.execute_script(
+        "return document.getElementById('redeem').classList.contains('show');"))
+    check("token: the token was spent", d.execute_script("return Save.me().inventory.tokens;") == 0)
+    mins = int(d.execute_script("return document.querySelector('.r-mins').textContent"))
+    check("token: the reward rolls 5-10 minutes", 5 <= mins <= 10, str(mins))
+    reward_smoke("token")
+    click("#redeemBackBtn")
+    time.sleep(0.4)
+    check("token: leaving the screen stops the timer", d.execute_script(
+        "return document.getElementById('home').classList.contains('show');"))
 
     print("\nMath RPG")
     battle_smoke("math/index.html", "mul", "normal", "math/mul")
@@ -228,7 +250,6 @@ try:
             String(parseInt(p[0], 10) + parseInt(p[1], 10));
         document.getElementById('attackBtn').click();
     """)
-    reward_smoke("math")
 
     print("\nLanguage RPG")
     battle_smoke("language/index.html", "letters", "easy", "lang/letters")
@@ -254,7 +275,6 @@ try:
             if (cards[i].textContent === fix) { cards[i].click(); break; }
         }
         """)
-    reward_smoke("lang")
 
     print("\nStory Quest")
     load("story/index.html")
@@ -275,7 +295,6 @@ try:
             if (cards[i].textContent === ok.t) { cards[i].click(); break; }
         }
     """)
-    reward_smoke("story")
 finally:
     d.quit()
 

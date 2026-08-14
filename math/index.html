@@ -307,8 +307,8 @@
     <h1 id="endTitle">Victory!</h1>
     <div class="subtitle" id="endText">You defeated the monster!</div>
 
-    <!-- Win-only reward. shared/reward.js renders and drives this panel. -->
-    <div id="reward" class="reward hidden"></div>
+    <!-- What this run paid. iPad time is bought in the hub shop now. -->
+    <div id="earned" class="reward"></div>
 
     <button id="playAgainBtn">Play Again</button>
   </section>
@@ -318,7 +318,6 @@
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
 <script src="../shared/hud.js"></script>
-<script src="../shared/reward.js"></script>
 <script>
 (() => {
   "use strict";
@@ -369,8 +368,8 @@
     timerId: null,
     timerStart: 0,
     busy: false,
-    shield: 0,          // one free hit, if a pet is equipped
-    earnedMins: 0,
+    shield: 0,           // one free hit, if a pet is equipped
+    goldAtStart: 0,      // so the win screen can show what this run paid
   };
 
   // ---------- Element refs ----------
@@ -390,10 +389,8 @@
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
     endEmoji: $("endEmoji"), endTitle: $("endTitle"), endText: $("endText"),
     playAgainBtn: $("playAgainBtn"), muteBtn: $("muteBtn"),
-    reward: $("reward"),
+    earned: $("earned"),
   };
-
-  Reward.mount(el.reward);
   // The hero chip, and the gate: no hero picked means back to the hub.
   Hud.mount({ home: "../index.html" });
 
@@ -924,7 +921,6 @@
   function startGame() {
     Sound.unlock();
     Sound.click();
-    Reward.clear();
     FOES = Save.foesFor("math");
     GEAR = Save.loadout();
     renderPet();
@@ -932,6 +928,7 @@
     state.shield = GEAR.shield;
     state.foeIndex = 0;
     state.busy = false;
+    state.goldAtStart = (Save.me() || { gold: 0 }).gold;
     el.foeSprite.style.transform = "scaleX(-1) scale(1)";
     el.foeSprite.style.opacity = "1";
     setupFoe();
@@ -948,9 +945,7 @@
     el.endEmoji.textContent = "🏆";
     el.endTitle.textContent = "Victory!";
     el.endText.textContent = "You defeated every monster. You're a math hero!";
-    // earned iPad game time: a fun, variable 5–10 minute reward
-    state.earnedMins = rand(5, 10);
-    Reward.offer(state.earnedMins);
+    showEarnings();
     Sound.win();
     showScreen("endScreen");
     Hud.applied(bonus);
@@ -958,12 +953,24 @@
 
   function gameOver() {
     stopTimer();
-    Reward.hide();                       // no reward time for a loss
+    showEarnings();
     el.endEmoji.textContent = "💀";
     el.endTitle.textContent = "Game Over";
-    el.endText.textContent = "The monster got you! Want to try again?";
+    el.endText.textContent = "The monster got you! You still keep your gold.";
     Sound.lose();
     showScreen("endScreen");
+  }
+
+  // What this run put in the purse. Gold is the reward now — iPad time is
+  // bought with it back at the hub.
+  function showEarnings() {
+    const now = (Save.me() || { gold: 0 }).gold;
+    const won = Math.max(0, now - state.goldAtStart);
+    el.earned.innerHTML =
+      '<div class="reward-line">\ud83e\ude99 You earned <b></b> gold this battle!</div>' +
+      '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +
+      'new worlds, and iPad game time.</div>';
+    el.earned.querySelector("b").textContent = won;
   }
 
   // ---------- Answer entry (on-screen pad + physical keyboard) ----------
@@ -983,7 +990,7 @@
 
   // ---------- Events ----------
   el.startBtn.addEventListener("click", startGame);
-  el.playAgainBtn.addEventListener("click", () => { Sound.click(); Reward.clear(); showScreen("menu"); });
+  el.playAgainBtn.addEventListener("click", () => { Sound.click(); showScreen("menu"); });
   el.attackBtn.addEventListener("click", playerAttack);
   el.keypad.addEventListener("click", (e) => {
     const b = e.target.closest("button.key");
@@ -1008,7 +1015,7 @@
 
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.
-  window.TEST = { state, FOES, MODES, newProblem, playerAttack };
+  window.TEST = { state, FOES, MODES, newProblem, playerAttack, showEarnings };
 })();
 </script>
 </body>

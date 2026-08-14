@@ -319,7 +319,23 @@
       <div class="btn-row" style="margin-top:22px">
         <button id="shopBtn">🛒 Shop</button>
         <button id="cardsBtn">🃏 Cards</button>
+        <button id="redeemBtn" style="display:none">🎟️ iPad time</button>
         <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= REDEEM A TOKEN ================= -->
+  <section class="screen scrolls" id="redeem">
+    <div class="screen-inner">
+      <div class="end-emoji">🎟️</div>
+      <h1>iPad Time!</h1>
+
+      <!-- shared/reward.js renders and drives this panel. -->
+      <div id="reward" class="reward"></div>
+
+      <div class="btn-row back-row">
+        <button id="redeemBackBtn" class="ghost-btn">Back</button>
       </div>
     </div>
   </section>
@@ -389,6 +405,7 @@
 
 <script src="shared/sound.js"></script>
 <script src="shared/save.js"></script>
+<script src="shared/reward.js"></script>
 <script>
 'use strict';
 
@@ -509,7 +526,34 @@ function renderHome() {
   $('hcLevel').textContent = `Level ${lv.level} · ${lv.into} / ${lv.need} XP`;
   $('hcXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
   $('hcGold').textContent = '🪙 ' + me.gold;
+  // the redeem button only exists when there's a token to spend
+  const tokens = me.inventory.tokens;
+  $('redeemBtn').style.display = tokens > 0 ? '' : 'none';
+  $('redeemBtn').textContent = tokens > 1 ? `🎟️ iPad time (${tokens})` : '🎟️ iPad time';
 }
+
+/* ---------- Redeeming an iPad Time Token ----------
+   Beating a run used to hand out iPad time automatically. Now it's bought
+   with gold in the shop and spent here, so it's earned across sessions
+   rather than reset every night. */
+Reward.mount($('reward'));
+
+$('redeemBtn').addEventListener('click', () => {
+  Sound.unlock();
+  if (!Save.useToken()) { Sound.denied(); return; }
+  Sound.buy();
+  Reward.offer(rand(5, 10));
+  renderHome();
+  showScreen('redeem');
+});
+
+$('redeemBackBtn').addEventListener('click', () => {
+  Sound.click();
+  Reward.clear();
+  goHome();
+});
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
 function goHome() {
   renderHome();

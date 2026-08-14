@@ -340,8 +340,8 @@
     <h1>Victory!</h1>
     <div class="subtitle">You beat every monster!</div>
 
-    <!-- shared/reward.js renders and drives this panel. -->
-    <div id="reward" class="reward"></div>
+    <!-- What this run paid. iPad time is bought in the hub shop now. -->
+    <div id="earned" class="reward"></div>
 
     <button id="winAgainBtn" class="ghost-btn">Play Again</button>
   </section>
@@ -363,7 +363,6 @@
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
 <script src="../shared/hud.js"></script>
-<script src="../shared/reward.js"></script>
 <script>
 'use strict';
 
@@ -1204,10 +1203,9 @@ const state = {
   answered: false,         // lock input while resolving
   timerId: null, timeLeft: 0, inFastZone: false,
   draw: null,              // deck function for current track
-  earnedMins: 0,
+  goldAtStart: 0,          // so the win screen can show what this run paid
 };
 
-Reward.mount($('reward'));
 // The hero chip, and the gate: no hero picked means back to the hub.
 Hud.mount({ home: '../index.html' });
 
@@ -1284,13 +1282,13 @@ renderMute();
    Game flow
    ================================================================== */
 function startGame() {
-  Reward.clear();
   state.foeIdx = 0;
   FOES = Save.foesFor('language');
   GEAR = Save.loadout();
   renderPet();
   state.playerHp = GEAR.maxHp;
   state.shield = GEAR.shield;
+  state.goldAtStart = (Save.me() || { gold: 0 }).gold;
   state.draw = makeDeck(
     state.track === 'letters' ? LETTERS :
     state.track === 'sight'   ? SIGHT   :
@@ -2005,10 +2003,21 @@ function winGame() {
   const bonus = Save.awardEvent('runWon');
   Sound.victory();
   Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
-  state.earnedMins = rand(5, 10);
-  Reward.offer(state.earnedMins);
+  showEarnings();
   showScreen('win');
   Hud.applied(bonus);
+}
+
+// What this run put in the purse. Gold is the reward now — iPad time is
+// bought with it back at the hub.
+function showEarnings() {
+  const now = (Save.me() || { gold: 0 }).gold;
+  const won = Math.max(0, now - state.goldAtStart);
+  $('earned').innerHTML =
+    '<div class="reward-line">\u{1FA99} You earned <b></b> gold this battle!</div>' +
+    '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +
+    'new worlds, and iPad game time.</div>';
+  $('earned').querySelector('b').textContent = won;
 }
 
 function gameOver() {
@@ -2018,12 +2027,12 @@ function gameOver() {
   showScreen('lose');
 }
 
-$('winAgainBtn').addEventListener('click', () => { Sound.click(); Reward.clear(); showScreen('menu'); });
+$('winAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 
 // Test seam: .verify/ scripts drive the real game and need to read the
 // current question and run state. Costs nothing in play.
-window.TEST = { state, FOES, MODES, newQuestion };
+window.TEST = { state, FOES, MODES, newQuestion, showEarnings };
 
 $('sayBtn').addEventListener('click', () => {
   Sound.unlock();
