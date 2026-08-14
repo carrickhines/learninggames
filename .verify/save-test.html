@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>save.js tests</title>
+<style>
+  body { font-family: ui-monospace, Menlo, Consolas, monospace; background: #12091f; color: #eee;
+         padding: 24px; line-height: 1.6; }
+  .pass { color: #5ce8a0; }
+  .fail { color: #ff5e7e; font-weight: bold; }
+  h1 { font-size: 20px; }
+  #summary { margin-top: 18px; font-size: 18px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>shared/save.js</h1>
+<div id="out"></div>
+<div id="summary"></div>
+
+<script src="../shared/save.js"></script>
+<script>
+/* Assertions over the save layer. Open this file in a browser, or drive it
+   headlessly and read window.RESULT / #summary. It clobbers the real save, so
+   it stashes and restores whatever was there. */
+'use strict';
+
+var stash = localStorage.getItem(Save._key);
+var pass = 0, fail = 0;
+
+function ok(label, cond, detail) {
+  var d = document.createElement('div');
+  d.className = cond ? 'pass' : 'fail';
+  d.textContent = (cond ? 'PASS  ' : 'FAIL  ') + label + (cond || !detail ? '' : '   -- ' + detail);
+  document.getElementById('out').appendChild(d);
+  cond ? pass++ : fail++;
+}
+
+function fresh() {
+  Save.reset();
+  return Save.createProfile('Tester', '🦖');
+}
+
+try {
+  /* ---------- profiles ---------- */
+  Save.reset();
+  ok('no active profile on a blank save', Save.me() === null);
+  ok('blank save lists no profiles', Save.profiles().length === 0);
+
+  var a = Save.createProfile('Alpha', '🦊');
+  ok('creating a profile makes it active', Save.me() !== null && Save.me().name === 'Alpha');
+  var b = Save.createProfile('Beta', '🐯');
+  ok('second profile becomes active', Save.me().name === 'Beta');
+  ok('both profiles are listed', Save.profiles().length === 2);
+
+  Save.setActive(a);
+  ok('switching back to the first profile works', Save.me().name === 'Alpha');
+  ok('switching to a bogus id is refused', Save.setActive('nope') === false);
+
+  Save.renameProfile(a, 'Alpha2', '🐸');
+  ok('renaming works', Save.me().name === 'Alpha2' && Save.me().avatar === '🐸');
+
+  Save.deleteProfile(b);
+  ok('deleting a profile removes it', Save.profiles().length === 1);
+
+  /* Profiles must not share state — the whole point of per-kid saves. */
+  fresh();
+  var p1 = Save.createProfile('Kid1', '🦸');
+  Save.award(50, 50);
+  var p2 = Save.createProfile('Kid2', '🦹');
+  ok("a new profile starts at zero gold", Save.me().gold === 0);
+  Save.setActive(p1);
+  ok("the other profile kept its gold", Save.me().gold === 50);
+
+  /* ---------- levels ---------- */
+  fresh();
+  ok('a new hero is level 1 with 0 xp', Save.levelOf(Save.me()).level === 1);
+  ok('level 1 needs 100 xp', Save.levelOf(Save.me()).need === 100);
+
+  var r = Save.award(0, 99);
+  ok('99 xp is still level 1', Save.levelOf(Save.me()).level === 1);
+  ok('no level-up reported below the threshold', r.leveledTo === null);
+
+  r = Save.award(0, 1);
+  ok('100 xp reaches level 2', Save.levelOf(Save.me()).level === 2);
+  ok('the level-up is reported', r.leveledTo === 2);
+  ok('level 2 costs more than level 1', Save.levelOf(Save.me()).need === 150);
+  ok('progress into the level resets', Save.levelOf(Save.me()).into === 0);
+
+  Save.award(0, 149);
+  ok('249 xp is still level 2', Save.levelOf(Save.me()).level === 2);
+  Save.award(0, 1);
+  ok('250 xp reaches level 3', Save.levelOf(Save.me()).level === 3);
+
+  /* A single huge award must skip through the levels correctly. */
+  fresh();
+  r = Save.award(0, 100 + 150 + 200);
+  ok('one big award lands on the right level', Save.levelOf(Save.me()).level === 4, 'got ' + Save.levelOf(Save.me()).level);
+  ok('the multi-level jump is reported', r.leveledTo === 4);
+
+  /* ---------- earning ---------- */
+  fresh();
+  Save.awardEvent('correct');
+  ok('a correct answer pays the table rate',
+     Save.me().gold === Save.ECONOMY.correct.gold && Save.me().xp === Save.ECONOMY.correct.xp);
+  Save.awardEvent('nosuchevent');
+  ok('an unknown event pays nothing', Save.me().gold === Save.ECONOMY.correct.gold);
+
+  fresh();
+  Save.recordAnswer(true); Save.recordAnswer(true); Save.recordAnswer(false);
+  ok('correct answers are counted', Save.me().stats.correct === 2);
+  ok('wrong answers are counted', Save.me().stats.wrong === 1);
+  ok('a wrong answer breaks the streak', Save.me().stats.streak === 0);
+  ok('the best streak is remembered', Save.me().stats.bestStreak === 2);
+
+  /* ---------- shop ---------- */
+  fresh();
+  ok('a new hero starts with the stick and tunic',
+     Save.owns('stick') && Save.owns('tunic'));
+  ok('buying with no gold is refused', Save.buy('sword') === 'broke');
+  ok('the refused purchase cost nothing', Save.me().gold === 0);
+
+  Save.award(1000, 0);
+  ok('buying with enough gold works', Save.buy('sword') === 'ok');
+  ok('the gold was actually spent', Save.me().gold === 1000 - Save.item('sword').cost);
+  ok('the item is owned', Save.owns('sword'));
+  ok('buying it twice is refused', Save.buy('sword') === 'owned');
+  ok('a purchased weapon is equipped', Save.me().inventory.weapon === 'sword');
+  ok('buying something that does not exist is refused', Save.buy('unicorn-cannon') === 'nosuch');
+
+  Save.buy('vest');
+  ok('armor raises max hearts', Save.loadout().maxHp === 6);
+  Save.buy('chick');
+  ok('a pet adds thinking time', Save.loadout().bonusTime === 2000);
+  ok('a pet shows up in the arena', Save.loadout().pet === '🐣');
+  Save.buy('flame');
+  ok('the flame blade upgrades double hits', Save.loadout().superDamage === 3);
+
+  Save.equip('sword');
+  ok('equipping an owned weapon works', Save.me().inventory.weapon === 'sword');
+  ok('equipping an unowned item is refused', Save.equip('axe') === false);
+
+  /* ---------- worlds ---------- */
+  fresh();
+  Save.award(1000, 0);
+  ok('only the meadow is unlocked at first', Save.me().progress.unlockedWorlds.length === 1);
+  ok('a locked world cannot be selected', Save.setWorld('cave') === false);
+  Save.buy('world-cave');
+  ok('buying a world unlocks it', Save.me().progress.unlockedWorlds.indexOf('cave') !== -1);
+  ok('an unlocked world can be selected', Save.setWorld('cave') === true);
+  ok('the foe lineup follows the world', Save.foesFor('math')[0].id === 'm-crab');
+  ok('math fights four monsters', Save.foesFor('math').length === 4);
+  ok('language fights five', Save.foesFor('language').length === 5);
+
+  /* ---------- tokens ---------- */
+  fresh();
+  ok('no tokens to start', Save.useToken() === false);
+  Save.award(1000, 0);
+  Save.buy('ipad');
+  ok('a token can be bought', Save.me().inventory.tokens === 1);
+  ok('tokens can be bought more than once', Save.buy('ipad') === 'ok');
+  ok('two tokens are held', Save.me().inventory.tokens === 2);
+  ok('spending a token works', Save.useToken() === true);
+  ok('the token was consumed', Save.me().inventory.tokens === 1);
+
+  /* ---------- cards ---------- */
+  fresh();
+  ok('the first catch always drops a card', Save.awardCard('m-slime') === 'new');
+  ok('the card is held once', Save.me().cards['m-slime'] === 1);
+  var got = 0;
+  for (var i = 0; i < 200; i++) if (Save.awardCard('m-slime')) got++;
+  ok('duplicates drop sometimes but not always', got > 40 && got < 160, 'got ' + got + '/200');
+  ok('duplicates stack', Save.me().cards['m-slime'] === 1 + got);
+  ok('awarding no card id is a no-op', Save.awardCard(null) === null);
+
+  var cards = Save.allCards();
+  ok('every world+story card is listed',
+     cards.length === Save.WORLDS.length * 9 + Save.STORY_CARDS.length,
+     'got ' + cards.length);
+  var ids = cards.map(function (c) { return c.id; });
+  ok('card ids are unique across the site', new Set(ids).size === ids.length);
+  ok('held counts come through', cards.filter(function (c) { return c.id === 'm-slime'; })[0].count > 1);
+  ok('uncaught monsters read zero', cards.filter(function (c) { return c.id === 'l-titan'; })[0].count === 0);
+
+  /* ---------- progress bookkeeping ---------- */
+  fresh();
+  Save.recordRunWon('math');
+  Save.recordRunWon('math');
+  ok('run wins accumulate', Save.me().progress.runsWon.math === 2);
+  Save.recordQuestDone(3);
+  Save.recordQuestDone(3);
+  ok('a finished quest is only recorded once', Save.me().progress.questsDone.length === 1);
+  Save.remember('math', 'mul', 'expert');
+  ok('the last track is remembered', Save.me().settings.lastTrack.math === 'mul');
+  ok('the mode is remembered per game', Save.me().settings.modeByGame.math === 'expert');
+
+  /* ---------- persistence across a reload ---------- */
+  fresh();
+  Save.award(77, 33);
+  var raw = localStorage.getItem(Save._key);
+  ok('the save is actually written to localStorage', !!raw && raw.indexOf('77') !== -1);
+  var reparsed = JSON.parse(raw);
+  ok('the written blob holds the gold',
+     reparsed.profiles[reparsed.active].gold === 77);
+
+  /* ---------- corrupt storage ---------- */
+  localStorage.setItem(Save._key, 'this is not json{{{');
+  var recovered = JSON.parse(JSON.stringify(
+    (function () { Save.reset(); return { p: Save.profiles().length }; })()));
+  ok('a corrupt save recovers instead of throwing', recovered.p === 0);
+
+  /* ---------- storage disabled ---------- */
+  var realSet = localStorage.setItem;
+  localStorage.setItem = function () { throw new Error('QuotaExceededError'); };
+  var threw = false;
+  try {
+    Save.reset();
+    Save.createProfile('NoStorage', '🤖');
+    Save.award(5, 5);
+    Save.buy('sword');
+  } catch (e) {
+    threw = true;
+  }
+  localStorage.setItem = realSet;
+  ok('a full or disabled localStorage never throws', !threw);
+
+  /* ---------- import ---------- */
+  Save.reset();
+  var payload = JSON.stringify({
+    v: 1, active: 'x',
+    profiles: { x: { name: 'Restored', avatar: '🐙', xp: 300, gold: 42,
+      inventory: { owned: ['stick'], weapon: 'stick', armor: 'tunic', pet: null, tokens: 0 },
+      cards: {}, progress: { world: 'meadow', unlockedWorlds: ['meadow'], runsWon: {}, questsDone: [], seqTier: 1 },
+      settings: { modeByGame: {}, lastTrack: {} },
+      stats: { correct: 0, wrong: 0, streak: 0, bestStreak: 0 } } }
+  });
+  Save.importFile(new File([payload], 'p.json', { type: 'application/json' }), function (good, msg) {
+    ok('importing a good file succeeds', good === true, msg);
+    ok('the imported hero is active', Save.me() && Save.me().name === 'Restored');
+    ok('the imported gold came through', Save.me().gold === 42);
+
+    Save.importFile(new File(['not json at all'], 'bad.json'), function (good2, msg2) {
+      ok('importing junk is rejected', good2 === false);
+      ok('the rejection explains itself', /progress file/.test(msg2), msg2);
+
+      Save.importFile(new File(['{"hello":"world"}'], 'wrong.json'), function (good3, msg3) {
+        ok('importing valid JSON with no profiles is rejected', good3 === false);
+        ok('that rejection explains itself too', /hero/.test(msg3), msg3);
+        finish();
+      });
+    });
+  });
+} catch (e) {
+  ok('tests ran without throwing', false, e && e.message);
+  finish();
+}
+
+function finish() {
+  try {
+    if (stash === null) localStorage.removeItem(Save._key);
+    else localStorage.setItem(Save._key, stash);
+  } catch (e) { /* nothing to restore into */ }
+  var s = document.getElementById('summary');
+  s.className = fail ? 'fail' : 'pass';
+  s.textContent = fail ? (fail + ' FAILED, ' + pass + ' passed')
+                       : ('All ' + pass + ' checks passed.');
+  window.RESULT = { pass: pass, fail: fail };
+}
+</script>
+</body>
+</html>

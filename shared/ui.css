@@ -220,6 +220,7 @@ button.choice.sel .sub { opacity: .85; }
   align-items: center;
   gap: 16px;
   margin-bottom: 8px;
+  padding-left: 172px;   /* clear the top-left hero chip (shared/hud.js) */
   padding-right: 66px;   /* clear the top-right mute button (~58px wide) */
   flex-shrink: 0;
 }

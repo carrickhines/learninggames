@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Learning Games">
+<title>Learning Games</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  /* The hub only. Frame, buttons, and the reward panel come from shared/. */
+
+  h1 { font-size: clamp(38px, 7.5vw, 64px); }
+
+  /* ---------- The hero card ---------- */
+  .hero-card {
+    display: flex;
+    align-items: center;
+    color: #fff;              /* the base button rule paints text dark-on-gold */
+    gap: 16px;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 20px;
+    padding: 12px 18px;
+    box-shadow: 0 5px 0 rgba(0,0,0,.3), 0 10px 24px rgba(0,0,0,.3);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    text-align: left;
+    max-width: 460px;
+    width: 100%;
+    transition: transform .08s, filter .15s;
+  }
+  .hero-card:hover { filter: brightness(1.1); }
+  .hero-card:active { transform: translateY(3px); }
+  .hero-card .face { font-size: 46px; line-height: 1; flex-shrink: 0; }
+  .hero-card .who { flex: 1; min-width: 0; }
+  /* the card's rows are spans (it's a <button>), so they need to be blocks */
+  .hero-card .who .nm, .hero-card .who .lv, .hero-card .xp-track { display: block; }
+  .hero-card .who .nm {
+    font-family: var(--display);
+    font-size: 21px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hero-card .who .lv { font-size: 13px; color: rgba(255,255,255,.7); margin-bottom: 5px; }
+  .hero-card .purse {
+    font-family: var(--display);
+    font-size: 21px;
+    color: var(--gold);
+    flex-shrink: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,.5);
+  }
+  .hero-card .swap { font-size: 20px; opacity: .5; flex-shrink: 0; }
+
+  .xp-track {
+    display: block;
+    height: 9px;
+    border-radius: 6px;
+    background: rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .xp-track .fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--xp), #c4b5fd);
+    border-radius: 6px;
+    transition: width .4s ease;
+  }
+
+  /* ---------- Game cards ---------- */
+  .games { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+  .game-card {
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 18px 16px 16px;
+    width: 210px;
+    font-size: 21px;
+    text-decoration: none;
+    display: block;
+  }
+  .game-card .emoji {
+    font-size: 54px;
+    display: block;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));
+  }
+  .game-card .sub {
+    font-family: var(--body);
+    font-size: 13px;
+    opacity: .72;
+    font-weight: normal;
+    display: block;
+    margin-top: 5px;
+    text-wrap: balance;
+  }
+  .game-card .who-for {
+    font-family: var(--body);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    opacity: .8;
+    display: block;
+    margin-top: 8px;
+  }
+
+  /* ---------- Profile picker ---------- */
+  .heroes { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .hero-pick { min-width: 150px; }
+  .hero-pick .emoji { font-size: 46px; }
+  .hero-pick .sub { margin-top: 5px; }
+
+  .avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    max-width: 420px;
+    margin: 0 auto 18px;
+  }
+  .avatar-opt {
+    font-size: 32px;
+    padding: 8px 0;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 2px solid rgba(255,255,255,.10);
+    box-shadow: none;
+    color: #fff;
+  }
+  .avatar-opt.sel {
+    border-color: var(--accent);
+    background: rgba(255,210,63,.22);
+    box-shadow: 0 0 0 3px rgba(255,210,63,.25);
+  }
+
+  #nameInput {
+    font-family: var(--display);
+    font-size: 26px;
+    text-align: center;
+    padding: 12px 18px;
+    width: min(340px, 80vw);
+    border-radius: 16px;
+    border: 3px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.3);
+    color: #fff;
+    outline: none;
+    margin-bottom: 18px;
+  }
+  #nameInput:focus { border-color: var(--accent); }
+
+  /* ---------- Settings ---------- */
+  .setting-note {
+    font-size: 14px;
+    color: rgba(255,255,255,.62);
+    max-width: 46ch;
+    text-wrap: balance;
+    margin: -4px auto 14px;
+  }
+  .danger-btn { background: linear-gradient(180deg, #ff8fa3, var(--bad)); box-shadow: 0 5px 0 #c23a55; color: #fff; }
+  #importFile { display: none; }
+  .flash {
+    min-height: 1.4em;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--good);
+    margin-top: 10px;
+  }
+  .flash.bad { color: var(--bad); }
+
+  .back-row { margin-top: 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- ================= WHO'S PLAYING ================= -->
+  <section class="screen show scrolls" id="who">
+    <div class="screen-inner">
+      <h1>Learning Games</h1>
+      <div class="subtitle">Who's playing?</div>
+
+      <div class="heroes" id="heroList"></div>
+
+      <div class="btn-row" style="margin-top:22px">
+        <button id="newHeroBtn">➕ New hero</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= NEW HERO ================= -->
+  <section class="screen scrolls" id="newHero">
+    <div class="screen-inner">
+      <h1>New Hero</h1>
+      <div class="subtitle">Pick a name and a face.</div>
+
+      <input id="nameInput" type="text" maxlength="12" placeholder="Your name"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+
+      <div class="avatar-grid" id="avatarGrid"></div>
+
+      <div class="btn-row">
+        <button id="createBtn">Start adventuring!</button>
+        <button id="cancelNewBtn" class="ghost-btn">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOME ================= -->
+  <section class="screen scrolls" id="home">
+    <div class="screen-inner">
+      <button class="hero-card" id="heroCard">
+        <span class="face" id="hcFace">🦸</span>
+        <span class="who">
+          <span class="nm" id="hcName">Hero</span>
+          <span class="lv" id="hcLevel">Level 1</span>
+          <span class="xp-track"><span class="fill" id="hcXp" style="width:0%"></span></span>
+        </span>
+        <span class="purse" id="hcGold">🪙 0</span>
+        <span class="swap">🔄</span>
+      </button>
+
+      <div class="group-label">Choose your adventure</div>
+      <div class="games">
+        <a class="game-card" href="math/index.html">
+          <span class="emoji">🔢</span>Math RPG
+          <span class="sub">Counting, adding, times tables, and algebra</span>
+          <span class="who-for">7 tracks</span>
+        </a>
+        <a class="game-card" href="language/index.html">
+          <span class="emoji">🔤</span>Language RPG
+          <span class="sub">Letters, spelling, grammar, and word play</span>
+          <span class="who-for">12 tracks</span>
+        </a>
+        <a class="game-card" href="story/index.html">
+          <span class="emoji">📖</span>Story Quest
+          <span class="sub">Read carefully — the story tells you what to do</span>
+          <span class="who-for">8 quests</span>
+        </a>
+      </div>
+
+      <div class="btn-row" style="margin-top:22px">
+        <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="screen scrolls" id="settings">
+    <div class="screen-inner">
+      <h1>Settings</h1>
+
+      <div class="group-label">Keep your progress safe</div>
+      <div class="setting-note">Progress lives in this browser. Clearing website data
+        erases it, so save a copy somewhere safe now and then.</div>
+      <div class="btn-row">
+        <button id="exportBtn">⬇️ Save progress to a file</button>
+        <button id="importBtn" class="ghost-btn">⬆️ Restore from a file</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json">
+
+      <div class="group-label">This hero</div>
+      <div class="btn-row">
+        <button id="renameBtn" class="ghost-btn">✏️ Rename</button>
+        <button id="deleteBtn" class="ghost-btn danger-btn">🗑️ Delete hero</button>
+      </div>
+
+      <div class="flash" id="flash"></div>
+
+      <div class="btn-row back-row">
+        <button id="settingsBackBtn" class="ghost-btn">Back</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="shared/sound.js"></script>
+<script src="shared/save.js"></script>
+<script>
+'use strict';
+
+/* ==================================================================
+   The hub: pick a hero, see what they've earned, launch a game.
+   ================================================================== */
+
+const $ = (id) => document.getElementById(id);
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+  $(id).classList.add('show');
+}
+
+/* ---------- Mute ---------- */
+function renderMute() {
+  $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
+  $('muteBtn').classList.toggle('muted', Sound.muted);
+}
+$('muteBtn').addEventListener('click', () => {
+  Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
+  renderMute();
+});
+renderMute();
+
+/* ---------- Who's playing ---------- */
+function renderHeroList() {
+  const list = $('heroList');
+  list.innerHTML = '';
+  const heroes = Save.profiles();
+  heroes.forEach(h => {
+    const b = document.createElement('button');
+    b.className = 'choice hero-pick';
+    b.innerHTML = `<span class="emoji">${h.avatar}</span>${escapeHtml(h.name)}` +
+      `<span class="sub">Level ${h.level} · 🪙 ${h.gold}</span>`;
+    b.addEventListener('click', () => {
+      Sound.unlock(); Sound.click();
+      Save.setActive(h.id);
+      goHome();
+    });
+    list.appendChild(b);
+  });
+  $('who').querySelector('.subtitle').textContent =
+    heroes.length ? "Who's playing?" : 'Make a hero to get started!';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* ---------- New hero ---------- */
+let pickedAvatar = Save.AVATARS[0];
+let renaming = false;      // the same screen doubles as the rename screen
+
+function renderAvatars() {
+  const g = $('avatarGrid');
+  g.innerHTML = '';
+  Save.AVATARS.forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'avatar-opt' + (a === pickedAvatar ? ' sel' : '');
+    b.textContent = a;
+    b.addEventListener('click', () => {
+      Sound.unlock(); Sound.tap();
+      pickedAvatar = a;
+      renderAvatars();
+    });
+    g.appendChild(b);
+  });
+}
+
+function openNewHero(forRename) {
+  renaming = !!forRename;
+  const me = Save.me();
+  pickedAvatar = renaming && me ? me.avatar : Save.AVATARS[0];
+  $('nameInput').value = renaming && me ? me.name : '';
+  $('newHero').querySelector('h1').textContent = renaming ? 'Rename Hero' : 'New Hero';
+  $('createBtn').textContent = renaming ? 'Save' : 'Start adventuring!';
+  renderAvatars();
+  showScreen('newHero');
+  $('nameInput').focus();
+}
+
+$('newHeroBtn').addEventListener('click', () => {
+  Sound.unlock(); Sound.click();
+  openNewHero(false);
+});
+
+$('createBtn').addEventListener('click', () => {
+  const name = ($('nameInput').value || '').trim() || 'Hero';
+  Sound.unlock(); Sound.click();
+  if (renaming) {
+    Save.renameProfile(Save.load().active, name, pickedAvatar);
+  } else {
+    Save.createProfile(name, pickedAvatar);
+  }
+  goHome();
+});
+
+$('nameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('createBtn').click();
+});
+
+$('cancelNewBtn').addEventListener('click', () => {
+  Sound.click();
+  if (renaming) showScreen('settings');
+  else if (Save.me()) goHome();
+  else { renderHeroList(); showScreen('who'); }
+});
+
+/* ---------- Home ---------- */
+function renderHome() {
+  const me = Save.me();
+  if (!me) { renderHeroList(); showScreen('who'); return; }
+  const lv = Save.levelOf(me);
+  $('hcFace').textContent = me.avatar;
+  $('hcName').textContent = me.name;
+  $('hcLevel').textContent = `Level ${lv.level} · ${lv.into} / ${lv.need} XP`;
+  $('hcXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
+  $('hcGold').textContent = '🪙 ' + me.gold;
+}
+
+function goHome() {
+  renderHome();
+  showScreen('home');
+}
+
+$('heroCard').addEventListener('click', () => {
+  Sound.click();
+  renderHeroList();
+  showScreen('who');
+});
+
+$('settingsBtn').addEventListener('click', () => { Sound.click(); flash(''); showScreen('settings'); });
+$('settingsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
+
+/* ---------- Settings ---------- */
+function flash(msg, bad) {
+  const f = $('flash');
+  f.textContent = msg;
+  f.classList.toggle('bad', !!bad);
+}
+
+$('exportBtn').addEventListener('click', () => {
+  Sound.click();
+  Save.exportFile();
+  flash('Saved! Keep that file somewhere safe.');
+});
+
+$('importBtn').addEventListener('click', () => { Sound.click(); $('importFile').click(); });
+
+$('importFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  Save.importFile(file, (ok, msg) => {
+    flash(msg, !ok);
+    if (ok) { Sound.levelUp(); renderHeroList(); renderHome(); }
+    else Sound.denied();
+  });
+  e.target.value = '';     // let the same file be picked again
+});
+
+$('renameBtn').addEventListener('click', () => { Sound.click(); openNewHero(true); });
+
+$('deleteBtn').addEventListener('click', () => {
+  const me = Save.me();
+  if (!me) return;
+  Sound.click();
+  if (!confirm(`Delete ${me.name} and all their progress? This can't be undone.`)) return;
+  Save.deleteProfile(Save.load().active);
+  renderHeroList();
+  if (Save.me()) goHome(); else showScreen('who');
+});
+
+/* ---------- Boot ---------- */
+Save.load();
+if (Save.me()) goHome();
+else { renderHeroList(); showScreen('who'); }
+</script>
+</body>
+</html>

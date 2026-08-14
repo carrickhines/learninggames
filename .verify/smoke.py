@@ -92,6 +92,7 @@ def battle_smoke(relpath, track, mode, label):
     """Menu -> pick track -> pick mode -> start -> a question is on screen."""
     load(relpath)
     check(label + ": styles resolved", styles_resolved())
+    check(label + ": the hero chip is up", exists(".hud"))
     check(label + ": menu visible", exists("#menu"))
     click('[data-track="%s"]' % track)
     click('[data-mode="%s"]' % mode)
@@ -108,6 +109,28 @@ def battle_smoke(relpath, track, mode, label):
 
 
 try:
+    print("\nHub")
+    load("index.html")
+    check("hub: styles resolved", styles_resolved())
+    # start from a clean slate, then make a hero the way a parent would
+    d.execute_script("Save.reset(); location.reload();")
+    time.sleep(1.0)
+    check("hub: a blank save asks who's playing", d.execute_script(
+        "return document.getElementById('who').classList.contains('show');"))
+    click("#newHeroBtn")
+    d.find_element(By.ID, "nameInput").send_keys("Tester")
+    d.find_elements(By.CSS_SELECTOR, ".avatar-opt")[3].click()
+    click("#createBtn")
+    time.sleep(0.6)
+    check("hub: creating a hero lands on home", d.execute_script(
+        "return document.getElementById('home').classList.contains('show');"))
+    check("hub: the hero card shows the name", text("#hcName") == "Tester")
+    check("hub: the hero starts at level 1", "Level 1" in text("#hcLevel"))
+    check("hub: the hero starts broke", text("#hcGold") == "🪙 0")
+    check("hub: all three games are linked",
+          len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 3)
+    check("hub: no JS errors", errs() == [], str(errs()))
+
     print("\nMath RPG")
     battle_smoke("math/index.html", "mul", "normal", "math/mul")
     battle_smoke("math/index.html", "add", "easy", "math/add")

@@ -88,9 +88,32 @@ def reward_states(prefix):
 
 try:
     # ---------- Hub ----------
-    if os.path.exists(os.path.join(ROOT, "index.html")):
-        load("index.html")
-        shot("hub")
+    # Seed a hero with some progress so the cards, bars, and prices all have
+    # something to show.
+    load("index.html")
+    d.execute_script("""
+        Save.reset();
+        Save.createProfile('Rex', '🦖');
+        Save.award(280, 170);
+        Save.awardCard('m-slime'); Save.awardCard('m-bat'); Save.awardCard('l-imp');
+        Save.awardCard('s-troll');
+        location.reload();
+    """)
+    time.sleep(1.0)
+    shot("hub-home")
+
+    d.execute_script("document.getElementById('heroCard').click();")
+    time.sleep(0.6)
+    shot("hub-who")
+
+    d.execute_script("document.getElementById('newHeroBtn').click();")
+    time.sleep(0.6)
+    shot("hub-new-hero")
+
+    load("index.html")
+    d.execute_script("document.getElementById('settingsBtn').click();")
+    time.sleep(0.6)
+    shot("hub-settings")
 
     # ---------- Math RPG ----------
     load("math/index.html")

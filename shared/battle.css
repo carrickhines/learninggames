@@ -8,6 +8,11 @@
    ========================================================================== */
 
 .fighter-info { flex: 1; max-width: 320px; }
+/* The hero chip (shared/hud.js) already names the player in the top-left
+   corner, so the player half of the topbar is just the hearts, sitting on the
+   chip's line. The foe still needs its name. */
+.fighter-info.player .name { display: none; }
+.fighter-info.player .pips { min-height: 46px; align-items: center; }
 .fighter-info .name {
   font-family: var(--display);
   font-size: 18px;

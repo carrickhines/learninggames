@@ -315,6 +315,8 @@
 </div>
 
 <script src="../shared/sound.js"></script>
+<script src="../shared/save.js"></script>
+<script src="../shared/hud.js"></script>
 <script src="../shared/reward.js"></script>
 <script>
 (() => {
@@ -392,6 +394,8 @@
   };
 
   Reward.mount(el.reward);
+  // The hero chip, and the gate: no hero picked means back to the hub.
+  Hud.mount({ home: "../index.html" });
 
   // reflect saved mute preference on the toggle
   function renderMute() {
