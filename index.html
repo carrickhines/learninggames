@@ -227,6 +227,55 @@
   .mcard.locked .mon { filter: brightness(0) saturate(0) opacity(.55); }
   .mcard.locked .nm { color: rgba(255,255,255,.5); }
 
+  /* rarity, on both the collection grid and the trader's cards */
+  .mcard.r2, .shop-item.r2 { border-color: rgba(125,211,252,.55); }
+  .mcard.r3, .shop-item.r3 { border-color: rgba(192,132,252,.65); }
+  .mcard.r2 .nm { color: #bfe4ff; }
+  .mcard.r3 .nm { color: #e9c9ff; }
+  .mcard.locked.r2, .mcard.locked.r3 { border-color: rgba(255,255,255,.12); }
+  .mcard.locked .nm { color: rgba(255,255,255,.5); }
+
+  /* a shiny sweeps a highlight across the card */
+  .mcard.foil, .shop-item.foil { overflow: hidden; position: relative; }
+  .mcard.foil::after, .shop-item.foil::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.5) 50%, transparent 70%);
+    animation: foilSweep 2.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes foilSweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+  /* ---------- Set progress ---------- */
+  .setrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 640px;
+    margin: 0 auto 7px;
+    font-size: 13px;
+    color: rgba(255,255,255,.8);
+  }
+  .setrow .wemoji { font-size: 20px; }
+  .setrow .wname { font-family: var(--display); min-width: 8.5em; text-align: left; }
+  .setrow .wbar {
+    flex: 1;
+    height: 8px;
+    border-radius: 5px;
+    background: rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .setrow .wfill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--xp), #c4b5fd);
+  }
+  .setrow .wcount { font-family: var(--display); min-width: 3.4em; }
+  .setrow .wperk { min-width: 11em; text-align: left; opacity: .65; }
+  .setrow.done .wfill { background: linear-gradient(90deg, #8affc4, var(--good)); }
+  .setrow.done .wperk { color: var(--good); opacity: 1; font-weight: bold; }
+
   /* ---------- Settings ---------- */
   .setting-note {
     font-size: 14px;
@@ -328,6 +377,32 @@
     </div>
   </section>
 
+  <!-- ================= CARD TRADER ================= -->
+  <section class="screen scrolls" id="trader">
+    <div class="screen-inner">
+      <h1>Card Trader</h1>
+      <div class="purse-big" id="traderPurse">🪙 0</div>
+      <div class="subtitle">Spare cards are worth something. Swap them for gold —
+        or trade a pile for one you're still missing.</div>
+
+      <div class="group-label">Trade for a card you're missing</div>
+      <div class="setting-note" id="wildNote"></div>
+      <div class="rack" id="wildRow"></div>
+
+      <div class="group-label">Your spares</div>
+      <div class="rack" id="spareRow"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button id="sellAllBtn">Sell every spare</button>
+      </div>
+
+      <div class="flash" id="traderFlash"></div>
+
+      <div class="btn-row back-row">
+        <button id="traderBackBtn" class="ghost-btn">Back</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= REDEEM A TOKEN ================= -->
   <section class="screen scrolls" id="redeem">
     <div class="screen-inner">
@@ -350,9 +425,11 @@
       <div class="purse-big" id="cardCount">0 of 0</div>
       <div class="subtitle">Beat a monster and it might leave its card behind.</div>
 
+      <div id="setStrip"></div>
       <div id="cardShelves"></div>
 
       <div class="btn-row back-row">
+        <button id="traderBtn">🔁 Card Trader</button>
         <button id="cardsBackBtn" class="ghost-btn">Back</button>
       </div>
     </div>
@@ -698,6 +775,7 @@ function renderCards() {
   const all = Save.allCards();
   const caught = all.filter(c => c.count > 0).length;
   $('cardCount').textContent = `${caught} of ${all.length}`;
+  renderSetStrip();
 
   // group by where they came from, in the order allCards() lists them
   const shelves = $('cardShelves');
@@ -719,15 +797,134 @@ function renderCards() {
     grid.className = 'shelf';
     byPlace[place].forEach(c => {
       const d = document.createElement('div');
-      d.className = 'mcard' + (c.count ? '' : ' locked');
+      d.className = 'mcard r' + c.r + (c.count ? '' : ' locked') +
+        (c.foil ? ' foil' : '');
       d.innerHTML = `<div class="mon">${c.emoji}</div><div class="nm"></div>` +
         (c.count > 1 ? `<div class="dupe">×${c.count}</div>` : '');
       d.querySelector('.nm').textContent = c.count ? c.name : '???';
+      d.title = c.count
+        ? `${c.name} — ${RARITY_NAME[c.r]}${c.foil ? ', shiny!' : ''}`
+        : 'Not caught yet';
       grid.appendChild(d);
     });
     shelves.appendChild(grid);
   });
 }
+
+const RARITY_NAME = { 1: 'common', 2: 'rare', 3: 'legendary' };
+
+/* What each world's set is worth, and how close it is. Finishing one is the
+   only way to the top tier of a gear slot, so this is the goal made visible. */
+function renderSetStrip() {
+  const strip = $('setStrip');
+  strip.innerHTML = '';
+  Save.setProgress().forEach(sp => {
+    const d = document.createElement('div');
+    d.className = 'setrow' + (sp.done ? ' done' : '');
+    d.innerHTML =
+      `<span class="wemoji">${sp.emoji}</span>` +
+      `<span class="wname"></span>` +
+      `<span class="wbar"><span class="wfill" style="width:${(sp.got / sp.total) * 100}%"></span></span>` +
+      `<span class="wcount">${sp.got}/${sp.total}</span>` +
+      `<span class="wperk">${sp.done ? '✓ ' + sp.perk : sp.perk}</span>`;
+    d.querySelector('.wname').textContent = sp.name;
+    strip.appendChild(d);
+  });
+}
+
+/* ---------- Card Trader ---------- */
+function renderTrader() {
+  const me = Save.me();
+  if (!me) return;
+  $('traderPurse').textContent = '🪙 ' + me.gold;
+
+  const spare = Save.spareCount();
+  const cost = Save.ECONOMY.wildCardCost;
+  $('wildNote').textContent = spare >= cost
+    ? `You have ${spare} spare cards. Any one below costs ${cost}.`
+    : `You have ${spare} spare cards — ${cost} trades for any card you're missing.`;
+
+  // offer a handful of missing cards rather than all fifty
+  const wild = $('wildRow');
+  wild.innerHTML = '';
+  const missing = Save.missingCards().slice(0, 8);
+  if (!missing.length) {
+    wild.innerHTML = '<div class="setting-note">You have every card. Every single one.</div>';
+  }
+  missing.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'choice shop-item r' + c.r + (spare < cost ? ' broke' : '');
+    b.innerHTML = `<span class="emoji">${c.emoji}</span><span class="nm"></span>` +
+      `<span class="sub">${c.from}</span>` +
+      `<span class="price">🃏 ${cost} spares</span>`;
+    b.querySelector('.nm').textContent = c.name;
+    b.addEventListener('click', () => {
+      Sound.unlock();
+      const r = Save.tradeForCard(c.id);
+      if (r === 'ok') {
+        Sound.cardGet();
+        traderFlash(`${c.name} is yours!`);
+      } else if (r === 'short') {
+        Sound.denied();
+        traderFlash(`Not enough spares — ${cost - Save.spareCount()} to go.`, true);
+      } else {
+        Sound.denied();
+        traderFlash("Can't trade for that one.", true);
+      }
+      renderTrader();
+      renderHome();
+    });
+    wild.appendChild(b);
+  });
+
+  const row = $('spareRow');
+  row.innerHTML = '';
+  const spares = Save.spareList();
+  if (!spares.length) {
+    row.innerHTML = '<div class="setting-note">No spares yet. Beat a monster you have already collected.</div>';
+  }
+  spares.forEach(r => {
+    const b = document.createElement('button');
+    b.className = 'choice shop-item r' + r.card.r + (r.foil ? ' foil' : '');
+    b.innerHTML = `<span class="emoji">${r.card.emoji}</span><span class="nm"></span>` +
+      `<span class="sub">${r.spare} spare${r.spare > 1 ? 's' : ''}` +
+      `${r.foil ? ` · ${r.foil} shiny ✨` : ''}</span>` +
+      `<span class="price">Sell for 🪙 ${r.gold}</span>`;
+    b.querySelector('.nm').textContent = r.card.name;
+    b.addEventListener('click', () => {
+      Sound.unlock();
+      const paid = Save.sellSpares(r.id);
+      Sound.buy();
+      traderFlash(`Sold for ${paid} gold!`);
+      renderTrader();
+      renderHome();
+    });
+    row.appendChild(b);
+  });
+  $('sellAllBtn').disabled = !spares.length;
+}
+
+function traderFlash(msg, bad) {
+  const f = $('traderFlash');
+  f.textContent = msg;
+  f.classList.toggle('bad', !!bad);
+}
+
+$('traderBtn').addEventListener('click', () => {
+  Sound.click();
+  traderFlash('');
+  renderTrader();
+  showScreen('trader');
+});
+$('traderBackBtn').addEventListener('click', () => { Sound.click(); renderCards(); showScreen('cards'); });
+$('sellAllBtn').addEventListener('click', () => {
+  const paid = Save.sellAllSpares();
+  if (!paid) { Sound.denied(); return; }
+  Sound.buy();
+  traderFlash(`Sold every spare for ${paid} gold!`);
+  renderTrader();
+  renderHome();
+});
 
 $('cardsBtn').addEventListener('click', () => {
   Sound.click();

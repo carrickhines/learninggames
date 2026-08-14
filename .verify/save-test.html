@@ -267,15 +267,142 @@ try {
   ok('spending a token works', Save.useToken() === true);
   ok('the token was consumed', Save.me().inventory.tokens === 1);
 
-  /* ---------- cards ---------- */
+  /* ---------- cards: rarity, pity, foils ---------- */
   fresh();
-  ok('the first catch always drops a card', Save.awardCard('m-slime') === 'new');
-  ok('the card is held once', Save.me().cards['m-slime'] === 1);
-  var got = 0;
-  for (var i = 0; i < 200; i++) if (Save.awardCard('m-slime')) got++;
-  ok('duplicates drop sometimes but not always', got > 40 && got < 160, 'got ' + got + '/200');
-  ok('duplicates stack', Save.me().cards['m-slime'] === 1 + got);
   ok('awarding no card id is a no-op', Save.awardCard(null) === null);
+  ok('a forced award always drops', !!Save.awardCard('m-slime', true));
+  ok('the card is held once', Save.held('m-slime') === 1);
+
+  /* Drop rate. Every roll here is against the same common monster, and the
+     pity counter is reset each time so it can't skew the measurement — this
+     is the natural rate on its own. */
+  function measureRate(cardId, rolls) {
+    var hits = 0;
+    for (var i = 0; i < rolls; i++) {
+      Save.update(function (p) { p.progress.koSinceCard = 0; });
+      if (Save.awardCard(cardId)) hits++;
+    }
+    return hits / rolls;
+  }
+
+  fresh();
+  var N = 4000;
+  var common = measureRate('m-slime', N);      // rarity 1
+  var want = Save.ECONOMY.cardChance;
+  ok('a common card drops near its configured rate',
+     Math.abs(common - want) < 0.03, 'got ' + common.toFixed(3) + ', want ' + want);
+
+  fresh();
+  var legend = measureRate('m-dragon', N);     // rarity 3
+  var wantL = Save.ECONOMY.cardChance * Save.ECONOMY.cardRarityOdds[3];
+  ok('a legendary drops far less often',
+     Math.abs(legend - wantL) < 0.02, 'got ' + legend.toFixed(3) + ', want ' + wantL);
+  ok('legendaries are rarer than commons', legend < common / 2);
+
+  /* Cards must be RARE — the whole point of the change. At the configured
+     rate a run of four monsters should usually pay nothing. */
+  ok('most monsters drop nothing', common < 0.25, 'rate ' + common.toFixed(3));
+
+  /* The pity counter is the floor: go this many monsters with no drop and the
+     next one is certain. */
+  fresh();
+  var pityAt = Save.ECONOMY.cardPity;
+  Save.update(function (p) { p.progress.koSinceCard = pityAt - 1; });
+  ok('the pity counter forces a drop', !!Save.awardCard('m-dragon'));
+  ok('a drop resets the pity counter', Save.me().progress.koSinceCard === 0);
+
+  fresh();
+  var longest = 0, since = 0;
+  for (var i = 0; i < 2000; i++) {
+    if (Save.awardCard('m-dragon')) { since = 0; } else { since++; longest = Math.max(longest, since); }
+  }
+  ok('no drought ever runs past the pity limit',
+     longest < pityAt, 'longest drought ' + longest + ', limit ' + pityAt);
+
+  /* Foils */
+  fresh();
+  var foils = 0, drops = 0;
+  for (var i = 0; i < 3000; i++) {
+    var d2 = Save.awardCard('m-slime', true);
+    drops++;
+    if (d2.foil) foils++;
+  }
+  var foilRate = foils / drops;
+  ok('foils land near their configured rate',
+     Math.abs(foilRate - Save.ECONOMY.foilChance) < 0.025,
+     'got ' + foilRate.toFixed(3) + ', want ' + Save.ECONOMY.foilChance);
+  ok('foils are counted separately from plain copies',
+     Save.foilsOf('m-slime') === foils && Save.held('m-slime') === drops);
+
+  ok('a repeat is reported as a duplicate',
+     Save.awardCard('m-slime', true).how === 'dupe');
+  fresh();
+  ok('a first catch is reported as new',
+     Save.awardCard('m-bat', true).how === 'new');
+
+  /* ---------- the trader ---------- */
+  fresh();
+  ok('nothing to sell with a single copy', Save.spares('m-slime') === 0);
+  for (var i = 0; i < 4; i++) Save.awardCard('m-slime', true);
+  ok('everything past the first copy is spare', Save.spares('m-slime') === 3);
+
+  var goldBefore = Save.me().gold;
+  var paid = Save.sellSpares('m-slime');
+  ok('selling spares pays gold', paid > 0);
+  ok('the gold arrived', Save.me().gold === goldBefore + paid);
+  ok('one copy is always kept', Save.held('m-slime') === 1);
+  ok('selling again pays nothing', Save.sellSpares('m-slime') === 0);
+
+  // rarity sets the price
+  ok('a legendary spare is worth more than a common',
+     Save.spareValue('m-dragon') > Save.spareValue('m-slime'));
+
+  // a foil is worth more, and is spent last
+  fresh();
+  Save.update(function (p) { p.cards['m-slime'] = 3; p.foils['m-slime'] = 1; });
+  var withFoil = Save.spareList()[0].gold;
+  fresh();
+  Save.update(function (p) { p.cards['m-slime'] = 3; });
+  var without = Save.spareList()[0].gold;
+  ok('a foil spare is worth more than a plain one', withFoil > without,
+     withFoil + ' vs ' + without);
+
+  /* Trading a pile of spares for a card you're missing — the guarantee that a
+     collection can always be finished by playing, not only by luck. */
+  fresh();
+  ok('trading with no spares is refused', Save.tradeForCard('m-dragon') === 'short');
+  ok('the refusal left the card uncollected', Save.held('m-dragon') === 0);
+
+  var cost = Save.ECONOMY.wildCardCost;
+  Save.update(function (p) { p.cards['m-slime'] = cost + 1; });
+  ok('enough spares are counted', Save.spareCount() >= cost);
+  ok('trading for a missing card works', Save.tradeForCard('m-dragon') === 'ok');
+  ok('the traded card is held', Save.held('m-dragon') === 1);
+  ok('the spares were spent', Save.spareCount() < cost);
+  ok('trading for one you already have is refused',
+     Save.tradeForCard('m-dragon') === 'have');
+  ok('trading for a card that does not exist is refused',
+     Save.tradeForCard('not-a-card') === 'nosuch');
+
+  ok('missing cards are listed', Save.missingCards().length > 0);
+  ok('a held card is not listed as missing',
+     Save.missingCards().every(function (c) { return c.id !== 'm-dragon'; }));
+
+  /* ---------- set perks ---------- */
+  fresh();
+  var baseHp = Save.loadout().maxHp;
+  var meadow = Save.world('meadow');
+  meadow.foes.math.concat(meadow.foes.language).forEach(function (f) {
+    Save.update(function (p) { p.cards[f.id] = 1; });
+  });
+  ok('finishing the meadow set is detected', Save.hasSet('meadow'));
+  ok('the meadow perk adds a heart', Save.loadout().maxHp === baseHp + 1);
+  ok('every world has a set perk',
+     Save.WORLDS.every(function (w) { return !!Save.SET_PERKS[w.id]; }));
+  ok('set progress reports the meadow as done',
+     Save.setProgress().filter(function (sp) { return sp.id === 'meadow'; })[0].done);
+  ok('set progress counts partial worlds',
+     Save.setProgress().filter(function (sp) { return sp.id === 'ember'; })[0].got === 0);
 
   var cards = Save.allCards();
   ok('every world+story card is listed',
@@ -283,8 +410,18 @@ try {
      'got ' + cards.length);
   var ids = cards.map(function (c) { return c.id; });
   ok('card ids are unique across the site', new Set(ids).size === ids.length);
-  ok('held counts come through', cards.filter(function (c) { return c.id === 'm-slime'; })[0].count > 1);
-  ok('uncaught monsters read zero', cards.filter(function (c) { return c.id === 'l-titan'; })[0].count === 0);
+  ok('every card carries its rarity',
+     cards.every(function (c) { return c.r >= 1 && c.r <= 3; }));
+
+  // this block stands on its own rather than inheriting an earlier test's cards
+  fresh();
+  Save.awardCard('m-slime', true);
+  Save.awardCard('m-slime', true);
+  cards = Save.allCards();
+  ok('held counts come through',
+     cards.filter(function (c) { return c.id === 'm-slime'; })[0].count === 2);
+  ok('uncaught monsters read zero',
+     cards.filter(function (c) { return c.id === 'l-titan'; })[0].count === 0);
 
   /* ---------- progress bookkeeping ---------- */
   fresh();

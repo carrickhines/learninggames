@@ -284,6 +284,39 @@ try:
     check("economy: something is affordable in the first day or two",
           first <= day * 2, "first weapon %d vs %d/day" % (first, day))
 
+    # ---- card rarity ----
+    # Expected drops per day of play, so a tweak to the odds can't quietly
+    # turn the collection back into something you finish in a week.
+    kos_per_day = 22                      # ~5 runs across the two battle games
+    rar = econ["cardRarityOdds"]
+    world_rarities = [f["r"] for w in worlds
+                      for g in ("math", "language") for f in w["foes"][g]]
+    avg = sum(econ["cardChance"] * rar[str(r)] for r in world_rarities) / len(world_rarities)
+    per_day = kos_per_day * avg
+    check("cards: a card is a rare event, not most fights",
+          econ["cardChance"] <= 0.2, "%.0f%% base" % (econ["cardChance"] * 100))
+    check("cards: a few a day at most, and at least one every other day",
+          0.4 <= per_day <= 3.5, "%.1f cards/day" % per_day)
+
+    # the pity counter must be a real floor without being the main source
+    pity_days = econ["cardPity"] / kos_per_day
+    check("cards: the pity counter guarantees one within a couple of days",
+          0.5 <= pity_days <= 3, "%.1f days" % pity_days)
+
+    check("cards: rarer tiers really are rarer",
+          rar["1"] > rar["2"] > rar["3"], str(rar))
+    check("cards: every world's last foe is legendary",
+          all(w["foes"][g][-1]["r"] == 3 for w in worlds for g in ("math", "language")))
+    check("cards: a foil is worth more than a plain copy", econ["foilWorth"] > 1)
+    check("cards: a legendary spare is worth more than a common",
+          econ["cardValue"]["3"] > econ["cardValue"]["1"])
+    check("cards: a wild-card trade costs a real pile of spares",
+          econ["wildCardCost"] >= 5, str(econ["wildCardCost"]))
+
+    perks = js("Save.SET_PERKS")
+    check("cards: every world's set is worth something",
+          all(w["id"] in perks and perks[w["id"]].get("label") for w in worlds))
+
     gated = [i for i in shop if i.get("set")]
     check("economy: the top tier of each slot is set-gated",
           sorted(i["kind"] for i in gated) == ["armor", "pet", "trinket", "weapon"],

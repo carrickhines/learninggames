@@ -1279,7 +1279,7 @@ function pickFinish(el, choice) {
 
 function miniComplete() {
   const card = state.mode === 'order' ? MINI_CARDS.order : MINI_CARDS.finish;
-  const drop = Save.awardCard(card.id);
+  const drop = Save.awardCard(card.id, true);   // a finished game always pays
   Save.recordRunWon('story');
   const bonus = Save.awardEvent('questDone');
   Sound.victory();
@@ -1288,7 +1288,7 @@ function miniComplete() {
   showEarnings();
   showScreen('win');
   Hud.applied(bonus);
-  if (drop) later(() => Hud.cardDrop(card, drop), 1400);
+  if (drop) later(() => Hud.cardDrop(drop), 1400);
 }
 
 const MINI_CARDS = {
@@ -1472,7 +1472,7 @@ function questComplete() {
   const bonus = Save.awardEvent('questDone');
   // each quest has its own character card, in QUESTS order
   const card = Save.STORY_CARDS[state.questIdx];
-  const drop = card && Save.awardCard(card.id);
+  const drop = card && Save.awardCard(card.id, true);   // a finished quest always pays
   Sound.victory();
   const total = quest().scenes.filter(s => s.chest).length;
   $('winText').textContent =
@@ -1480,7 +1480,7 @@ function questComplete() {
   showEarnings();
   showScreen('win');
   Hud.applied(bonus);
-  if (drop) later(() => Hud.cardDrop(card, drop), 1400);
+  if (drop) later(() => Hud.cardDrop(drop), 1400);
 }
 
 // What this quest put in the purse. Gold is the reward now — iPad time is

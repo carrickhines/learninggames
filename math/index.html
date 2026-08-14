@@ -1208,7 +1208,7 @@
     // the monster you just beat may leave its collectible card behind
     const foe = FOES[state.foeIndex];
     const drop = Save.awardCard(foe.id);
-    if (drop) setTimeout(() => Hud.cardDrop(foe, drop), 500);
+    if (drop) setTimeout(() => Hud.cardDrop(drop), 500);
     el.foeSprite.style.transition = "transform .6s, opacity .6s";
     el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
     el.foeSprite.style.opacity = "0";

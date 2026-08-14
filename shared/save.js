@@ -35,9 +35,24 @@ var Save = (function () {
     // Wrong answers cost nothing. Progress only ever goes up — the games are
     // already punishing enough with lost hearts.
 
-    // A monster's card always drops the first time you beat it; after that it
-    // drops this often, and duplicates stack.
-    dupCardChance: 0.5,
+    /* ---- Monster cards ----
+       Cards are rare on purpose: a collection you finish in a week isn't a
+       collection. A beaten monster rolls `cardChance`, scaled down for the
+       rarer ones, so a world's nine cards take weeks and its legendaries are
+       the ones you actually chase.
+
+       The pity counter is what keeps rare from meaning miserable: go
+       `cardPity` monsters with nothing to show and the next one drops for
+       certain. A floor you can feel, without capping the ceiling. */
+    cardChance: 0.12,
+    cardRarityOdds: { 1: 1, 2: 0.5, 3: 0.25 },   // common, rare, legendary
+    cardPity: 30,
+    foilChance: 0.05,        // any drop can come back shiny
+
+    // What the Card Trader pays for a spare, by rarity. A foil counts triple.
+    cardValue: { 1: 40, 2: 120, 3: 400 },
+    foilWorth: 3,
+    wildCardCost: 12,        // spare cards traded for one you're missing
 
     baseXpToLevel: 100,   // XP for level 1 -> 2
     xpStepPerLevel: 50    // each level costs this much more than the last
@@ -266,7 +281,8 @@ var Save = (function () {
         trinket: null,
         tokens: 0
       },
-      cards: {},                     // card id -> times caught
+      cards: {},                     // card id -> copies held (foils included)
+      foils: {},                     // card id -> how many of those are shiny
       progress: {
         world: 'meadow',
         unlockedWorlds: ['meadow'],
@@ -322,6 +338,7 @@ var Save = (function () {
         if (p.inventory.trinket === undefined) p.inventory.trinket = null;
         if (!p.progress) p.progress = {};
         if (p.progress.koSinceCard === undefined) p.progress.koSinceCard = 0;
+        if (!p.foils) p.foils = {};
       });
     }
 
@@ -483,49 +500,197 @@ var Save = (function () {
 
   /* ---------- Cards ------------------------------------------------------- */
 
-  /* Award a monster's card. Always drops the first time; after that it drops
-     `dupCardChance` of the time and stacks. Returns 'new', 'dupe', or null. */
-  function awardCard(cardId) {
+  /* Every card in the game, by id — foes across every world, plus the Story
+     Quest characters. Built once; the games look monsters up by id. */
+  var CARD_BY_ID = (function () {
+    var m = {};
+    WORLDS.forEach(function (w) {
+      ['math', 'language'].forEach(function (game) {
+        w.foes[game].forEach(function (f) {
+          m[f.id] = { id: f.id, name: f.name, emoji: f.emoji, r: f.r || 1,
+                      from: w.name, world: w.id, game: game };
+        });
+      });
+    });
+    STORY_CARDS.forEach(function (c) {
+      m[c.id] = { id: c.id, name: c.name, emoji: c.emoji, r: c.r || 2,
+                  from: 'Story Quest', world: null, game: 'story' };
+    });
+    return m;
+  })();
+
+  function card(id) { return CARD_BY_ID[id] || null; }
+
+  function held(id, p) {
+    p = p || me();
+    return (p && p.cards[id]) || 0;
+  }
+
+  function foilsOf(id, p) {
+    p = p || me();
+    return (p && p.foils && p.foils[id]) || 0;
+  }
+
+  /* Roll for a monster's card after beating it.
+
+     Returns null for no drop, or { id, how: 'new'|'dupe', foil, pity } so the
+     caller can make a moment of it. `pity` marks a drop the counter forced,
+     which is worth knowing when tuning.
+
+     A trinket's `cardBonus` multiplies the odds; the pity counter is shared
+     across all monsters, so a drought anywhere ends the same way.
+
+     `guaranteed` skips the roll. Story Quest uses it: finishing a twelve-scene
+     quest is a long commitment, and paying that with a dice roll that usually
+     says no would be miserable. Rarity is for monsters you can re-fight in a
+     minute. */
+  function awardCard(cardId, guaranteed) {
     var p = me();
     if (!p || !cardId) return null;
+    var c = card(cardId);
+    var odds = ECONOMY.cardChance *
+               (ECONOMY.cardRarityOdds[c ? c.r : 1] || 1) *
+               (1 + loadout().cardBonus);
+
+    var pity = (p.progress.koSinceCard || 0) + 1;
+    var forced = guaranteed || pity >= ECONOMY.cardPity;
+    if (!forced && Math.random() >= odds) {
+      p.progress.koSinceCard = pity;
+      write();
+      return null;
+    }
+
+    p.progress.koSinceCard = 0;
     var had = p.cards[cardId] || 0;
-    if (had === 0) {
-      p.cards[cardId] = 1;
-      write();
-      return 'new';
+    p.cards[cardId] = had + 1;
+
+    var foil = Math.random() < ECONOMY.foilChance;
+    if (foil) {
+      if (!p.foils) p.foils = {};
+      p.foils[cardId] = (p.foils[cardId] || 0) + 1;
     }
-    if (Math.random() < ECONOMY.dupCardChance) {
-      p.cards[cardId] = had + 1;
-      write();
-      return 'dupe';
-    }
-    return null;
+    write();
+    return { id: cardId, how: had === 0 ? 'new' : 'dupe', foil: foil,
+             pity: forced && !guaranteed };
+  }
+
+  /* ---------- The Card Trader ---------------------------------------------
+     Spares are the point of a rare drop you already own. They sell for gold
+     by rarity, and enough of them buy a card you're missing outright — so a
+     collection can always be finished by playing, never only by luck. */
+
+  /* How many copies of a card are spare (everything past the first). */
+  function spares(id, p) {
+    return Math.max(0, held(id, p) - 1);
+  }
+
+  /* Trade-in value of one spare, in gold. Foils are worth `foilWorth` times
+     as much, and are spent last. */
+  function spareValue(id, p) {
+    var c = card(id);
+    return ECONOMY.cardValue[c ? c.r : 1] || ECONOMY.cardValue[1];
+  }
+
+  /* Everything spare, as trader rows. */
+  function spareList() {
+    var p = me();
+    if (!p) return [];
+    return Object.keys(p.cards)
+      .filter(function (id) { return spares(id, p) > 0 && card(id); })
+      .map(function (id) {
+        var n = spares(id, p);
+        var f = Math.min(foilsOf(id, p), n);   // a foil is only spare if a copy is
+        return {
+          id: id, card: card(id), spare: n, foil: f,
+          gold: (n - f) * spareValue(id) + f * spareValue(id) * ECONOMY.foilWorth
+        };
+      })
+      .sort(function (a, b) { return b.gold - a.gold; });
+  }
+
+  /* Sell every spare copy of one card. Returns the gold paid. */
+  function sellSpares(id) {
+    var p = me();
+    if (!p) return 0;
+    var n = spares(id, p);
+    if (!n) return 0;
+    var f = Math.min(foilsOf(id, p), n);
+    var paid = (n - f) * spareValue(id) + f * spareValue(id) * ECONOMY.foilWorth;
+    p.cards[id] -= n;
+    if (f && p.foils) p.foils[id] -= f;
+    p.gold += paid;
+    write();
+    return paid;
+  }
+
+  function sellAllSpares() {
+    var rows = spareList();
+    var total = 0;
+    rows.forEach(function (r) { total += sellSpares(r.id); });
+    return total;
+  }
+
+  /* How many spare cards are held in total — the currency for a wild card.
+     A foil counts as `foilWorth`. */
+  function spareCount() {
+    return spareList().reduce(function (n, r) {
+      return n + (r.spare - r.foil) + r.foil * ECONOMY.foilWorth;
+    }, 0);
+  }
+
+  /* Which cards are still missing, so the trader can offer them. */
+  function missingCards() {
+    var p = me();
+    if (!p) return [];
+    return Object.keys(CARD_BY_ID)
+      .filter(function (id) { return !p.cards[id]; })
+      .map(function (id) { return CARD_BY_ID[id]; });
+  }
+
+  /* Trade `wildCardCost` spares for one card you don't have. Returns
+     'ok', 'short', 'have', or 'nosuch'. Cheapest spares go first, and foils
+     are spent last — nobody wants their shiny eaten by a bulk trade. */
+  function tradeForCard(wantId) {
+    var p = me();
+    if (!p || !card(wantId)) return 'nosuch';
+    if (p.cards[wantId]) return 'have';
+    if (spareCount() < ECONOMY.wildCardCost) return 'short';
+
+    var need = ECONOMY.wildCardCost;
+    var rows = spareList().sort(function (a, b) {
+      return spareValue(a.id) - spareValue(b.id);
+    });
+    rows.forEach(function (r) {
+      if (need <= 0) return;
+      var plain = r.spare - r.foil;
+      var takePlain = Math.min(plain, need);
+      p.cards[r.id] -= takePlain;
+      need -= takePlain;
+      while (need > 0 && (p.foils && p.foils[r.id] > 0) && p.cards[r.id] > 1) {
+        p.cards[r.id] -= 1;
+        p.foils[r.id] -= 1;
+        need -= ECONOMY.foilWorth;
+      }
+    });
+
+    p.cards[wantId] = 1;
+    write();
+    return 'ok';
   }
 
   /* Every card in the game, flattened, with how many the active profile has.
      Drives the hub's collection grid. */
   function allCards() {
     var p = me();
-    var out = [];
-    WORLDS.forEach(function (w) {
-      ['math', 'language'].forEach(function (game) {
-        w.foes[game].forEach(function (f) {
-          out.push({
-            id: f.id, name: f.name, emoji: f.emoji,
-            from: w.name, game: game,
-            count: (p && p.cards[f.id]) || 0
-          });
-        });
-      });
+    return Object.keys(CARD_BY_ID).map(function (id) {
+      var c = CARD_BY_ID[id];
+      return {
+        id: c.id, name: c.name, emoji: c.emoji, r: c.r,
+        from: c.from, game: c.game,
+        count: (p && p.cards[id]) || 0,
+        foil: (p && p.foils && p.foils[id]) || 0
+      };
     });
-    STORY_CARDS.forEach(function (c) {
-      out.push({
-        id: c.id, name: c.name, emoji: c.emoji,
-        from: 'Story Quest', game: 'story',
-        count: (p && p.cards[c.id]) || 0
-      });
-    });
-    return out;
   }
 
   /* ---------- Shop -------------------------------------------------------- */
@@ -625,13 +790,41 @@ var Save = (function () {
     return base;
   }
 
-  /* Perks from completed card sets. Phase 2 fills SET_PERKS in; the shape is
-     here now so loadout() has one place to apply them. */
+  /* What finishing a world's card set is permanently worth. These stack, and
+     they're the reason a collection feeds the character instead of just
+     filling a grid. */
+  var SET_PERKS = {
+    meadow: { label: '+1 heart',            maxHp: 1 },
+    cave:   { label: '+15% gold',           goldBonus: 0.15 },
+    sky:    { label: 'wider DOUBLE window', fastBonus: 1000 },
+    reef:   { label: '+1 heart, +15% gold', maxHp: 1, goldBonus: 0.15 },
+    ember:  { label: '+2 hearts',           maxHp: 2 }
+  };
+
   function setPerks(p, base) {
     WORLDS.forEach(function (w) {
       if (!hasSet(w.id, p)) return;
-      base.maxHp += 1;                 // every finished set is a heart
-      base.goldBonus += 0.05;
+      var perk = SET_PERKS[w.id];
+      if (!perk) return;
+      base.maxHp += perk.maxHp || 0;
+      base.goldBonus += perk.goldBonus || 0;
+      base.fastBonus += perk.fastBonus || 0;
+      base.cardBonus += perk.cardBonus || 0;
+    });
+  }
+
+  /* Set progress for the hub: how many of each world's cards are held, what
+     finishing it is worth, and whether it's done. */
+  function setProgress() {
+    var p = me();
+    return WORLDS.map(function (w) {
+      var all = w.foes.math.concat(w.foes.language);
+      var got = all.filter(function (f) { return p && p.cards[f.id]; }).length;
+      return {
+        id: w.id, name: w.name, emoji: w.emoji,
+        got: got, total: all.length, done: got === all.length,
+        perk: (SET_PERKS[w.id] || {}).label || ''
+      };
     });
   }
 
@@ -772,6 +965,20 @@ var Save = (function () {
 
     awardCard: awardCard,
     allCards: allCards,
+    card: card,
+    held: held,
+    foilsOf: foilsOf,
+    setProgress: setProgress,
+    SET_PERKS: SET_PERKS,
+
+    spares: spares,
+    spareList: spareList,
+    spareCount: spareCount,
+    spareValue: spareValue,
+    sellSpares: sellSpares,
+    sellAllSpares: sellAllSpares,
+    missingCards: missingCards,
+    tradeForCard: tradeForCard,
 
     item: item,
     owns: owns,

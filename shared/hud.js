@@ -54,6 +54,16 @@ var Hud = (function () {
       '.levelup .cardget .mon{font-size:70px;line-height:1;filter:drop-shadow(0 6px 8px rgba(0,0,0,.35))}',
       '.levelup .cardget .small{font-size:16px;letter-spacing:2px;text-transform:uppercase;opacity:.85}',
       '.levelup .cardget .big2{font-size:28px;line-height:1.1}',
+      /* rarity colours the frame; a foil sweeps a shine across it */
+      '.levelup .cardget.r2{background:linear-gradient(180deg,#bfe4ff,#7dd3fc);',
+      'box-shadow:0 10px 0 #3b8fb5,0 20px 40px rgba(0,0,0,.5)}',
+      '.levelup .cardget.r3{background:linear-gradient(180deg,#f5c9ff,#c084fc);',
+      'box-shadow:0 10px 0 #7c3aad,0 20px 40px rgba(0,0,0,.5)}',
+      '.levelup .cardget.foil{position:relative;overflow:hidden}',
+      '.levelup .cardget.foil::after{content:"";position:absolute;inset:0;',
+      'background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.85) 50%,transparent 70%);',
+      'animation:foilSweep 1.4s ease-in-out infinite}',
+      '@keyframes foilSweep{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}',
       '@keyframes luPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}'
     ].join('');
     document.head.appendChild(s);
@@ -96,19 +106,33 @@ var Hud = (function () {
     setTimeout(function () { f.remove(); }, 1100);
   }
 
-  /* "You caught a card!" — the drop moment. `how` is 'new' or 'dupe'. */
-  function cardDrop(card, how) {
-    if (!card || !how) return;
+  /* "You caught a card!" — the drop moment.
+
+     `drop` is what Save.awardCard() returned:
+       { id, how: 'new' | 'dupe', foil, pity }
+     Cards are rare now, so this is a real event and gets a real moment: a
+     shiny frame for a foil, and the rarity said out loud. */
+  var RARITY = { 1: 'CARD', 2: 'RARE CARD', 3: 'LEGENDARY CARD' };
+
+  function cardDrop(drop) {
+    if (!drop) return;
+    var card = Save.card(drop.id);
+    if (!card) return;
     Sound.cardGet();
+
+    var kind = RARITY[card.r] || RARITY[1];
+    var line = drop.how === 'new' ? 'NEW ' + kind : 'ANOTHER ' + kind;
+
     var box = document.createElement('div');
     box.className = 'levelup';
-    box.innerHTML = '<div class="card cardget">' +
+    box.innerHTML = '<div class="card cardget r' + card.r +
+      (drop.foil ? ' foil' : '') + '">' +
       '<div class="mon">' + card.emoji + '</div>' +
-      '<div class="small">' + (how === 'new' ? 'NEW CARD!' : 'Another one!') + '</div>' +
+      '<div class="small">' + (drop.foil ? '\u2728 SHINY ' + line + ' \u2728' : line) + '</div>' +
       '<div class="big2"></div></div>';
     box.querySelector('.big2').textContent = card.name;
     document.getElementById('app').appendChild(box);
-    setTimeout(function () { box.remove(); }, 1800);
+    setTimeout(function () { box.remove(); }, drop.foil ? 2400 : 1800);
   }
 
   /* A full-screen "LEVEL 4!" moment. Brief, and it blocks nothing. */

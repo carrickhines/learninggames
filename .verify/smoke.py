@@ -234,12 +234,34 @@ try:
     check("cards: uncaught monsters are locked",
           len(d.find_elements(By.CSS_SELECTOR, ".mcard.locked")) == total)
     check("cards: the count reads zero", text("#cardCount") == "0 of %d" % total)
-    d.execute_script("Save.awardCard('m-slime'); Save.awardCard('m-slime'); renderCards();")
+    # cards are a rare roll now; the second argument forces one
+    d.execute_script("Save.awardCard('m-slime', true); Save.awardCard('m-slime', true); renderCards();")
     time.sleep(0.3)
     check("cards: a caught monster unlocks its slot",
           len(d.find_elements(By.CSS_SELECTOR, ".mcard.locked")) == total - 1)
     check("cards: the caught count went up", text("#cardCount") == "1 of %d" % total)
+    check("cards: set progress is shown for every world",
+          len(d.find_elements(By.CSS_SELECTOR, ".setrow")) ==
+          d.execute_script("return Save.WORLDS.length;"))
     check("cards: no JS errors", errs() == [], str(errs()))
+
+    print("\nCard Trader")
+    click("#traderBtn")
+    time.sleep(0.5)
+    check("trader: a spare is listed for sale",
+          len(d.find_elements(By.CSS_SELECTOR, "#spareRow .shop-item")) == 1)
+    check("trader: cards you're missing are offered",
+          len(d.find_elements(By.CSS_SELECTOR, "#wildRow .shop-item")) > 0)
+    before = d.execute_script("return Save.me().gold;")
+    d.execute_script("document.querySelector('#spareRow .shop-item').click();")
+    time.sleep(0.4)
+    check("trader: selling a spare pays gold",
+          d.execute_script("return Save.me().gold;") > before)
+    check("trader: the sold spare is gone",
+          d.execute_script("return Save.held('m-slime');") == 1)
+    check("trader: no JS errors", errs() == [], str(errs()))
+    click("#traderBackBtn")
+    time.sleep(0.4)
     click("#cardsBackBtn")
     time.sleep(0.5)
 

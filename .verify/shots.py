@@ -130,19 +130,29 @@ try:
     # the collection, part-caught
     load("index.html")
     d.execute_script("""
-        ['m-slime','m-bat','m-dragon','l-imp','l-ghost','s-troll','s-ghost','m-crab']
-            .forEach(function (id) { Save.awardCard(id); });
-        Save.update(function (p) { p.cards['m-slime'] = 4; p.cards['l-imp'] = 2; });
+        ['m-slime','m-bat','m-dragon','l-imp','l-ghost','l-rex','s-troll','s-ghost','m-crab']
+            .forEach(function (id) { Save.awardCard(id, true); });
+        Save.update(function (p) {
+            p.cards['m-slime'] = 4; p.cards['l-imp'] = 2; p.foils['m-dragon'] = 1;
+        });
         document.getElementById('cardsBtn').click();
     """)
     time.sleep(0.6)
     shot("hub-cards")
 
-    # the card-drop moment
+    d.execute_script("document.getElementById('traderBtn').click();")
+    time.sleep(0.6)
+    shot("hub-trader")
+
+    # the card-drop moment, plain and shiny
     load("math/index.html")
-    d.execute_script("Hud.cardDrop({emoji:'🐉', name:'The Big Dragon'}, 'new');")
+    d.execute_script("Hud.cardDrop({id:'m-dragon', how:'new', foil:false});")
     time.sleep(0.5)
     shot("math-card-drop")
+    load("math/index.html")
+    d.execute_script("Hud.cardDrop({id:'l-titan', how:'new', foil:true});")
+    time.sleep(0.5)
+    shot("math-card-drop-foil")
 
     # redeeming an iPad Time Token, in each of its three states
     load("index.html")

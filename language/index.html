@@ -1975,7 +1975,7 @@ function playerAttack(double) {
         // the monster you just beat may leave its collectible card behind
         const foe = FOES[state.foeIdx];
         const drop = Save.awardCard(foe.id);
-        if (drop) setTimeout(() => Hud.cardDrop(foe, drop), 500);
+        if (drop) setTimeout(() => Hud.cardDrop(drop), 500);
         setTimeout(nextFoeOrWin, 900);
       } else {
         setTimeout(newQuestion, 600);
