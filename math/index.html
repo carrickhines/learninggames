@@ -818,20 +818,51 @@
     });
   }
 
+  /* ---------- How long a question gets ----------
+     The mode sets the baseline, but a question is not a question: recalling
+     7 x 8 is a different act from working out what rule turns 1, 2, 4, 5, 7, 8
+     into the next number. Each track scales the clock by how much *thinking*
+     it asks for, rather than everyone racing the times-table timer.
+
+     1 is the times-table baseline. The blocks tracks are above it because the
+     child is physically counting; Rule Hunter is furthest above because it is
+     the only track that asks him to find a rule rather than recall a fact. */
+  const TRACK_TIME = {
+    next: 1.0, oneless: 1.0, mul: 1.0,
+    div: 1.2,
+    add: 1.4, sub: 1.4, count: 1.4,     // counting real blocks takes as long as it takes
+    skip: 1.5, pattern: 1.5,            // sequencing: spot the step, then apply it
+    sort: 1.5,                          // read the question, then compare four things
+    alg: 1.8,                           // two-step algebra is pencil-and-paper work
+    rule: 2.2                           // find the rule, not the answer
+  };
+
+  /* Rule Hunter's upper rungs are harder again — interleaved rules, and
+     "what is the 10th number?" is arithmetic you have to plan. */
+  const RULE_TIER_TIME = { 1: 1, 2: 1, 3: 1.1, 4: 1.3, 5: 1.6 };
+
+  /* The one place the clock is worked out. startTimer draws the bar from this
+     and isFastAnswer judges the double-hit from it — computing them separately
+     is how the white marker ends up disagreeing with the actual window. */
+  function timing() {
+    const m = MODES[state.mode];
+    let scale = TRACK_TIME[state.track] || 1;
+    if (state.track === "rule") scale *= RULE_TIER_TIME[ruleTier()] || 1;
+    return {
+      // a pet buys thinking time; an hourglass widens the double-hit window
+      total: m.total * scale + GEAR.bonusTime + GEAR.fastBonus,
+      fast: m.fast * scale + GEAR.fastBonus,
+      penalty: m.penalty
+    };
+  }
+
   // ---------- Timer ----------
   // The Double Attack Timer: the bar is shown in every mode. While the bar is
   // still in the gold "fast" zone (left of the white marker has not been
   // reached) a correct answer lands a SUPER double hit.
   function startTimer() {
     stopTimer();
-    const m = MODES[state.mode];
-    // a pet buys you a little more time to think, but not a longer fast zone
-    // a pet buys thinking time; an hourglass widens the double-hit window
-    const mode = {
-      total: m.total + GEAR.bonusTime + GEAR.fastBonus,
-      fast: m.fast + GEAR.fastBonus,
-      penalty: m.penalty
-    };
+    const mode = timing();
     state.timerStart = performance.now();
 
     // place the marker at the boundary between the fast zone and the rest
@@ -859,7 +890,7 @@
 
   // Was the answer given while the fast zone was still active?
   function isFastAnswer() {
-    return (performance.now() - state.timerStart) < MODES[state.mode].fast + GEAR.fastBonus;
+    return (performance.now() - state.timerStart) < timing().fast;
   }
 
   function stopTimer() {
@@ -1408,7 +1439,7 @@
 
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.
-  window.TEST = { state, FOES, MODES, newProblem, playerAttack, showEarnings,
+  window.TEST = { state, FOES, MODES, TRACK_TIME, timing, newProblem, playerAttack, showEarnings,
                  makers: MAKERS, sortGroups: SORT_GROUPS, bumpRuleTier };
 })();
 </script>

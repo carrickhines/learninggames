@@ -44,6 +44,26 @@ its way down. That matters because a throw *during parse* leaves no error for a
 `window.onerror` trap installed after the page loads, so "no JS errors" alone
 would report a completely broken page as fine.
 
+## A trap worth naming
+
+`Save.update(fn)` passes the *profile* to its callback. So this is wrong, and
+fails silently by assigning the profile object to the field:
+
+```js
+d.execute_script("Save.update(function (p) { p.progress.seqTier = arguments[0]; });", 3)
+```
+
+`arguments[0]` inside the callback is `p`, not the value handed to
+`execute_script`. Hoist it first:
+
+```js
+d.execute_script("var tier = arguments[0];"
+                 "Save.update(function (p) { p.progress.seqTier = tier; });", 3)
+```
+
+This has bitten three separate checks, each time producing a test that passed
+while measuring nothing.
+
 ## Notes
 
 - `shots.py` corrects for Firefox's window-vs-viewport size mismatch so the app

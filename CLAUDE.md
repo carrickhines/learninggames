@@ -440,6 +440,33 @@ last (at least 15%), Normal must leave at least 30 seconds, and even Expert at
 least 15. This exists because Easy was once 15s and Normal 14s — two modes that
 felt identical, with Expert falling off a cliff after them.
 
+## Time per track
+
+The mode is only the baseline. **A question is not a question**: recalling 7×8
+is a different act from working out what rule turns 1, 2, 4, 5, 7, 8 into the
+next number, and both are different from reading a sentence to find its one
+wrong word. `TRACK_TIME` in each battle game scales the clock by how much
+*thinking* a track asks for, where 1 is the recall baseline.
+
+| | Normal, seconds |
+|---|---|
+| Math: times tables, counting | 35 |
+| Math: number blocks (add/sub/count on) | 49 |
+| Math: skip counting, patterns, sorting | 52 |
+| Math: algebra | 63 |
+| Math: **Rule Hunter** | 77 → 123 by rung |
+| Language: tap-one-card tracks | 48 |
+| Language: word building | 67 |
+| Language: read-a-sentence tracks | 72–77 |
+
+Rule Hunter scales again by rung (`RULE_TIER_TIME`) — rung 5 asks for the 10th
+number in a sequence, which is arithmetic you have to plan.
+
+**`timing()` is the single place the clock is worked out**, in both games.
+`startTimer()` draws the bar from it and `isFastAnswer()` judges the double-hit
+from it. They used to compute the fast zone separately, which is exactly how
+the white marker ends up disagreeing with the window it claims to mark.
+
 **Easy stays pressure-free:** the timer and the double-hit bonus are shown, but
 running out of time does not let the foe attack (`penalty: false`). The timer
 is a reward for speed, never a punishment. A *wrong* answer still lets the foe

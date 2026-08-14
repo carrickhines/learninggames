@@ -164,6 +164,63 @@ try:
         check("%s: Normal and Expert do" % game,
               modes["normal"]["penalty"] and modes["expert"]["penalty"])
 
+    # ---- per-track time ----
+    # A question is not a question: recalling 7x8 is a different act from
+    # finding the rule behind 1, 2, 4, 5, 7, 8. Each track scales the clock.
+    for game, path, unit, slowest in (
+            ("math", "math/index.html", 1000.0, "rule"),
+            ("language", "language/index.html", 1.0, "fixit")):
+        d.get("file://" + os.path.join(ROOT, path))
+        time.sleep(0.9)
+        scales = js("TEST.TRACK_TIME")
+
+        check("%s: every track has a time scale" % game,
+              all(v > 0 for v in scales.values()), str(scales))
+        check("%s: nothing is faster than the baseline" % game,
+              min(scales.values()) >= 1, str(scales))
+        check("%s: the thinking tracks get noticeably longer" % game,
+              max(scales.values()) >= 1.5,
+              "slowest scale is %.1f" % max(scales.values()))
+
+        # the clock the game actually uses, per track, on Normal
+        def secs(track, tier=None):
+            return d.execute_script("""
+                var track = arguments[0], tier = arguments[1];
+                TEST.state.mode = 'normal';
+                TEST.state.track = track;
+                if (tier) Save.update(function (p) { p.progress.seqTier = tier; });
+                return TEST.timing().total;
+            """, track, tier) / unit
+
+        base = secs("mul" if game == "math" else "letters")
+        slow = secs(slowest)
+        check("%s: %s gets much longer than a recall question" % (game, slowest),
+              slow >= base * 1.5, "%.0fs vs %.0fs" % (slow, base))
+        check("%s: even the quickest track keeps the mode's floor" % game,
+              base >= 30, "%.0fs" % base)
+
+        # the bar and the double-hit window must be computed from one place,
+        # or the white marker ends up lying about where the bonus ends
+        parts = d.execute_script("var t = TEST.timing(); return [t.total, t.fast];")
+        check("%s: the fast zone sits inside the bar" % game,
+              0 < parts[1] < parts[0], str(parts))
+
+    # Rule Hunter's upper rungs are harder again and get more time still
+    d.get("file://" + os.path.join(ROOT, "math/index.html"))
+    time.sleep(0.9)
+    def rule_secs(tier):
+        return d.execute_script("""
+            var tier = arguments[0];
+            TEST.state.mode = 'normal';
+            TEST.state.track = 'rule';
+            Save.update(function (p) { p.progress.seqTier = tier; });
+            return TEST.timing().total;
+        """, tier) / 1000.0
+    t1, t5 = rule_secs(1), rule_secs(5)
+    check("math: the hardest Rule Hunter rung gets more time than the first",
+          t5 > t1 * 1.4, "rung 1 %.0fs, rung 5 %.0fs" % (t1, t5))
+    check("math: even rung 1 of Rule Hunter is generous", t1 >= 60, "%.0fs" % t1)
+
     # =================== Story Quest ===================
     print("\nStory Quest")
     d.get("file://" + os.path.join(ROOT, "story/index.html"))

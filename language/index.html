@@ -2061,17 +2061,39 @@ function nextFoeOrWin() {
 /* ==================================================================
    Timer — gold fast zone at the start = double damage window
    ================================================================== */
+/* ---------- How long a question gets ----------
+   The mode sets the baseline, but a question is not a question: tapping the
+   letter you just heard is a different act from reading a whole sentence to
+   find the one word that's wrong, or building a word chunk by chunk.
+
+   1 is the tap-one-card baseline. Anything asking the child to read a
+   sentence, or to make several taps in the right order, scales above it. */
+const TRACK_TIME = {
+  letters: 1.0, sounds: 1.0, sight: 1.0, rhyme: 1.0, opposites: 1.0,
+  read: 1.2, past: 1.2, twins: 1.2,
+  builder: 1.4,                       // spell it out, one letter at a time
+  grammar: 1.5, marks: 1.5,           // read the sentence, then find the word
+  fixit: 1.6,                         // read it, spot the mistake, then fix it
+  forge: 1.6, syllable: 1.6           // several chunks, in the right order
+};
+
+/* The one place the clock is worked out, so the bar and the double-hit
+   window can never disagree. */
+function timing() {
+  const m = MODES[state.mode];
+  const scale = TRACK_TIME[state.track] || 1;
+  return {
+    // a pet buys thinking time; an hourglass widens the double-hit window
+    total: m.total * scale + (GEAR.bonusTime + GEAR.fastBonus) / 1000,
+    fast: m.fast * scale + GEAR.fastBonus / 1000,
+    penalty: m.penalty
+  };
+}
+
 function startTimer() {
   stopTimer();
   state.askedAt = performance.now();   // for the grown-ups' record
-  const m = MODES[state.mode];
-  // a pet buys you a little more time to think, but not a longer fast zone
-  // a pet buys thinking time; an hourglass widens the double-hit window
-  const mode = {
-    total: m.total + (GEAR.bonusTime + GEAR.fastBonus) / 1000,
-    fast: m.fast + GEAR.fastBonus / 1000,
-    penalty: m.penalty
-  };
+  const mode = timing();
   state.timeLeft = mode.total;
   state.inFastZone = true;
   $('fastMark').style.left = (100 * (mode.total - mode.fast) / mode.total) + '%';
@@ -2178,7 +2200,7 @@ $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('m
 
 // Test seam: .verify/ scripts drive the real game and need to read the
 // current question and run state. Costs nothing in play.
-window.TEST = { state, FOES, MODES, newQuestion, showEarnings,
+window.TEST = { state, FOES, MODES, TRACK_TIME, timing, newQuestion, showEarnings,
                 TRACKS, track, SOUNDS, OPPOS, makeDeck };
 
 $('sayBtn').addEventListener('click', () => {
