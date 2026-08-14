@@ -241,6 +241,8 @@ try:
     battle("language/index.html", "fixit", "normal", "lang-battle-fixit")
     battle("language/index.html", "forge", "normal", "lang-battle-forge")
     battle("language/index.html", "rhyme", "easy", "lang-battle-rhyme")
+    battle("language/index.html", "sounds", "easy", "lang-battle-sounds")
+    battle("language/index.html", "opposites", "easy", "lang-battle-opposites")
     d.execute_script("""
         document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
         document.getElementById('win').classList.add('show');

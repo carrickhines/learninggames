@@ -117,7 +117,7 @@
 <script>
 'use strict';
 
-/* Keep these five lists in sync with index.html */
+/* Keep these six lists in sync with index.html */
 const LETTERS = [
   ['A','apple'],['B','ball'],['C','cat'],['D','dog'],['E','elephant'],
   ['F','fish'],['G','grapes'],['H','hat'],['I','ice'],['J','juice'],
@@ -138,6 +138,14 @@ const RHYME_WORDS = ['frog','log','ten','socks','tree','man','pan','star',
                      'jar','sled','bread','cap','clap','eye','fly','one',
                      'goat','boat','coat','cake','snake','mouse','house',
                      'moon','spoon','fish','dish','ring','king'];
+// Beginning Sounds and Opposites words that aren't already in WORDS or
+// SIGHT (those reuse their W_/S_ clips — no need to record them twice)
+const NEW_WORDS = ['ball','bear','book','cake','duck','drum','fish','frog',
+                   'horse','house','moon','mouse','milk','pizza','sock','star',
+                   'tree','train','tiger','rain','ring','robot',
+                   'big','small','hot','cold','day','night','happy','sad',
+                   'up','down','fast','slow','wet','dry','open','closed',
+                   'loud','quiet','old','young'];
 // Time Machine verbs: each needs a V_ sentence stem plus O_ clips for
 // both option words (the game shuffles the cards and chains the clips)
 const PAST = [
@@ -212,6 +220,8 @@ const SECTIONS = [
     { id: 'P_spell',    text: 'Spell this word!' },
     { id: 'P_findword', text: 'Find the word!' },
     { id: 'P_rhyme',    text: 'What rhymes with...?' },
+    { id: 'P_startsound', text: 'Which one starts like...?' },
+    { id: 'P_opposite', text: 'What is the opposite of...?' },
     { id: 'P_or',       text: 'or...?' },
     { id: 'P_great',    text: 'Great job!' },
     { id: 'P_double',   text: 'Double hit!' },
@@ -227,6 +237,8 @@ const SECTIONS = [
     SIGHT.map(w => ({ id: 'S_' + w, text: w })) },
   { title: 'Rhyme words (just the word)', items:
     RHYME_WORDS.map(w => ({ id: 'R_' + w, text: w })) },
+  { title: 'Sound and opposite words (just the word)', items:
+    NEW_WORDS.map(w => ({ id: 'R_' + w, text: w })) },
   { title: 'Time Machine sentences (stop after the dots)', items:
     PAST.map(v => ({ id: 'V_' + v.now, text: `Today I ${v.now}. Yesterday I...` })) },
   { title: 'Time Machine words (just the word, real and silly alike)', items:

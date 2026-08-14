@@ -214,61 +214,13 @@
     <h1>Language RPG</h1>
     <div class="subtitle">Read, spell, and beat the monsters!</div>
 
+    <!-- Both quest rows are rendered from the TRACKS registry in the script
+         below, so a new track is one entry in one place. -->
     <div class="group-label">Little hero quests</div>
-    <div class="btn-row" id="trackGrid">
-      <button class="choice" data-track="letters">
-        <span class="emoji">🔠</span>Letter Hunt
-        <span class="sub">Hear it, find the letter</span>
-      </button>
-      <button class="choice" data-track="builder">
-        <span class="emoji">🧱</span>Word Builder
-        <span class="sub">Spell it with blocks</span>
-      </button>
-      <button class="choice" data-track="sight">
-        <span class="emoji">⭐</span>Sight Words
-        <span class="sub">Hear it, tap the word</span>
-      </button>
-      <button class="choice" data-track="read">
-        <span class="emoji">🖼️</span>Read It!
-        <span class="sub">Read it, tap the picture</span>
-      </button>
-      <button class="choice" data-track="rhyme">
-        <span class="emoji">🎵</span>Rhyme Time
-        <span class="sub">Hear it, tap the rhyme</span>
-      </button>
-      <button class="choice" data-track="past">
-        <span class="emoji">🕰️</span>Time Machine
-        <span class="sub">Today I... yesterday I...</span>
-      </button>
-    </div>
+    <div class="btn-row" id="trackGrid"></div>
 
     <div class="group-label">Big hero quests</div>
-    <div class="btn-row" id="trackGrid2">
-      <button class="choice" data-track="fixit">
-        <span class="emoji">🔍</span>Fix It!
-        <span class="sub">Find and fix the mistake</span>
-      </button>
-      <button class="choice" data-track="forge">
-        <span class="emoji">⚒️</span>Word Forge
-        <span class="sub">Build words from parts</span>
-      </button>
-      <button class="choice" data-track="grammar">
-        <span class="emoji">🏷️</span>Grammar Hunt
-        <span class="sub">Tap the noun or verb</span>
-      </button>
-      <button class="choice" data-track="syllable">
-        <span class="emoji">🔨</span>Syllable Smith
-        <span class="sub">Spell it chunk by chunk</span>
-      </button>
-      <button class="choice" data-track="twins">
-        <span class="emoji">🎭</span>Word Twins
-        <span class="sub">Same or opposite?</span>
-      </button>
-      <button class="choice" data-track="marks">
-        <span class="emoji">✏️</span>Mark It!
-        <span class="sub">Commas and end marks</span>
-      </button>
-    </div>
+    <div class="btn-row" id="trackGrid2"></div>
 
     <div class="group-label">Choose your speed</div>
     <div class="btn-row" id="modeRow">
@@ -495,6 +447,41 @@ const RHYMES = [
 
 // find a word's clip wherever it was recorded: the word list, the sight
 // list, or the rhyme-only extras
+// Beginning Sounds (age 5). Families of words that start with the same
+// sound. Authoring rules, same spirit as Rhyme Time: every family has one
+// initial sound and no two families share it (or a decoy could secretly be
+// right), every emoji must be unmistakably nameable by a five-year-old, and
+// no emoji repeats anywhere in the list.
+const SOUNDS = [
+  [['ball','⚽'],   ['bear','🐻'],  ['book','📕']],
+  [['cat','🐱'],    ['car','🚗'],   ['cake','🍰']],
+  [['dog','🐶'],    ['duck','🦆'],  ['drum','🥁']],
+  [['fish','🐟'],   ['fox','🦊'],   ['frog','🐸']],
+  [['hat','🎩'],    ['horse','🐴'], ['house','🏠']],
+  [['moon','🌙'],   ['mouse','🐭'], ['milk','🥛']],
+  [['pig','🐷'],    ['pen','🖊️'],   ['pizza','🍕']],
+  [['sun','☀️'],    ['sock','🧦'],  ['star','⭐']],
+  [['tree','🌳'],   ['train','🚂'], ['tiger','🐯']],
+  [['rain','🌧️'],   ['ring','💍'],  ['robot','🤖']],
+];
+
+// Opposites (age 5). Vocabulary by picture, the little-hero counterpart to
+// the big heroes' Word Twins. Authoring rule: both halves must be drawable
+// as one unmistakable emoji, and no emoji may repeat across pairs — a decoy
+// is any picture from another pair, so a repeat would make two right answers.
+const OPPOS = [
+  [['big','🐘'],    ['small','🐜']],
+  [['hot','🔥'],    ['cold','🧊']],
+  [['day','☀️'],    ['night','🌙']],
+  [['happy','😀'],  ['sad','😢']],
+  [['up','⬆️'],     ['down','⬇️']],
+  [['fast','🐇'],   ['slow','🐢']],
+  [['wet','💧'],    ['dry','🏜️']],
+  [['open','📖'],   ['closed','📕']],
+  [['loud','📢'],   ['quiet','🤫']],
+  [['old','👴'],    ['young','👶']],
+];
+
 const wordClip = w =>
   WORDS.some(p => p[0] === w) ? 'W_' + w :
   SIGHT.includes(w)           ? 'S_' + w : 'R_' + w;
@@ -1193,6 +1180,51 @@ function makeDeck(pool) {
 }
 
 /* ==================================================================
+   The tracks — one place that knows everything about each quest.
+
+   A track used to be declared three times over: a hand-written card in the
+   menu markup, a branch in a ternary chain that picked its content, and an
+   entry in a maker registry. Adding a track meant touching all three and
+   noticing none of them warned you if you missed one. Now this array is the
+   single source: it renders the menu, picks the deck, and maps the maker.
+   ================================================================== */
+const TRACKS = [
+  // --- little hero: the ladder toward reading ---
+  { id: 'letters',  row: 'little', emoji: '🔠', name: 'Letter Hunt',
+    sub: 'Hear it, find the letter',  pool: () => LETTERS, make: makeLetterQ },
+  { id: 'sounds',   row: 'little', emoji: '🔡', name: 'Beginning Sounds',
+    sub: 'Which starts the same?',    pool: () => SOUNDS,  make: makeSoundQ },
+  { id: 'builder',  row: 'little', emoji: '🧱', name: 'Word Builder',
+    sub: 'Spell it with blocks',      pool: () => WORDS,   make: makeBuilderQ },
+  { id: 'sight',    row: 'little', emoji: '⭐', name: 'Sight Words',
+    sub: 'Hear it, tap the word',     pool: () => SIGHT,   make: makeSightQ },
+  { id: 'read',     row: 'little', emoji: '🖼️', name: 'Read It!',
+    sub: 'Read it, tap the picture',  pool: () => WORDS,   make: makeReadQ },
+  { id: 'rhyme',    row: 'little', emoji: '🎵', name: 'Rhyme Time',
+    sub: 'Hear it, tap the rhyme',    pool: () => RHYMES,  make: makeRhymeQ },
+  { id: 'opposites',row: 'little', emoji: '🌗', name: 'Opposites',
+    sub: 'Hot and cold, big and small', pool: () => OPPOS, make: makeOppositeQ },
+  { id: 'past',     row: 'little', emoji: '🕰️', name: 'Time Machine',
+    sub: 'Today I… yesterday I…',     pool: () => PAST,    make: makePastQ },
+
+  // --- big hero: spelling, grammar, vocabulary ---
+  { id: 'fixit',    row: 'big', emoji: '🔍', name: 'Fix It!',
+    sub: 'Find and fix the mistake',  pool: () => FIXIT,   make: makeFixitQ },
+  { id: 'forge',    row: 'big', emoji: '⚒️', name: 'Word Forge',
+    sub: 'Build words from parts',    pool: () => FORGE,   make: makeForgeQ },
+  { id: 'grammar',  row: 'big', emoji: '🏷️', name: 'Grammar Hunt',
+    sub: 'Tap the noun or verb',      pool: () => GRAMMAR, make: makeGrammarQ },
+  { id: 'syllable', row: 'big', emoji: '🔨', name: 'Syllable Smith',
+    sub: 'Spell it chunk by chunk',   pool: () => SYLLB,   make: makeSyllableQ },
+  { id: 'twins',    row: 'big', emoji: '🎭', name: 'Word Twins',
+    sub: 'Same or opposite?',         pool: () => TWINS,   make: makeTwinsQ },
+  { id: 'marks',    row: 'big', emoji: '✏️', name: 'Mark It!',
+    sub: 'Commas and end marks',      pool: () => MARKS,   make: makeMarksQ },
+];
+
+const track = (id) => TRACKS.filter(t => t.id === id)[0];
+
+/* ==================================================================
    State
    ================================================================== */
 const state = {
@@ -1220,16 +1252,22 @@ function showScreen(id) {
 /* ==================================================================
    Menu wiring
    ================================================================== */
-// both quest rows (little + big hero) share one selection
-document.querySelectorAll('#menu .choice[data-track]').forEach(btn => {
+// The quest cards, built from TRACKS. Both rows are one selection.
+TRACKS.forEach(t => {
+  const btn = document.createElement('button');
+  btn.className = 'choice';
+  btn.dataset.track = t.id;
+  btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}` +
+    `<span class="sub">${t.sub}</span>`;
   btn.addEventListener('click', () => {
     Sound.unlock(); Sound.click();
     document.querySelectorAll('#menu .choice[data-track]').forEach(b => b.classList.remove('sel'));
     btn.classList.add('sel');
-    state.track = btn.dataset.track;
+    state.track = t.id;
     Save.remember('language', state.track, null);
     updateStart();
   });
+  $(t.row === 'little' ? 'trackGrid' : 'trackGrid2').appendChild(btn);
 });
 document.querySelectorAll('#menu .choice[data-mode]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1289,17 +1327,7 @@ function startGame() {
   state.playerHp = GEAR.maxHp;
   state.shield = GEAR.shield;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
-  state.draw = makeDeck(
-    state.track === 'letters' ? LETTERS :
-    state.track === 'sight'   ? SIGHT   :
-    state.track === 'rhyme'   ? RHYMES  :
-    state.track === 'past'    ? PAST    :
-    state.track === 'fixit'   ? FIXIT   :
-    state.track === 'forge'   ? FORGE   :
-    state.track === 'grammar' ? GRAMMAR :
-    state.track === 'syllable'? SYLLB   :
-    state.track === 'twins'   ? TWINS   :
-    state.track === 'marks'   ? MARKS   : WORDS);
+  state.draw = makeDeck(track(state.track).pool());
   showScreen('game');
   spawnFoe();
 }
@@ -1412,6 +1440,48 @@ function makeRhymeQ() {
   };
 }
 
+// Beginning Sounds: the cue picture and word, then tap the other picture that
+// starts with the same sound. The initial letter is shown too, so a child who
+// can't yet hear the sound alone still has a way in.
+function makeSoundQ() {
+  const fam = state.draw();
+  const [t, a] = shuffle(fam).slice(0, 2);   // cue word + one that matches it
+  const decoys = shuffle(SOUNDS.filter(f => f !== fam)).slice(0, 2)
+    .map(f => f[rand(0, f.length - 1)]);     // one picture from 2 other families
+  const letter = t[0][0].toUpperCase();
+  return {
+    prompt: `Tap what starts with ${letter}, like ${t[0]}!`,
+    big: t[1] + ' ' + t[0],
+    choices: shuffle([a, ...decoys].map(p => p[1])),
+    answer: a[1],
+    word: t[0],
+    revealMsg: `${t[0]} and ${a[0]} both start with ${letter}`,
+    isPics: true,
+    sayIt: () => Voice.play(['P_startsound', wordClip(t[0])],
+                            `Which one starts like... ${t[0]}?`),
+  };
+}
+
+// Opposites: the cue picture and word, then tap the picture that means the
+// opposite. Decoys are pictures from other pairs, so they're never defensible.
+function makeOppositeQ() {
+  const pair = state.draw();
+  const [t, a] = shuffle(pair);              // either half can be the cue
+  const decoys = shuffle(OPPOS.filter(p => p !== pair)).slice(0, 2)
+    .map(p => p[rand(0, 1)]);
+  return {
+    prompt: 'Tap the OPPOSITE!',
+    big: t[1] + ' ' + t[0],
+    choices: shuffle([a, ...decoys].map(p => p[1])),
+    answer: a[1],
+    word: t[0],
+    revealMsg: `The opposite of ${t[0]} is ${a[0]}`,
+    isPics: true,
+    sayIt: () => Voice.play(['P_opposite', wordClip(t[0])],
+                            `What is the opposite of... ${t[0]}?`),
+  };
+}
+
 function makePastQ() {
   const item = state.draw();
   const opts = shuffle([item.past, item.wrong]);
@@ -1511,17 +1581,11 @@ function makeMarksQ() {
   };
 }
 
-const MAKERS = { letters: makeLetterQ, builder: makeBuilderQ, sight: makeSightQ,
-                 read: makeReadQ, rhyme: makeRhymeQ, past: makePastQ,
-                 fixit: makeFixitQ, forge: makeForgeQ,
-                 grammar: makeGrammarQ, syllable: makeSyllableQ,
-                 twins: makeTwinsQ, marks: makeMarksQ };
-
 /* ==================================================================
    Render the question + answer area
    ================================================================== */
 function newQuestion() {
-  const q = state.question = MAKERS[state.track]();
+  const q = state.question = track(state.track).make();
   state.answered = false;
   $('feedback').textContent = '';
   $('qPrompt').textContent = q.prompt;
@@ -2032,7 +2096,8 @@ $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('m
 
 // Test seam: .verify/ scripts drive the real game and need to read the
 // current question and run state. Costs nothing in play.
-window.TEST = { state, FOES, MODES, newQuestion, showEarnings };
+window.TEST = { state, FOES, MODES, newQuestion, showEarnings,
+                TRACKS, track, SOUNDS, OPPOS, makeDeck };
 
 $('sayBtn').addEventListener('click', () => {
   Sound.unlock();

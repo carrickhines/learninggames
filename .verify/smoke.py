@@ -266,6 +266,10 @@ try:
           len(d.find_elements(By.CSS_SELECTOR, "#playerPips .pip")) == 6)
     check("lang: the foes come from the hero's world", d.execute_script(
         "return TEST.FOES[0].id === 'l-slime';"))
+    battle_smoke("language/index.html", "sounds", "easy", "lang/sounds")
+    battle_smoke("language/index.html", "opposites", "easy", "lang/opposites")
+    check("lang: the picture choices are tappable",
+          len(d.find_elements(By.CSS_SELECTOR, ".picbtn")) == 3)
     battle_smoke("language/index.html", "fixit", "normal", "lang/fixit")
     # Fix It! takes two taps: find the mistake, then pick the correction
     earns_smoke(
