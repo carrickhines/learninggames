@@ -154,8 +154,51 @@ try:
           len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 3)
     check("hub: no JS errors", errs() == [], str(errs()))
 
+    print("\nShop")
+    click("#shopBtn")
+    time.sleep(0.5)
+    items = d.find_elements(By.CSS_SELECTOR, ".shop-item")
+    check("shop: every item is racked", len(items) == d.execute_script("return Save.SHOP.length;"),
+          "%d cards" % len(items))
+    check("shop: a broke hero can't afford the good stuff",
+          len(d.find_elements(By.CSS_SELECTOR, ".shop-item.broke")) > 0)
+    check("shop: the starter gear reads as worn",
+          len(d.find_elements(By.CSS_SELECTOR, ".shop-item.worn")) >= 2)
+
+    # try to buy something with no money
+    d.execute_script("""
+        var els = document.querySelectorAll('.shop-item');
+        for (var i = 0; i < els.length; i++)
+            if (els[i].textContent.indexOf('Sharp Sword') === 0 ||
+                els[i].textContent.indexOf('⚔️Sharp Sword') === 0) { els[i].click(); return; }
+        els[1].click();
+    """)
+    time.sleep(0.4)
+    check("shop: buying while broke is refused and explained",
+          "more gold needed" in text("#shopFlash"), text("#shopFlash"))
+    check("shop: the refusal cost nothing", d.execute_script("return Save.me().gold;") == 0)
+
+    # now with money
+    d.execute_script("Save.award(1000, 0); renderShop();")
+    d.execute_script("""
+        var els = document.querySelectorAll('.shop-item');
+        for (var i = 0; i < els.length; i++)
+            if (els[i].textContent.indexOf('Leather Vest') >= 0) { els[i].click(); return; }
+    """)
+    time.sleep(0.4)
+    check("shop: buying armor works", d.execute_script("return Save.owns('vest');"))
+    check("shop: armor is equipped on purchase",
+          d.execute_script("return Save.loadout().maxHp;") == 6)
+    check("shop: the gold was spent", d.execute_script("return Save.me().gold;") == 1000 - 80)
+    check("shop: no JS errors", errs() == [], str(errs()))
+
     print("\nMath RPG")
     battle_smoke("math/index.html", "mul", "normal", "math/mul")
+    # the armor bought above must actually be worn in the fight
+    check("math: armor adds a heart",
+          len(d.find_elements(By.CSS_SELECTOR, "#playerHp .pip")) == 6)
+    check("math: the foes come from the hero's world", d.execute_script(
+        "return TEST.FOES[0].id === 'm-slime';"))
     battle_smoke("math/index.html", "add", "easy", "math/add")
     check("math/add: number blocks rendered", d.execute_script(
         "return document.querySelectorAll('.tower .block').length > 0;"))
@@ -171,6 +214,10 @@ try:
 
     print("\nLanguage RPG")
     battle_smoke("language/index.html", "letters", "easy", "lang/letters")
+    check("lang: armor adds a heart",
+          len(d.find_elements(By.CSS_SELECTOR, "#playerPips .pip")) == 6)
+    check("lang: the foes come from the hero's world", d.execute_script(
+        "return TEST.FOES[0].id === 'l-slime';"))
     battle_smoke("language/index.html", "fixit", "normal", "lang/fixit")
     # Fix It! takes two taps: find the mistake, then pick the correction
     earns_smoke(

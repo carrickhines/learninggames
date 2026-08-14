@@ -157,6 +157,34 @@
   }
   #nameInput:focus { border-color: var(--accent); }
 
+  /* ---------- Shop ---------- */
+  .purse-big {
+    font-family: var(--display);
+    font-size: 30px;
+    color: var(--gold);
+    text-shadow: 0 3px 0 rgba(0,0,0,.35);
+    margin: -2px 0 10px;
+  }
+  .rack { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  .shop-item { min-width: 152px; max-width: 190px; }
+  .shop-item .price {
+    display: block;
+    font-family: var(--display);
+    font-size: 15px;
+    color: var(--gold);
+    margin-top: 7px;
+  }
+  /* owned but not worn: readable, but clearly already paid for */
+  .shop-item.owned { border-color: rgba(92,232,160,.45); }
+  .shop-item.owned .price { color: var(--good); }
+  /* worn right now */
+  .shop-item.worn { box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 0 0 3px var(--good), 0 9px 18px rgba(0,0,0,.28); }
+  .shop-item.worn .price { color: var(--good); font-weight: bold; }
+  /* can't afford it yet */
+  .shop-item.broke { opacity: .5; }
+  .shop-item.broke .price { color: rgba(255,255,255,.55); }
+
   /* ---------- Settings ---------- */
   .setting-note {
     font-size: 14px;
@@ -250,7 +278,26 @@
       </div>
 
       <div class="btn-row" style="margin-top:22px">
+        <button id="shopBtn">🛒 Shop</button>
         <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SHOP ================= -->
+  <section class="screen scrolls" id="shop">
+    <div class="screen-inner">
+      <h1>Shop</h1>
+      <div class="purse-big" id="shopGold">🪙 0</div>
+      <div class="subtitle">Spend what you've earned. Tap something you already
+        own to wear it.</div>
+
+      <div id="shopRacks"></div>
+
+      <div class="flash" id="shopFlash"></div>
+
+      <div class="btn-row back-row">
+        <button id="shopBackBtn" class="ghost-btn">Back</button>
       </div>
     </div>
   </section>
@@ -419,6 +466,113 @@ $('heroCard').addEventListener('click', () => {
   renderHeroList();
   showScreen('who');
 });
+
+/* ---------- Shop ---------- */
+const RACKS = [
+  { kind: 'weapon', label: 'Weapons' },
+  { kind: 'armor',  label: 'Armor' },
+  { kind: 'pet',    label: 'Pets' },
+  { kind: 'world',  label: 'Places to fight' },
+  { kind: 'token',  label: 'Treats' },
+];
+
+function renderShop() {
+  const me = Save.me();
+  if (!me) return;
+  $('shopGold').textContent = '🪙 ' + me.gold;
+
+  const racks = $('shopRacks');
+  racks.innerHTML = '';
+  RACKS.forEach(({ kind, label }) => {
+    const heading = document.createElement('div');
+    heading.className = 'group-label';
+    heading.textContent = label;
+    racks.appendChild(heading);
+
+    const row = document.createElement('div');
+    row.className = 'rack';
+    Save.SHOP.filter(it => it.kind === kind).forEach(it => {
+      row.appendChild(shopCard(it, me));
+    });
+    racks.appendChild(row);
+  });
+}
+
+function shopCard(it, me) {
+  const b = document.createElement('button');
+  const owned = Save.owns(it.id);
+  // "worn" means in use right now: equipped gear, or the world you fight in
+  const worn = it.kind === 'world' ? me.progress.world === it.world
+             : it.kind === 'token' ? false
+             : me.inventory[it.kind] === it.id;
+  const affordable = me.gold >= it.cost;
+
+  b.className = 'choice shop-item' +
+    (worn ? ' worn' : '') +
+    (owned && !worn ? ' owned' : '') +
+    (!owned && !affordable ? ' broke' : '');
+
+  let price;
+  if (it.kind === 'token') price = me.inventory.tokens
+      ? `🪙 ${it.cost}  ·  you have ${me.inventory.tokens}` : `🪙 ${it.cost}`;
+  else if (worn) price = it.kind === 'world' ? '✓ Fighting here' : '✓ Wearing it';
+  else if (owned) price = it.kind === 'world' ? 'Tap to go here' : 'Tap to wear it';
+  else price = '🪙 ' + it.cost;
+
+  b.innerHTML = `<span class="emoji">${it.emoji}</span>${escapeHtml(it.name)}` +
+    `<span class="sub">${escapeHtml(it.sub)}</span>` +
+    `<span class="price"></span>`;
+  b.querySelector('.price').textContent = price;
+
+  b.addEventListener('click', () => onShopTap(it, owned, worn));
+  return b;
+}
+
+function onShopTap(it, owned, worn) {
+  Sound.unlock();
+  if (worn && it.kind !== 'token') { Sound.click(); return; }
+
+  // Already paid for: this tap equips it (or travels to that world).
+  if (owned && it.kind !== 'token') {
+    if (it.kind === 'world') Save.setWorld(it.world);
+    else Save.equip(it.id);
+    Sound.tap();
+    shopFlash(it.kind === 'world' ? `Off to the ${it.name}!` : `${it.name} on!`);
+    renderShop();
+    return;
+  }
+
+  const result = Save.buy(it.id);
+  if (result === 'ok') {
+    Sound.buy();
+    shopFlash(it.kind === 'token'
+      ? 'Bought! Redeem it from the hub whenever you like.'
+      : `${it.name} is yours!`);
+  } else if (result === 'broke') {
+    Sound.denied();
+    const short = it.cost - Save.me().gold;
+    shopFlash(`${short} more gold needed — go win some battles!`, true);
+  } else {
+    Sound.denied();
+    shopFlash("Can't buy that right now.", true);
+  }
+  renderShop();
+  renderHome();
+}
+
+function shopFlash(msg, bad) {
+  const f = $('shopFlash');
+  f.textContent = msg;
+  f.classList.toggle('bad', !!bad);
+}
+
+$('shopBtn').addEventListener('click', () => {
+  Sound.click();
+  shopFlash('');
+  renderShop();
+  showScreen('shop');
+});
+$('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 
 $('settingsBtn').addEventListener('click', () => { Sound.click(); flash(''); showScreen('settings'); });
 $('settingsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });

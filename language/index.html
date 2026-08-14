@@ -307,6 +307,7 @@
 
     <div class="arena" id="arena">
       <div class="sprite player" id="playerSprite">🦸</div>
+      <div class="pet" id="pet" style="display:none"></div>
       <div class="slash" id="slash">💥</div>
       <div class="sprite foe" id="foeSprite">👾</div>
     </div>
@@ -1157,13 +1158,11 @@ const MARKS = [
 
 // Foes: escalating HP; last one is the boss. `scale` evens out emoji glyphs
 // that fill their em-box differently, so the foes read as similar-sized.
-const FOES = [
-  { emoji: '🐌', name: 'Slow Slime',    hp: 3, scale: 0.90 },
-  { emoji: '👾', name: 'Pixel Imp',     hp: 3, scale: 0.95 },
-  { emoji: '👻', name: 'Giggly Ghost',  hp: 4, scale: 0.95 },
-  { emoji: '🦖', name: 'Chompy Rex',    hp: 5, scale: 1.05 },
-  { emoji: '🐉', name: 'The Big Dragon',hp: 6, scale: 1.16 },
-];
+// The monsters, the hearts, the timer, and the slash all come from the hero's
+// world and equipped gear (shared/save.js). Read fresh at the start of each run
+// so a shop trip takes effect immediately.
+let FOES = Save.foesFor('language');
+let GEAR = Save.loadout();
 
 // Modes: `total` = seconds on the bar, `fast` = double-hit window,
 // `penalty` = does timing out let the foe attack? (never on Easy)
@@ -1173,7 +1172,7 @@ const MODES = {
   expert: { total: 15, fast: 5,  penalty: true  },
 };
 
-const PLAYER_HP = 5;
+const BASE_PLAYER_HP = 5;   // armor raises this; see GEAR.maxHp
 
 /* ==================================================================
    Helpers
@@ -1199,7 +1198,8 @@ function makeDeck(pool) {
    ================================================================== */
 const state = {
   track: null, mode: null,
-  foeIdx: 0, foeHp: 0, playerHp: PLAYER_HP,
+  foeIdx: 0, foeHp: 0, playerHp: BASE_PLAYER_HP,
+  shield: 0,               // one free hit, if a pet is equipped
   question: null,          // current question object
   answered: false,         // lock input while resolving
   timerId: null, timeLeft: 0, inFastZone: false,
@@ -1286,7 +1286,11 @@ renderMute();
 function startGame() {
   Reward.clear();
   state.foeIdx = 0;
-  state.playerHp = PLAYER_HP;
+  FOES = Save.foesFor('language');
+  GEAR = Save.loadout();
+  renderPet();
+  state.playerHp = GEAR.maxHp;
+  state.shield = GEAR.shield;
   state.draw = makeDeck(
     state.track === 'letters' ? LETTERS :
     state.track === 'sight'   ? SIGHT   :
@@ -1323,8 +1327,14 @@ function renderPips(container, cur, max, kind) {
     container.appendChild(p);
   }
 }
+// The pet companion, shown beside the hero when one is equipped.
+function renderPet() {
+  $('pet').textContent = GEAR.pet || '';
+  $('pet').style.display = GEAR.pet ? '' : 'none';
+}
+
 function renderHp() {
-  renderPips($('playerPips'), Math.max(0, state.playerHp), PLAYER_HP, 'heart');
+  renderPips($('playerPips'), Math.max(0, state.playerHp), GEAR.maxHp, 'heart');
   renderPips($('foePips'), Math.max(0, state.foeHp), FOES[state.foeIdx].hp, 'orb');
 }
 
@@ -1837,7 +1847,7 @@ function playSlash(atFoe) {
   const slash = $('slash');
   slash.style.left = (atFoe ? rect.width * 0.68 : rect.width * 0.18) + 'px';
   slash.style.top = rect.height * 0.18 + 'px';
-  slash.textContent = atFoe ? '💥' : '💢';
+  slash.textContent = atFoe ? GEAR.slash : '💢';
   slash.classList.remove('go');
   void slash.offsetWidth; // restart animation
   slash.classList.add('go');
@@ -1874,7 +1884,9 @@ function animateAttack(attacker, defender, onImpact, onDone) {
    Combat
    ================================================================== */
 function playerAttack(double) {
-  const dmg = double ? 2 : 1;
+  // a sharper weapon sometimes lands an extra point of damage
+  const crit = !double && Math.random() < GEAR.crit;
+  const dmg = double ? GEAR.superDamage : 1 + (crit ? 1 : 0);
   if (double) $('playerSprite').classList.add('super');
 
   animateAttack('player', 'foe',
@@ -1886,7 +1898,7 @@ function playerAttack(double) {
         floatText('DOUBLE! -' + dmg, '#ffd23f', true);
         setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
       } else {
-        floatText('-' + dmg, '#fff', true);
+        floatText((crit ? 'CRIT! -' : '-') + dmg, crit ? '#ffd23f' : '#fff', true);
       }
       $('feedback').textContent = double ? '⭐ DOUBLE HIT! ⭐' : 'Great hit!';
     },
@@ -1908,6 +1920,12 @@ function playerAttack(double) {
 function foeAttack() {
   animateAttack('foe', 'player',
     () => {
+      if (state.shield > 0) {          // the pet blocks one hit per run
+        state.shield--;
+        Sound.click();
+        floatText('BLOCKED!', '#5ce8a0', false);
+        return;
+      }
       state.playerHp -= 1;
       renderHp();
       Sound.hurt();
@@ -1936,7 +1954,9 @@ function nextFoeOrWin() {
    ================================================================== */
 function startTimer() {
   stopTimer();
-  const mode = MODES[state.mode];
+  const m = MODES[state.mode];
+  // a pet buys you a little more time to think, but not a longer fast zone
+  const mode = { total: m.total + GEAR.bonusTime / 1000, fast: m.fast, penalty: m.penalty };
   state.timeLeft = mode.total;
   state.inFastZone = true;
   $('fastMark').style.left = (100 * (mode.total - mode.fast) / mode.total) + '%';

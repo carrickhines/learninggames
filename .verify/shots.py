@@ -127,6 +127,16 @@ try:
     time.sleep(0.6)
     shot("hub-settings")
 
+    # the shop, mid-progression: some gear owned and worn, some out of reach
+    load("index.html")
+    d.execute_script("""
+        Save.award(400, 0);
+        Save.buy('sword'); Save.buy('vest'); Save.buy('chick'); Save.buy('ipad');
+        document.getElementById('shopBtn').click();
+    """)
+    time.sleep(0.6)
+    shot("hub-shop")
+
     # ---------- Math RPG ----------
     load("math/index.html")
     shot("math-menu")
