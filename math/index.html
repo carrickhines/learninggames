@@ -704,6 +704,13 @@
     return climbed;
   }
 
+  /* "the 8th number" reads as a position; "number 8" reads as a value. */
+  function ordinal(n) {
+    const teen = n % 100 >= 11 && n % 100 <= 13;
+    const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th";
+    return n + suffix;
+  }
+
   function makeRule() {
     const tier = ruleTier();
 
@@ -746,13 +753,36 @@
       return { text: seq.join(", ") + ", ?", answer: seq[5] + a };
     }
 
-    // tier 5: stop continuing the pattern and name it, or jump far ahead
+    /* Tier 5: stop continuing the pattern. Either name it, or jump far ahead.
+
+       The jump-ahead is the most valuable question on the whole ladder — it
+       is the moment a child realises he doesn't have to write out every term
+       to know one. But the arithmetic has to stay out of the way, or it
+       becomes a mental-multiplication test instead: "8, 17, 26, 35 … what is
+       number 10?" is 8 + 9x9, which swamps the idea it is trying to teach.
+
+       So mostly the sequence is the multiples of its step, and the answer is
+       a times-table fact he is already drilling next door — "7, 14, 21, 28 …
+       the 8th number" is just 7 x 8. When there is an offset, the step is
+       kept to 2, 5 or 10 and the target position stays close. */
     if (Math.random() < 0.5) {
-      const step = rand(2, 9), start = rand(1, 9);
+      if (Math.random() < 0.75) {
+        // the multiples of one number: the answer is step x position
+        const step = pick([2, 3, 4, 5, 10]);
+        const nth = rand(6, 12);
+        const seq = [step, step * 2, step * 3, step * 4];
+        return {
+          text: seq.join(", ") + `, …   what is the ${ordinal(nth)} number?`,
+          answer: step * nth
+        };
+      }
+      // offset, but with a friendly step and a nearer target
+      const step = pick([2, 5, 10]);
+      const start = rand(1, 4);
+      const nth = rand(5, 8);
       const seq = [start, start + step, start + step * 2, start + step * 3];
-      const nth = rand(7, 12);
       return {
-        text: seq.join(", ") + `, …   what is number ${nth}?`,
+        text: seq.join(", ") + `, …   what is the ${ordinal(nth)} number?`,
         answer: start + step * (nth - 1)
       };
     }

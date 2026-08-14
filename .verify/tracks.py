@@ -231,12 +231,12 @@ try:
             kinds = "tiles" if any(r["choices"] for r in rows) else "numbers"
             print("  PASS  rule tier %d: %d problems (%s)" % (tier, ROUNDS, kinds))
 
-    # tier 5's "what is number N?" form, checked directly
+    # tier 5's jump-ahead form, checked directly
     rows = [q for q in sample("rule", ROUNDS * 2, 5) if not q["choices"]]
     bad = 0
     for q in rows:
         seq = nums(q["text"])
-        nth = seq[-1]                      # the "what is number N?" N
+        nth = seq[-1]                      # the "what is the Nth number?" N
         start, step = seq[0], seq[1] - seq[0]
         if int(q["answer"]) != start + step * (nth - 1):
             bad += 1
@@ -244,6 +244,44 @@ try:
         fail("rule tier 5: %d wrong far-ahead answers" % bad)
     else:
         print("  PASS  rule tier 5: %d far-ahead answers correct" % len(rows))
+
+    # The jump-ahead question teaches that you needn't list every term to know
+    # one. That idea drowns if the arithmetic is hard: "8, 17, 26, 35 ... the
+    # 10th?" is 8 + 9x9 in your head. So either the sequence is the multiples
+    # of its step (making the answer a times-table fact), or the step is one
+    # of the easy ones.
+    hard, far = [], []
+    for q in rows:
+        seq = nums(q["text"])
+        nth = seq[-1]
+        start, step = seq[0], seq[1] - seq[0]
+        if start != step and step not in (2, 5, 10):
+            hard.append(q["text"])
+        if nth > 12:
+            far.append(q["text"])
+    if hard:
+        fail("rule tier 5: %d questions need awkward mental multiplication, e.g. %s"
+             % (len(hard), hard[0]))
+    else:
+        print("  PASS  rule tier 5: the arithmetic stays tractable")
+    if far:
+        fail("rule tier 5: %d ask for a position past 12, e.g. %s" % (len(far), far[0]))
+    else:
+        print("  PASS  rule tier 5: never asks past the 12th position")
+
+    # most of them should be a straight times-table fact
+    tables = [q for q in rows if nums(q["text"])[0] == nums(q["text"])[1] - nums(q["text"])[0]]
+    share = len(tables) / len(rows) if rows else 0
+    if not 0.55 <= share <= 0.95:
+        fail("rule tier 5: %.0f%% are times-table shaped, want most of them" % (share * 100))
+    else:
+        print("  PASS  rule tier 5: %.0f%% are a times-table fact" % (share * 100))
+
+    # and the wording should read as a position, not a value
+    if any("what is number" in q["text"] for q in rows):
+        fail('rule tier 5: still says "what is number N" rather than "the Nth number"')
+    else:
+        print("  PASS  rule tier 5: asks for the Nth number, not number N")
 
     # the ladder must actually climb, and stop at 5
     d.execute_script("Save.update(function (p) { p.progress.seqTier = 1; p.progress.seqCorrect = 0; });")

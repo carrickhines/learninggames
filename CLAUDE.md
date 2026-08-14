@@ -285,10 +285,19 @@ steps up every 5 correct answers, so the ladder is remembered between sessions.
 2. Multiplicative — `2, 4, 8, 16, ?` (the leap from adding to multiplying)
 3. Backwards and dividing — `20, 17, 14, ?` (so "bigger" stops being a safe guess)
 4. Two interleaved rules — `1, 2, 4, 5, 7, 8, ?` (working memory)
-5. Name the rule, or predict the 10th number
+5. Name the rule, or jump ahead to the Nth number
 
 Rung 5 is the point of the whole track: it stops asking *what's the next
 number* and starts asking *what's the rule*.
+
+**The jump-ahead question keeps its arithmetic out of the way.** It exists to
+teach that you needn't list every term to know one — and that idea drowns if
+the sum is hard. `8, 17, 26, 35 … the 10th?` is 8 + 9×9 in your head, which is
+a mental-multiplication test wearing a sequencing costume. So the sequence is
+usually the multiples of its step, making the answer a times-table fact he is
+already drilling next door (`7, 14, 21, 28 … the 8th` is just 7 × 8); when
+there is an offset, the step is 2, 5 or 10 and the target position stays near.
+`tracks.py` enforces both, and that most of them stay times-table shaped.
 
 ## Number blocks (addition, count-on, subtraction)
 
