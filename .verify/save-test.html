@@ -119,9 +119,9 @@ try {
   ok('buying with no gold is refused', Save.buy('sword') === 'broke');
   ok('the refused purchase cost nothing', Save.me().gold === 0);
 
-  Save.award(1000, 0);
+  Save.award(20000, 0);   // enough for several tiers; prices get retuned
   ok('buying with enough gold works', Save.buy('sword') === 'ok');
-  ok('the gold was actually spent', Save.me().gold === 1000 - Save.item('sword').cost);
+  ok('the gold was actually spent', Save.me().gold === 20000 - Save.item('sword').cost);
   ok('the item is owned', Save.owns('sword'));
   ok('buying it twice is refused', Save.buy('sword') === 'owned');
   ok('a purchased weapon is equipped', Save.me().inventory.weapon === 'sword');
@@ -139,9 +139,114 @@ try {
   ok('equipping an owned weapon works', Save.me().inventory.weapon === 'sword');
   ok('equipping an unowned item is refused', Save.equip('axe') === false);
 
+  /* ---------- the v2 economy ---------- */
+  fresh();
+  ok('a new hero has a trinket slot', Save.me().inventory.trinket === null);
+
+  // every tier of every slot must be reachable, or a price is a typo
+  ['weapon', 'armor', 'pet', 'trinket'].forEach(function (kind) {
+    var tiers = Save.SHOP.filter(function (i) { return i.kind === kind; });
+    ok(kind + ': has at least 5 tiers', tiers.length >= 5, 'got ' + tiers.length);
+    var costs = tiers.map(function (i) { return i.cost; });
+    var sorted = costs.slice().sort(function (a, b) { return a - b; });
+    ok(kind + ': tiers are priced in ascending order',
+       JSON.stringify(costs) === JSON.stringify(sorted), costs.join(','));
+    ok(kind + ': exactly one tier is gated on a card set',
+       tiers.filter(function (i) { return i.set; }).length === 1);
+  });
+
+  // the set-gated top tier must refuse gold alone
+  fresh();
+  Save.award(999999, 0);
+  var gated = Save.SHOP.filter(function (i) { return i.set; });
+  ok('every set-gated item names a real world',
+     gated.every(function (i) { return !!Save.world(i.set); }));
+  ok('a set-gated item is refused however rich you are',
+     gated.every(function (i) { return Save.buy(i.id) === 'noset'; }));
+  ok('the refusal spent nothing', Save.me().gold === 999999);
+
+  // ...and accept once the set is held
+  fresh();
+  Save.award(999999, 0);
+  var reef = Save.world('reef');
+  reef.foes.math.concat(reef.foes.language).forEach(function (f) {
+    Save.update(function (p) { p.cards[f.id] = 1; });
+  });
+  ok('holding every card completes the set', Save.hasSet('reef') === true);
+  ok('a completed set appears in setsHeld', Save.setsHeld().indexOf('reef') !== -1);
+  var reefItem = Save.SHOP.filter(function (i) { return i.set === 'reef'; })[0];
+  ok('the set-gated item can now be bought', Save.buy(reefItem.id) === 'ok');
+  ok('a finished set grants a permanent heart', Save.loadout().maxHp >= 6);
+
+  // world gold multipliers
+  fresh();
+  Save.setContext('math');
+  ok('the starting world pays the base rate', Math.abs(Save.goldRate() - 1) < 0.001);
+  Save.award(1000000, 0);
+  Save.buy('world-ember');
+  Save.setWorld('ember');
+  ok('a harder world pays more',
+     Math.abs(Save.goldRate() - Save.world('ember').gold) < 0.001,
+     'rate ' + Save.goldRate());
+  Save.setContext('story');
+  ok("Story Quest doesn't get the world multiplier",
+     Math.abs(Save.goldRate() - 1) < 0.001, 'rate ' + Save.goldRate());
+
+  // the award actually pays the multiplied amount
+  fresh();
+  Save.setContext('math');
+  Save.award(1000000, 0);
+  Save.buy('world-cave');
+  Save.setWorld('cave');
+  var before = Save.me().gold;
+  var paid = Save.award(100, 0);
+  ok('the multiplier is applied when paying out',
+     paid.gold === Math.round(100 * Save.world('cave').gold),
+     'paid ' + paid.gold);
+  ok('the banked gold matches what was reported',
+     Save.me().gold === before + paid.gold);
+
+  // a trinket's gold bonus stacks on top
+  fresh();
+  Save.setContext('math');
+  Save.award(1000000, 0);
+  Save.buy('coin');
+  ok('a lucky coin raises the rate',
+     Save.goldRate() > 1, 'rate ' + Save.goldRate());
+
+  /* ---------- migration from v1 ---------- */
+  Save.reset();
+  var v1 = {
+    v: 1, active: 'old',
+    profiles: { old: { name: 'Veteran', avatar: '🦊', xp: 400, gold: 500,
+      inventory: { owned: ['stick', 'tunic'], weapon: 'stick', armor: 'tunic', pet: null, tokens: 2 },
+      cards: { 'm-slime': 3 },
+      progress: { world: 'meadow', unlockedWorlds: ['meadow'], runsWon: {}, questsDone: [], seqTier: 2 },
+      settings: { modeByGame: {}, lastTrack: {} },
+      stats: { correct: 10, wrong: 2, streak: 0, bestStreak: 5 } } }
+  };
+  localStorage.setItem(Save._key, JSON.stringify(v1));
+  Save._reload();
+  ok('a v1 save still loads', Save.me() && Save.me().name === 'Veteran');
+  ok('gold is scaled by the rebalance factor',
+     Save.me().gold === 500 * Save._goldScale, 'got ' + Save.me().gold);
+  ok('the migration adds the trinket slot', Save.me().inventory.trinket === null);
+  ok('the migration keeps what was already earned',
+     Save.me().xp === 400 && Save.me().cards['m-slime'] === 3 &&
+     Save.me().inventory.tokens === 2);
+  ok('the save is stamped with the new version', Save.load().v === Save._version);
+  ok('the new version was written to storage',
+     JSON.parse(localStorage.getItem(Save._key)).v === Save._version);
+
+  // running it twice must not pay twice
+  var afterFirst = Save.me().gold;
+  Save._reload();
+  ok('the migration does not run a second time',
+     Save.me().gold === afterFirst, 'got ' + Save.me().gold);
+
   /* ---------- worlds ---------- */
   fresh();
-  Save.award(1000, 0);
+  Save.award(100000, 0);   // enough for any world; prices get retuned
   ok('only the meadow is unlocked at first', Save.me().progress.unlockedWorlds.length === 1);
   ok('a locked world cannot be selected', Save.setWorld('cave') === false);
   Save.buy('world-cave');
@@ -154,7 +259,7 @@ try {
   /* ---------- tokens ---------- */
   fresh();
   ok('no tokens to start', Save.useToken() === false);
-  Save.award(1000, 0);
+  Save.award(100000, 0);
   Save.buy('ipad');
   ok('a token can be bought', Save.me().inventory.tokens === 1);
   ok('tokens can be bought more than once', Save.buy('ipad') === 'ok');

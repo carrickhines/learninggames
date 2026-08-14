@@ -1093,6 +1093,7 @@ renderMute();
    Quest flow
    ================================================================== */
 function startQuest() {
+  Save.setContext('story');   // no world multiplier here — there's no world
   state.mode = 'quest';
   state.sceneIdx = 0;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
@@ -1107,6 +1108,7 @@ function startQuest() {
    Little hero games
    ================================================================== */
 function startMini(mode) {
+  Save.setContext('story');
   state.mode = mode;
   state.round = 0;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;

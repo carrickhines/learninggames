@@ -222,6 +222,75 @@ try:
     check("shop: every world beyond the first can be bought",
           sorted(unlockable) == sorted(w["id"] for w in worlds[1:]),
           "%s vs %s" % (unlockable, [w["id"] for w in worlds[1:]]))
+    # ---- the economy curve ----
+    # A price edit shouldn't be able to quietly turn "months" back into "a
+    # week". Simulate a day of play against the real price table and check
+    # the top tier lands in the intended range.
+    econ = js("Save.ECONOMY")
+    worlds = js("Save.WORLDS")
+
+    # what one math run pays in the starting world, at the table rates
+    run_gold = (econ["correct"]["gold"] * 15          # ~15 questions a run
+                + econ["foeDefeated"]["gold"] * 4
+                + econ["runWon"]["gold"])
+    day = run_gold * 5                                # ~30 min/day, ~5 runs
+    check("economy: a day in the meadow pays a sane amount",
+          150 <= day <= 700, "%d gold/day" % day)
+
+    # worlds unlock over the first weeks, and each one raises the rate
+    mults = [w["gold"] for w in worlds]
+    check("economy: every world pays at least as well as the last",
+          mults == sorted(mults) and mults[0] == 1, str(mults))
+    world_costs = [i["cost"] for i in shop if i["kind"] == "world"]
+    check("economy: worlds are priced in ascending order",
+          world_costs == sorted(world_costs), str(world_costs))
+
+    # days to afford everything, letting the rate rise as worlds are bought
+    def days_to(target_gold):
+        gold, days, rate, pending = 0, 0, 1.0, sorted(
+            [(i["cost"], w["gold"]) for i in shop if i["kind"] == "world"
+             for w in worlds if w["id"] == i.get("world")])
+        while gold < target_gold and days < 3000:
+            gold += day * rate
+            days += 1
+            while pending and gold >= pending[0][0]:
+                cost, mult = pending.pop(0)
+                gold -= cost
+                rate = mult
+        return days
+
+    SLOTS = ("weapon", "armor", "pet", "trinket")
+
+    # Tier 4 is the ceiling gold alone can reach — tier 5 also needs a card
+    # set. So tier 4 is the honest measure of "how long does grinding take".
+    tier4 = {k: max(i["cost"] for i in shop
+                    if i["kind"] == k and not i.get("set"))
+             for k in SLOTS}
+    gold_ceiling = days_to(sum(tier4.values()))
+    check("economy: the best gold-only gear takes months, not a week",
+          60 <= gold_ceiling <= 200, "%d days of play" % gold_ceiling)
+
+    # Tier 5 shouldn't ALSO be a gold wall — the card set is the gate, and
+    # finishing a set only to be told you're broke would be a rotten moment.
+    tier5 = {k: max(i["cost"] for i in shop if i["kind"] == k) for k in SLOTS}
+    everything = days_to(sum(tier5.values()))
+    check("economy: the set-gated tier is reachable soon after tier 4",
+          everything - gold_ceiling <= 120,
+          "%d days for tier 4, %d for everything" % (gold_ceiling, everything))
+    check("economy: everything still takes many months",
+          everything >= 100, "%d days" % everything)
+
+    first = min(i["cost"] for i in shop if i["kind"] == "weapon" and i["cost"] > 0)
+    check("economy: something is affordable in the first day or two",
+          first <= day * 2, "first weapon %d vs %d/day" % (first, day))
+
+    gated = [i for i in shop if i.get("set")]
+    check("economy: the top tier of each slot is set-gated",
+          sorted(i["kind"] for i in gated) == ["armor", "pet", "trinket", "weapon"],
+          str(sorted(i["kind"] for i in gated)))
+    check("economy: every gated item points at a real world",
+          all(any(w["id"] == i["set"] for w in worlds) for i in gated))
+
     check("worlds: each has a full lineup for both battle games",
           all(len(w["foes"]["math"]) == 4 and len(w["foes"]["language"]) == 5 for w in worlds))
 finally:

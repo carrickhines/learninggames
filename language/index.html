@@ -1321,6 +1321,7 @@ renderMute();
    ================================================================== */
 function startGame() {
   state.foeIdx = 0;
+  Save.setContext('language');   // the world's gold multiplier applies here
   FOES = Save.foesFor('language');
   GEAR = Save.loadout();
   renderPet();
@@ -2022,7 +2023,12 @@ function startTimer() {
   stopTimer();
   const m = MODES[state.mode];
   // a pet buys you a little more time to think, but not a longer fast zone
-  const mode = { total: m.total + GEAR.bonusTime / 1000, fast: m.fast, penalty: m.penalty };
+  // a pet buys thinking time; an hourglass widens the double-hit window
+  const mode = {
+    total: m.total + (GEAR.bonusTime + GEAR.fastBonus) / 1000,
+    fast: m.fast + GEAR.fastBonus / 1000,
+    penalty: m.penalty
+  };
   state.timeLeft = mode.total;
   state.inFastZone = true;
   $('fastMark').style.left = (100 * (mode.total - mode.fast) / mode.total) + '%';

@@ -44,65 +44,110 @@ var Save = (function () {
   };
 
   /* ---------- Worlds and their monsters ----------------------------------
-     A world is a foe lineup plus a look. Math RPG fights four monsters per
-     run and Language RPG five, so each world lists both. Every foe `id` is
-     also its collectible card id, so it must stay unique across the site. */
+     A world is a foe lineup, a look, and a payout. Math RPG fights four
+     monsters per run and Language RPG five, so each world lists both.
+
+     `gold` multiplies everything earned while fighting there. Harder worlds
+     paying more is what keeps the late shop from becoming a grind — without
+     it, a 12,000-gold sword at the starting rate is a month of nothing.
+
+     Every foe `id` is also its collectible card id, so it must stay unique
+     across the site. `r` is the card's rarity: 1 common, 2 rare, 3 legendary.
+     Each world's last foe is its boss and is always legendary. */
 
   var WORLDS = [
     {
-      id: 'meadow', name: 'Sunny Meadow', emoji: '🌳', cost: 0,
+      id: 'meadow', name: 'Sunny Meadow', emoji: '🌳', gold: 1,
       sub: 'Where every hero starts',
       foes: {
         math: [
-          { id: 'm-slime',  name: 'Slime',   emoji: '🟢', hp: 3, scale: 0.80 },
-          { id: 'm-bat',    name: 'Bat',     emoji: '🦇', hp: 4, scale: 1.05 },
-          { id: 'm-ghost',  name: 'Ghost',   emoji: '👻', hp: 4, scale: 0.92 },
-          { id: 'm-dragon', name: 'Dragon',  emoji: '🐉', hp: 5, scale: 1.16 }
+          { id: 'm-slime',  name: 'Slime',   emoji: '🟢', hp: 3, scale: 0.80, r: 1 },
+          { id: 'm-bat',    name: 'Bat',     emoji: '🦇', hp: 4, scale: 1.05, r: 1 },
+          { id: 'm-ghost',  name: 'Ghost',   emoji: '👻', hp: 4, scale: 0.92, r: 2 },
+          { id: 'm-dragon', name: 'Dragon',  emoji: '🐉', hp: 5, scale: 1.16, r: 3 }
         ],
         language: [
-          { id: 'l-slime',  name: 'Slow Slime',     emoji: '🐌', hp: 3, scale: 0.90 },
-          { id: 'l-imp',    name: 'Pixel Imp',      emoji: '👾', hp: 3, scale: 0.95 },
-          { id: 'l-ghost',  name: 'Giggly Ghost',   emoji: '👻', hp: 4, scale: 0.95 },
-          { id: 'l-rex',    name: 'Chompy Rex',     emoji: '🦖', hp: 5, scale: 1.05 },
-          { id: 'l-dragon', name: 'The Big Dragon', emoji: '🐉', hp: 6, scale: 1.16 }
+          { id: 'l-slime',  name: 'Slow Slime',     emoji: '🐌', hp: 3, scale: 0.90, r: 1 },
+          { id: 'l-imp',    name: 'Pixel Imp',      emoji: '👾', hp: 3, scale: 0.95, r: 1 },
+          { id: 'l-ghost',  name: 'Giggly Ghost',   emoji: '👻', hp: 4, scale: 0.95, r: 1 },
+          { id: 'l-rex',    name: 'Chompy Rex',     emoji: '🦖', hp: 5, scale: 1.05, r: 2 },
+          { id: 'l-dragon', name: 'The Big Dragon', emoji: '🐉', hp: 6, scale: 1.16, r: 3 }
         ]
       }
     },
     {
-      id: 'cave', name: 'Crystal Cave', emoji: '💎', cost: 150,
+      id: 'cave', name: 'Crystal Cave', emoji: '💎', gold: 1.4,
       sub: 'Darker, and the monsters are tougher',
       foes: {
         math: [
-          { id: 'm-crab',   name: 'Rock Crab',    emoji: '🦀', hp: 4, scale: 0.95 },
-          { id: 'm-spider', name: 'Cave Spider',  emoji: '🕷️', hp: 4, scale: 0.90 },
-          { id: 'm-golem',  name: 'Gem Golem',    emoji: '🗿', hp: 5, scale: 1.05 },
-          { id: 'm-kraken', name: 'Deep Kraken',  emoji: '🦑', hp: 6, scale: 1.10 }
+          { id: 'm-crab',   name: 'Rock Crab',    emoji: '🦀', hp: 4, scale: 0.95, r: 1 },
+          { id: 'm-spider', name: 'Cave Spider',  emoji: '🕷️', hp: 4, scale: 0.90, r: 1 },
+          { id: 'm-golem',  name: 'Gem Golem',    emoji: '🗿', hp: 5, scale: 1.05, r: 2 },
+          { id: 'm-kraken', name: 'Deep Kraken',  emoji: '🦑', hp: 6, scale: 1.10, r: 3 }
         ],
         language: [
-          { id: 'l-bug',    name: 'Grumble Bug',  emoji: '🐛', hp: 4, scale: 0.90 },
-          { id: 'l-bat',    name: 'Echo Bat',     emoji: '🦇', hp: 4, scale: 1.00 },
-          { id: 'l-troll',  name: 'Mumble Troll', emoji: '🧌', hp: 5, scale: 1.05 },
-          { id: 'l-squid',  name: 'Inky Squid',   emoji: '🦑', hp: 5, scale: 1.05 },
-          { id: 'l-wyrm',   name: 'Cave Wyrm',    emoji: '🐉', hp: 7, scale: 1.16 }
+          { id: 'l-bug',    name: 'Grumble Bug',  emoji: '🐛', hp: 4, scale: 0.90, r: 1 },
+          { id: 'l-bat',    name: 'Echo Bat',     emoji: '🦇', hp: 4, scale: 1.00, r: 1 },
+          { id: 'l-troll',  name: 'Mumble Troll', emoji: '🧌', hp: 5, scale: 1.05, r: 1 },
+          { id: 'l-squid',  name: 'Inky Squid',   emoji: '🦑', hp: 5, scale: 1.05, r: 2 },
+          { id: 'l-wyrm',   name: 'Cave Wyrm',    emoji: '🐉', hp: 7, scale: 1.16, r: 3 }
         ]
       }
     },
     {
-      id: 'sky', name: 'Sky Castle', emoji: '🏰', cost: 400,
-      sub: 'The toughest monsters of all',
+      id: 'sky', name: 'Sky Castle', emoji: '🏰', gold: 1.8,
+      sub: 'Monsters above the clouds',
       foes: {
         math: [
-          { id: 'm-cloud',  name: 'Storm Cloud',  emoji: '🌩️', hp: 5, scale: 0.95 },
-          { id: 'm-bird',   name: 'Sky Screecher',emoji: '🦅', hp: 5, scale: 1.00 },
-          { id: 'm-robot',  name: 'Clockwork',    emoji: '🤖', hp: 6, scale: 1.00 },
-          { id: 'm-star',   name: 'Star Tyrant',  emoji: '🌟', hp: 7, scale: 1.10 }
+          { id: 'm-cloud',  name: 'Storm Cloud',   emoji: '🌩️', hp: 5, scale: 0.95, r: 1 },
+          { id: 'm-bird',   name: 'Sky Screecher', emoji: '🦅', hp: 5, scale: 1.00, r: 1 },
+          { id: 'm-robot',  name: 'Clockwork',     emoji: '🤖', hp: 6, scale: 1.00, r: 2 },
+          { id: 'm-star',   name: 'Star Tyrant',   emoji: '🌟', hp: 7, scale: 1.10, r: 3 }
         ],
         language: [
-          { id: 'l-owl',    name: 'Riddle Owl',   emoji: '🦉', hp: 5, scale: 0.95 },
-          { id: 'l-genie',  name: 'Word Genie',   emoji: '🧞', hp: 5, scale: 1.05 },
-          { id: 'l-knight', name: 'Iron Knight',  emoji: '🛡️', hp: 6, scale: 0.95 },
-          { id: 'l-phoenix',name: 'Phoenix',      emoji: '🔥', hp: 6, scale: 1.05 },
-          { id: 'l-titan',  name: 'Sky Titan',    emoji: '👹', hp: 8, scale: 1.16 }
+          { id: 'l-owl',    name: 'Riddle Owl',   emoji: '🦉', hp: 5, scale: 0.95, r: 1 },
+          { id: 'l-genie',  name: 'Word Genie',   emoji: '🧞', hp: 5, scale: 1.05, r: 1 },
+          { id: 'l-knight', name: 'Iron Knight',  emoji: '🛡️', hp: 6, scale: 0.95, r: 1 },
+          { id: 'l-phoenix',name: 'Phoenix',      emoji: '🔥', hp: 6, scale: 1.05, r: 2 },
+          { id: 'l-titan',  name: 'Sky Titan',    emoji: '👹', hp: 8, scale: 1.16, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'reef', name: 'Sunken Reef', emoji: '🌊', gold: 2.3,
+      sub: 'Down where the light runs out',
+      foes: {
+        math: [
+          { id: 'm-jelly',  name: 'Zap Jelly',    emoji: '🪼', hp: 6, scale: 0.95, r: 1 },
+          { id: 'm-puffer', name: 'Puffer',       emoji: '🐡', hp: 6, scale: 0.95, r: 1 },
+          { id: 'm-shark',  name: 'Gnash',        emoji: '🦈', hp: 7, scale: 1.10, r: 2 },
+          { id: 'm-leviath',name: 'Leviathan',    emoji: '🐋', hp: 9, scale: 1.16, r: 3 }
+        ],
+        language: [
+          { id: 'l-crab',   name: 'Clacky Crab',  emoji: '🦀', hp: 6, scale: 0.95, r: 1 },
+          { id: 'l-eel',    name: 'Mumble Eel',   emoji: '🐍', hp: 6, scale: 1.00, r: 1 },
+          { id: 'l-turtle', name: 'Old Shellback',emoji: '🐢', hp: 7, scale: 1.00, r: 1 },
+          { id: 'l-siren',  name: 'Siren',        emoji: '🧜', hp: 7, scale: 1.05, r: 2 },
+          { id: 'l-maw',    name: 'The Deep Maw', emoji: '🐙', hp: 10, scale: 1.16, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'ember', name: 'Ember Peak', emoji: '🌋', gold: 3,
+      sub: 'The last mountain. Bring everything.',
+      foes: {
+        math: [
+          { id: 'm-imp',    name: 'Cinder Imp',   emoji: '👺', hp: 7, scale: 0.95, r: 1 },
+          { id: 'm-magma',  name: 'Magma Blob',   emoji: '🟠', hp: 8, scale: 1.00, r: 1 },
+          { id: 'm-titan',  name: 'Ash Titan',    emoji: '🗿', hp: 9, scale: 1.10, r: 2 },
+          { id: 'm-wyrm',   name: 'Emberwyrm',    emoji: '🐲', hp: 11, scale: 1.16, r: 3 }
+        ],
+        language: [
+          { id: 'l-spark',  name: 'Spark Sprite', emoji: '✨', hp: 7, scale: 0.90, r: 1 },
+          { id: 'l-hound',  name: 'Ash Hound',    emoji: '🐕', hp: 8, scale: 1.00, r: 1 },
+          { id: 'l-golem',  name: 'Slag Golem',   emoji: '🪨', hp: 9, scale: 1.05, r: 1 },
+          { id: 'l-djinn',  name: 'Fire Djinn',   emoji: '🔥', hp: 9, scale: 1.05, r: 2 },
+          { id: 'l-emberk', name: 'Ember King',   emoji: '👑', hp: 12, scale: 1.16, r: 3 }
         ]
       }
     }
@@ -125,44 +170,80 @@ var Save = (function () {
   ];
 
   /* ---------- The shop ----------------------------------------------------
-     Buffs are deliberately mild. The point is owning something that grows,
-     not making the math easy. */
+     Five tiers per slot, each roughly 3x the last, so there is always
+     something affordable soon and something a long way off. The top tier of
+     each slot also needs a completed card set (`set`), which is what makes
+     "the best gear" a matter of months rather than a big number.
+
+     Buffs stay mild on purpose. Owning something that grows is the point;
+     making the math easy is not. */
 
   var SHOP = [
-    // Weapons — a chance at extra damage, and they change the slash effect.
+    // ---- Weapons: a chance at extra damage, and the slash effect you see ----
     { id: 'stick', kind: 'weapon', name: 'Wooden Stick', emoji: '🪵', cost: 0,
       sub: 'Your trusty starter', slash: '💥' },
-    { id: 'sword', kind: 'weapon', name: 'Sharp Sword', emoji: '⚔️', cost: 60,
-      sub: 'Sometimes hits extra hard', slash: '⚔️', crit: 0.15 },
-    { id: 'axe', kind: 'weapon', name: 'Battle Axe', emoji: '🪓', cost: 140,
-      sub: 'Extra hits more often', slash: '🪓', crit: 0.25 },
-    { id: 'flame', kind: 'weapon', name: 'Flame Blade', emoji: '🔥', cost: 300,
-      sub: 'DOUBLE hits do 3 damage', slash: '🔥', crit: 0.25, superDamage: 3 },
+    { id: 'sword', kind: 'weapon', name: 'Sharp Sword', emoji: '⚔️', cost: 250,
+      sub: 'Sometimes hits extra hard', slash: '⚔️', crit: 0.12 },
+    { id: 'axe', kind: 'weapon', name: 'Battle Axe', emoji: '🪓', cost: 900,
+      sub: 'Extra hits more often', slash: '🪓', crit: 0.20 },
+    { id: 'flame', kind: 'weapon', name: 'Flame Blade', emoji: '🔥', cost: 3000,
+      sub: 'DOUBLE hits do 3 damage', slash: '🔥', crit: 0.22, superDamage: 3 },
+    { id: 'frost', kind: 'weapon', name: 'Frost Fang', emoji: '❄️', cost: 9000,
+      sub: 'Crits often, DOUBLEs do 3', slash: '❄️', crit: 0.32, superDamage: 3 },
+    { id: 'storm', kind: 'weapon', name: 'Storm Breaker', emoji: '⚡', cost: 30000,
+      set: 'ember', sub: 'DOUBLE hits do 4', slash: '⚡', crit: 0.35, superDamage: 4 },
 
-    // Armor — more hearts.
+    // ---- Armor: more hearts ----
     { id: 'tunic', kind: 'armor', name: 'Cloth Tunic', emoji: '👕', cost: 0,
       sub: '5 hearts', bonusHp: 0 },
-    { id: 'vest', kind: 'armor', name: 'Leather Vest', emoji: '🦺', cost: 80,
+    { id: 'vest', kind: 'armor', name: 'Leather Vest', emoji: '🦺', cost: 250,
       sub: '6 hearts', bonusHp: 1 },
-    { id: 'plate', kind: 'armor', name: 'Shiny Plate', emoji: '🛡️', cost: 250,
+    { id: 'chain', kind: 'armor', name: 'Chain Mail', emoji: '⛓️', cost: 1100,
       sub: '7 hearts', bonusHp: 2 },
+    { id: 'plate', kind: 'armor', name: 'Shiny Plate', emoji: '🛡️', cost: 3400,
+      sub: '8 hearts', bonusHp: 3 },
+    { id: 'scale', kind: 'armor', name: 'Dragon Scale', emoji: '🐲', cost: 10000,
+      sub: '9 hearts', bonusHp: 4 },
+    { id: 'aegis', kind: 'armor', name: 'Star Aegis', emoji: '🌟', cost: 26000,
+      set: 'sky', sub: '10 hearts', bonusHp: 5 },
 
-    // Pets — a companion in the arena with one small passive.
-    { id: 'chick', kind: 'pet', name: 'Cheep', emoji: '🐣', cost: 70,
+    // ---- Pets: a companion in the arena, plus one small passive ----
+    { id: 'chick', kind: 'pet', name: 'Cheep', emoji: '🐣', cost: 200,
       sub: '+2 seconds to think', bonusTime: 2000 },
-    { id: 'cat', kind: 'pet', name: 'Whiskers', emoji: '🐱', cost: 160,
+    { id: 'cat', kind: 'pet', name: 'Whiskers', emoji: '🐱', cost: 950,
       sub: '+3 seconds to think', bonusTime: 3000 },
-    { id: 'drake', kind: 'pet', name: 'Ember', emoji: '🐲', cost: 320,
-      sub: 'Blocks one hit each run', shield: 1 },
+    { id: 'drake', kind: 'pet', name: 'Ember', emoji: '🐲', cost: 3000,
+      sub: 'Blocks one hit each run', shield: 1, bonusTime: 1000 },
+    { id: 'griffin', kind: 'pet', name: 'Skyclaw', emoji: '🦅', cost: 8000,
+      sub: 'Blocks a hit, +3 seconds', shield: 1, bonusTime: 3000 },
+    { id: 'phoenix', kind: 'pet', name: 'Blaze', emoji: '🔥', cost: 22000,
+      set: 'reef', sub: 'Blocks two hits, +4 seconds', shield: 2, bonusTime: 4000 },
 
-    // Worlds — new monsters to fight and new cards to collect.
+    // ---- Trinkets: a fourth slot, and the effects that don't touch damage ----
+    { id: 'coin', kind: 'trinket', name: 'Lucky Coin', emoji: '🪙', cost: 400,
+      sub: '+10% gold', goldBonus: 0.10 },
+    { id: 'lens', kind: 'trinket', name: "Finder's Lens", emoji: '🔎', cost: 1600,
+      sub: 'Monster cards drop more often', cardBonus: 0.5 },
+    { id: 'hourglass', kind: 'trinket', name: 'Hourglass', emoji: '⏳', cost: 4200,
+      sub: 'A wider DOUBLE window', fastBonus: 1500 },
+    { id: 'clover', kind: 'trinket', name: 'Four-Leaf Clover', emoji: '🍀', cost: 11000,
+      sub: '+25% gold, better card luck', goldBonus: 0.25, cardBonus: 0.5 },
+    { id: 'crown', kind: 'trinket', name: "Hero's Crown", emoji: '👑', cost: 28000,
+      set: 'cave', sub: '+50% gold, wide DOUBLE window',
+      goldBonus: 0.50, fastBonus: 2000, cardBonus: 0.5 },
+
+    // ---- Worlds: new monsters, new cards, and better pay ----
     { id: 'world-cave', kind: 'world', world: 'cave', name: 'Crystal Cave',
-      emoji: '💎', cost: 150, sub: 'Four new monsters' },
+      emoji: '💎', cost: 1200, sub: 'New monsters · 1.4× gold' },
     { id: 'world-sky', kind: 'world', world: 'sky', name: 'Sky Castle',
-      emoji: '🏰', cost: 400, sub: 'The toughest monsters' },
+      emoji: '🏰', cost: 5000, sub: 'New monsters · 1.8× gold' },
+    { id: 'world-reef', kind: 'world', world: 'reef', name: 'Sunken Reef',
+      emoji: '🌊', cost: 14000, sub: 'New monsters · 2.3× gold' },
+    { id: 'world-ember', kind: 'world', world: 'ember', name: 'Ember Peak',
+      emoji: '🌋', cost: 30000, sub: 'New monsters · 3× gold' },
 
     // The old automatic win reward, now something you choose to spend on.
-    { id: 'ipad', kind: 'token', name: 'iPad Time Token', emoji: '🎟️', cost: 150,
+    { id: 'ipad', kind: 'token', name: 'iPad Time Token', emoji: '🎟️', cost: 600,
       sub: '5–10 minutes, redeem any time' }
   ];
 
@@ -182,6 +263,7 @@ var Save = (function () {
         weapon: 'stick',
         armor: 'tunic',
         pet: null,
+        trinket: null,
         tokens: 0
       },
       cards: {},                     // card id -> times caught
@@ -192,15 +274,19 @@ var Save = (function () {
         questsDone: [],              // Story Quest quest indexes
         seqTier: 1,                  // Rule Hunter rung (math), 1-5
         seqCorrect: 0,               // correct answers on the current rung
-        skipMastered: false          // unlocks skip-counting by 2s and 3s
+        skipMastered: false,         // unlocks skip-counting by 2s and 3s
+        koSinceCard: 0               // pity counter for card drops
       },
       settings: { modeByGame: {}, lastTrack: {} },
       stats: { correct: 0, wrong: 0, streak: 0, bestStreak: 0 }
     };
   }
 
+  var VERSION = 2;
+  var V2_GOLD_SCALE = 20;   // see migrate(): the v2 price rebalance factor
+
   function blankSave() {
-    return { v: 1, active: null, profiles: {} };
+    return { v: VERSION, active: null, profiles: {} };
   }
 
   var data = null;
@@ -211,10 +297,36 @@ var Save = (function () {
       if (!raw) return blankSave();
       var d = JSON.parse(raw);
       if (!d || typeof d !== 'object' || !d.profiles) return blankSave();
-      return d;
+      return migrate(d);
     } catch (e) {
       return blankSave();          // corrupt or unreadable: start clean
     }
+  }
+
+  /* Bring an older save forward. Runs once — `v` is bumped and written back,
+     so a hero can't be paid the migration bonus twice. */
+  function migrate(d) {
+    var v = d.v || 1;
+    if (v >= VERSION) return d;
+
+    if (v < 2) {
+      // Prices went up roughly 20x in the v2 rebalance (the whole shop moved
+      // from ~1,900 gold to ~40,000). Scale what everyone already has by the
+      // same factor, so the change neither strands a saver nor makes anyone
+      // instantly rich.
+      Object.keys(d.profiles).forEach(function (id) {
+        var p = d.profiles[id];
+        p.gold = Math.round((p.gold || 0) * V2_GOLD_SCALE);
+        // fields added in v2
+        if (!p.inventory) p.inventory = {};
+        if (p.inventory.trinket === undefined) p.inventory.trinket = null;
+        if (!p.progress) p.progress = {};
+        if (p.progress.koSinceCard === undefined) p.progress.koSinceCard = 0;
+      });
+    }
+
+    d.v = VERSION;
+    return d;
   }
 
   function write() {
@@ -227,7 +339,13 @@ var Save = (function () {
   }
 
   function load() {
-    if (!data) data = read();
+    if (!data) {
+      var before = null;
+      try { before = localStorage.getItem(KEY); } catch (e) { /* storage off */ }
+      data = read();
+      // if read() migrated, write the result back so it only happens once
+      if (before && data.v === VERSION && before.indexOf('"v":' + VERSION) === -1) write();
+    }
     return data;
   }
 
@@ -314,15 +432,33 @@ var Save = (function () {
      award() returns what actually happened so the caller can animate it:
        { gold, xp, leveledTo }   leveledTo is null unless a level was gained. */
 
+  /* Which game is being played right now. The world's gold multiplier only
+     applies where you actually fight in a world, so parking in Ember Peak
+     can't inflate Story Quest's payouts. Games set this at run start. */
+  var context = null;
+  function setContext(game) { context = game; }
+
+  function goldRate() {
+    var p = me();
+    if (!p) return 1;
+    var mult = 1;
+    if (context === 'math' || context === 'language') {
+      var w = world(p.progress.world);
+      if (w) mult = w.gold || 1;
+    }
+    return mult * (1 + loadout().goldBonus);
+  }
+
   function award(gold, xp) {
     var p = me();
     if (!p) return { gold: 0, xp: 0, leveledTo: null };
+    var paid = Math.round(gold * goldRate());
     var before = levelOf(p).level;
-    p.gold += gold;
+    p.gold += paid;
     p.xp += xp;
     var after = levelOf(p).level;
     write();
-    return { gold: gold, xp: xp, leveledTo: after > before ? after : null };
+    return { gold: paid, xp: xp, leveledTo: after > before ? after : null };
   }
 
   /* Convenience for the events in the ECONOMY table above. */
@@ -404,13 +540,15 @@ var Save = (function () {
     return !!p && p.inventory.owned.indexOf(id) !== -1;
   }
 
-  /* Buy an item. Returns 'ok', 'broke', 'owned', or 'nosuch'. Tokens are
-     consumable, so they can be bought over and over. */
+  /* Buy an item. Returns 'ok', 'broke', 'owned', 'noset', or 'nosuch'.
+     Tokens are consumable, so they can be bought over and over. */
   function buy(id) {
     var p = me();
     var it = item(id);
     if (!p || !it) return 'nosuch';
     if (it.kind !== 'token' && owns(id)) return 'owned';
+    // the best of each slot is gated on a finished card set, not just gold
+    if (it.set && !hasSet(it.set, p)) return 'noset';
     if (p.gold < it.cost) return 'broke';
 
     p.gold -= it.cost;
@@ -428,10 +566,12 @@ var Save = (function () {
     return 'ok';
   }
 
+  var SLOTS = ['weapon', 'armor', 'pet', 'trinket'];
+
   function equip(id) {
     var it = item(id);
     if (!it || !owns(id)) return false;
-    if (it.kind !== 'weapon' && it.kind !== 'armor' && it.kind !== 'pet') return false;
+    if (SLOTS.indexOf(it.kind) === -1) return false;
     update(function (p) { p.inventory[it.kind] = id; });
     return true;
   }
@@ -454,11 +594,15 @@ var Save = (function () {
 
   function loadout() {
     var p = me();
-    var base = { maxHp: 5, bonusTime: 0, crit: 0, superDamage: 2, slash: '💥', pet: null, shield: 0 };
+    var base = {
+      maxHp: 5, bonusTime: 0, fastBonus: 0, crit: 0, superDamage: 2,
+      slash: '💥', pet: null, shield: 0, goldBonus: 0, cardBonus: 0
+    };
     if (!p) return base;
     var w = item(p.inventory.weapon);
     var a = item(p.inventory.armor);
     var pet = item(p.inventory.pet);
+    var tr = item(p.inventory.trinket);
     if (w) {
       base.crit = w.crit || 0;
       base.superDamage = w.superDamage || 2;
@@ -470,7 +614,44 @@ var Save = (function () {
       base.bonusTime = pet.bonusTime || 0;
       base.shield = pet.shield || 0;
     }
+    if (tr) {
+      base.goldBonus = tr.goldBonus || 0;
+      base.cardBonus = tr.cardBonus || 0;
+      base.fastBonus = tr.fastBonus || 0;
+      base.bonusTime += tr.bonusTime || 0;
+    }
+    // completing a world's card set is permanent, and stacks
+    setPerks(p, base);
     return base;
+  }
+
+  /* Perks from completed card sets. Phase 2 fills SET_PERKS in; the shape is
+     here now so loadout() has one place to apply them. */
+  function setPerks(p, base) {
+    WORLDS.forEach(function (w) {
+      if (!hasSet(w.id, p)) return;
+      base.maxHp += 1;                 // every finished set is a heart
+      base.goldBonus += 0.05;
+    });
+  }
+
+  /* Does this profile hold every card in a world? That's what gates the top
+     tier of each gear slot, and what the Card Trader trades against. */
+  function hasSet(worldId, p) {
+    p = p || me();
+    var w = world(worldId);
+    if (!p || !w) return false;
+    var all = w.foes.math.concat(w.foes.language);
+    for (var i = 0; i < all.length; i++) {
+      if (!p.cards[all[i].id]) return false;
+    }
+    return true;
+  }
+
+  /* Which sets are done — the hub shows these, and buy() checks them. */
+  function setsHeld() {
+    return WORLDS.filter(function (w) { return hasSet(w.id); })
+                 .map(function (w) { return w.id; });
   }
 
   /* The foe lineup for a game, from the profile's currently selected world. */
@@ -595,6 +776,10 @@ var Save = (function () {
     item: item,
     owns: owns,
     buy: buy,
+    hasSet: hasSet,
+    setsHeld: setsHeld,
+    setContext: setContext,
+    goldRate: goldRate,
     equip: equip,
     unequipPet: unequipPet,
     useToken: useToken,
@@ -612,6 +797,11 @@ var Save = (function () {
     importFile: importFile,
     reset: reset,
 
-    _key: KEY
+    /* Test seam: drop the in-memory copy so the next call re-reads (and
+       re-migrates) from storage, the way a fresh page load would. */
+    _reload: function () { data = null; load(); },
+    _key: KEY,
+    _version: VERSION,
+    _goldScale: V2_GOLD_SCALE
   };
 })();

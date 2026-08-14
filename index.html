@@ -184,6 +184,9 @@
   /* can't afford it yet */
   .shop-item.broke { opacity: .5; }
   .shop-item.broke .price { color: rgba(255,255,255,.55); }
+  /* gold isn't the problem — it needs a finished card set */
+  .shop-item.setlocked { opacity: .6; border-color: rgba(255,210,63,.35); }
+  .shop-item.setlocked .price { color: var(--accent); }
 
   /* ---------- Monster cards ---------- */
   .shelf {
@@ -568,11 +571,12 @@ $('heroCard').addEventListener('click', () => {
 
 /* ---------- Shop ---------- */
 const RACKS = [
-  { kind: 'weapon', label: 'Weapons' },
-  { kind: 'armor',  label: 'Armor' },
-  { kind: 'pet',    label: 'Pets' },
-  { kind: 'world',  label: 'Places to fight' },
-  { kind: 'token',  label: 'Treats' },
+  { kind: 'weapon',  label: 'Weapons' },
+  { kind: 'armor',   label: 'Armor' },
+  { kind: 'pet',     label: 'Pets' },
+  { kind: 'trinket', label: 'Trinkets' },
+  { kind: 'world',   label: 'Places to fight' },
+  { kind: 'token',   label: 'Treats' },
 ];
 
 function renderShop() {
@@ -605,17 +609,21 @@ function shopCard(it, me) {
              : it.kind === 'token' ? false
              : me.inventory[it.kind] === it.id;
   const affordable = me.gold >= it.cost;
+  // the best of each slot also needs a finished card set
+  const setLocked = !!it.set && !Save.hasSet(it.set);
 
   b.className = 'choice shop-item' +
     (worn ? ' worn' : '') +
     (owned && !worn ? ' owned' : '') +
-    (!owned && !affordable ? ' broke' : '');
+    (!owned && setLocked ? ' setlocked' : '') +
+    (!owned && !setLocked && !affordable ? ' broke' : '');
 
   let price;
   if (it.kind === 'token') price = me.inventory.tokens
       ? `🪙 ${it.cost}  ·  you have ${me.inventory.tokens}` : `🪙 ${it.cost}`;
   else if (worn) price = it.kind === 'world' ? '✓ Fighting here' : '✓ Wearing it';
   else if (owned) price = it.kind === 'world' ? 'Tap to go here' : 'Tap to wear it';
+  else if (setLocked) price = `🔒 ${Save.world(it.set).name} set`;
   else price = '🪙 ' + it.cost;
 
   b.innerHTML = `<span class="emoji">${it.emoji}</span>${escapeHtml(it.name)}` +
@@ -651,12 +659,24 @@ function onShopTap(it, owned, worn) {
     Sound.denied();
     const short = it.cost - Save.me().gold;
     shopFlash(`${short} more gold needed — go win some battles!`, true);
+  } else if (result === 'noset') {
+    Sound.denied();
+    const w = Save.world(it.set);
+    shopFlash(`Collect every ${w.name} monster card first — ${w.emoji} ${setCardsLeft(it.set)} to go!`, true);
   } else {
     Sound.denied();
     shopFlash("Can't buy that right now.", true);
   }
   renderShop();
   renderHome();
+}
+
+// How many of a world's cards are still missing, for the shop's locked note.
+function setCardsLeft(worldId) {
+  const w = Save.world(worldId);
+  const me = Save.me();
+  const all = w.foes.math.concat(w.foes.language);
+  return all.filter(f => !(me.cards[f.id] > 0)).length;
 }
 
 function shopFlash(msg, bad) {

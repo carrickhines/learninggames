@@ -217,7 +217,11 @@ try:
     check("shop: buying armor works", d.execute_script("return Save.owns('vest');"))
     check("shop: armor is equipped on purchase",
           d.execute_script("return Save.loadout().maxHp;") == 6)
-    check("shop: the gold was spent", d.execute_script("return Save.me().gold;") == 1000 - 80)
+    # read the price rather than hardcoding it — the economy gets retuned
+    vest = d.execute_script("return Save.item('vest').cost;")
+    check("shop: the gold was spent",
+          d.execute_script("return Save.me().gold;") == 1000 - vest,
+          "expected %d" % (1000 - vest))
     check("shop: no JS errors", errs() == [], str(errs()))
 
     print("\nCollection")

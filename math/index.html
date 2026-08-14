@@ -811,7 +811,12 @@
     stopTimer();
     const m = MODES[state.mode];
     // a pet buys you a little more time to think, but not a longer fast zone
-    const mode = { total: m.total + GEAR.bonusTime, fast: m.fast, penalty: m.penalty };
+    // a pet buys thinking time; an hourglass widens the double-hit window
+    const mode = {
+      total: m.total + GEAR.bonusTime + GEAR.fastBonus,
+      fast: m.fast + GEAR.fastBonus,
+      penalty: m.penalty
+    };
     state.timerStart = performance.now();
 
     // place the marker at the boundary between the fast zone and the rest
@@ -839,7 +844,7 @@
 
   // Was the answer given while the fast zone was still active?
   function isFastAnswer() {
-    return (performance.now() - state.timerStart) < MODES[state.mode].fast;   // gear never widens the fast zone
+    return (performance.now() - state.timerStart) < MODES[state.mode].fast + GEAR.fastBonus;
   }
 
   function stopTimer() {
@@ -1239,6 +1244,7 @@
   function startGame() {
     Sound.unlock();
     Sound.click();
+    Save.setContext("math");     // the world's gold multiplier applies here
     FOES = Save.foesFor("math");
     GEAR = Save.loadout();
     renderPet();

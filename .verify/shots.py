@@ -155,8 +155,9 @@ try:
     # the shop, mid-progression: some gear owned and worn, some out of reach
     load("index.html")
     d.execute_script("""
-        Save.award(400, 0);
-        Save.buy('sword'); Save.buy('vest'); Save.buy('chick'); Save.buy('ipad');
+        Save.award(6000, 0);
+        Save.buy('sword'); Save.buy('vest'); Save.buy('chick');
+        Save.buy('coin'); Save.buy('ipad'); Save.buy('world-cave');
         document.getElementById('shopBtn').click();
     """)
     time.sleep(0.6)
