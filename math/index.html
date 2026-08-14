@@ -1137,7 +1137,7 @@
       Save.recordAnswer(true);
       Hud.applied(Save.awardEvent(isSuper ? "correctFast" : "correct"));
       const climbed = bumpRuleTier();
-      if (climbed) setTimeout(() => Hud.levelUp(climbed), 900);
+      if (climbed) Hud.queue({ kind: "level", level: climbed });
       if (isSuper) el.playerSprite.classList.add("super");
       animateAttack("player", "foe",
         () => {
@@ -1215,8 +1215,7 @@
     Hud.applied(Save.awardEvent("foeDefeated"));
     // the monster you just beat may leave its collectible card behind
     const foe = FOES[state.foeIndex];
-    const drop = Save.awardCard(foe.id);
-    if (drop) setTimeout(() => Hud.cardDrop(drop), 500);
+    Hud.cardDrop(Save.awardCard(foe.id));
     el.foeSprite.style.transition = "transform .6s, opacity .6s";
     el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
     el.foeSprite.style.opacity = "0";
@@ -1224,14 +1223,20 @@
     setTimeout(() => {
       state.foeIndex++;
       if (state.foeIndex >= FOES.length) return win();
-      setupFoe();
-      el.foeSprite.style.transition = "transform .5s, opacity .5s";
-      el.foeSprite.style.transform = "scaleX(-1) scale(1)";
-      el.foeSprite.style.opacity = "1";
-      floatText("New foe!", "#fff", true);
-      state.busy = false;
-      newProblem();
+      // Anything earned fighting that monster opens now, while there's no
+      // question on screen for it to cover. The next monster waits for it.
+      Hud.flush(nextFoe);
     }, 900);
+  }
+
+  function nextFoe() {
+    setupFoe();
+    el.foeSprite.style.transition = "transform .5s, opacity .5s";
+    el.foeSprite.style.transform = "scaleX(-1) scale(1)";
+    el.foeSprite.style.opacity = "1";
+    floatText("New foe!", "#fff", true);
+    state.busy = false;
+    newProblem();
   }
 
   function setupFoe() {
@@ -1301,6 +1306,7 @@
     Log.endSession({ won: true, gold: earnedThisRun() });
     showScreen("endScreen");
     Hud.applied(bonus);
+    Hud.flush();          // nothing left to cover here
   }
 
   function gameOver() {
@@ -1312,6 +1318,7 @@
     Sound.lose();
     Log.endSession({ won: false, gold: earnedThisRun() });
     showScreen("endScreen");
+    Hud.flush();          // whatever was earned still gets opened
   }
 
   // What this run put in the purse. Gold is the reward now — iPad time is

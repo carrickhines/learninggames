@@ -35,6 +35,11 @@ var Hud = (function () {
       '.hud .nm{max-width:9ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud .coins{color:var(--gold);text-shadow:0 2px 3px rgba(0,0,0,.5)}',
       '.hud .home{opacity:.6;font-size:15px}',
+      /* something is waiting to be opened */
+      '.hud .waiting{background:linear-gradient(180deg,#ffe27a,var(--accent));',
+      'color:var(--ink);border-radius:999px;padding:2px 7px;font-size:12px;',
+      'box-shadow:0 2px 0 var(--accent-2);animation:waitBob 1.1s ease-in-out infinite}',
+      '@keyframes waitBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
       /* a run's earnings float up off the chip */
       '.hud-float{position:absolute;top:44px;left:20px;z-index:21;font-family:var(--display);',
       'font-size:20px;font-weight:bold;color:var(--gold);pointer-events:none;',
@@ -93,6 +98,7 @@ var Hud = (function () {
       '<span class="coins">🪙 ' + me.gold + '</span>' +
       '<span class="home">🏠</span>';
     el.querySelector('.nm').textContent = me.name;   // never trust a typed name in HTML
+    badge();                                         // render() rebuilt the chip
   }
 
   /* Float "+N 🪙" off the chip and refresh it. */
@@ -106,6 +112,65 @@ var Hud = (function () {
     setTimeout(function () { f.remove(); }, 1100);
   }
 
+  /* ---------- The reward queue ----------------------------------------------
+     Level-ups and card drops are full-screen banners, and they used to fire
+     the instant they were earned — which meant landing on top of the question
+     the child was still reading. They're held instead, and released at a
+     moment when there's nothing to cover: between monsters, or on the end
+     screen. The chip shows a badge while something is waiting, so the wait
+     itself is part of the anticipation.
+
+     Small feedback (the gold float) stays immediate — it's a corner wisp,
+     not a banner, and it never covers anything. */
+
+  var queued = [];
+  var draining = false;
+
+  function queue(item) {
+    if (!item) return;
+    queued.push(item);
+    badge();
+  }
+
+  function pending() { return queued.length; }
+
+  /* Show everything held, one after another, then call `done`. Safe to call
+     with nothing queued — it just runs `done` straight away. */
+  function flush(done) {
+    if (draining) return;
+    if (!queued.length) { if (done) done(); return; }
+    draining = true;
+
+    var play = function () {
+      if (!queued.length) {
+        draining = false;
+        badge();
+        if (done) done();
+        return;
+      }
+      var item = queued.shift();
+      badge();
+      var hold = item.kind === 'card' ? (item.drop.foil ? 2400 : 1800) : 1800;
+      if (item.kind === 'card') showCard(item.drop);
+      else showLevel(item.level);
+      setTimeout(play, hold + 220);
+    };
+    play();
+  }
+
+  /* A pip on the chip while a reward is waiting to be opened. */
+  function badge() {
+    if (!el) return;
+    var b = el.querySelector('.waiting');
+    if (!queued.length) { if (b) b.remove(); return; }
+    if (!b) {
+      b = document.createElement('span');
+      b.className = 'waiting';
+      el.appendChild(b);
+    }
+    b.textContent = '🎁' + (queued.length > 1 ? queued.length : '');
+  }
+
   /* "You caught a card!" — the drop moment.
 
      `drop` is what Save.awardCard() returned:
@@ -114,7 +179,7 @@ var Hud = (function () {
      shiny frame for a foil, and the rarity said out loud. */
   var RARITY = { 1: 'CARD', 2: 'RARE CARD', 3: 'LEGENDARY CARD' };
 
-  function cardDrop(drop) {
+  function showCard(drop) {
     if (!drop) return;
     var card = Save.card(drop.id);
     if (!card) return;
@@ -135,8 +200,8 @@ var Hud = (function () {
     setTimeout(function () { box.remove(); }, drop.foil ? 2400 : 1800);
   }
 
-  /* A full-screen "LEVEL 4!" moment. Brief, and it blocks nothing. */
-  function levelUp(level) {
+  /* A full-screen "LEVEL 4!" moment. */
+  function showLevel(level) {
     render();
     Sound.levelUp();
     var box = document.createElement('div');
@@ -148,13 +213,22 @@ var Hud = (function () {
   }
 
   /* The one call a game makes after any scoring event: hand it whatever
-     Save.award()/awardEvent() returned and the HUD does the rest. */
+     Save.award()/awardEvent() returned and the HUD does the rest. The gold
+     shows at once; a level-up waits for a gap in the game. */
   function applied(result) {
     if (!result) return;
     if (result.gold) gained(result.gold);
     else render();
-    if (result.leveledTo) levelUp(result.leveledTo);
+    if (result.leveledTo) queue({ kind: 'level', level: result.leveledTo });
   }
+
+  /* A card drop waits its turn too. */
+  function cardDrop(drop) {
+    if (drop) queue({ kind: 'card', drop: drop });
+  }
+
+  /* For the end screens, where a banner covers nothing anyway. */
+  function levelUp(level) { queue({ kind: 'level', level: level }); flush(); }
 
   /* Beating a map stop: stash what it paid and send the player back to the
      map, where the hero walks on and the chest opens. The reward lands where
@@ -175,6 +249,9 @@ var Hud = (function () {
     gained: gained,
     levelUp: levelUp,
     cardDrop: cardDrop,
-    applied: applied
+    applied: applied,
+    queue: queue,
+    pending: pending,
+    flush: flush
   };
 })();

@@ -1306,7 +1306,8 @@ function miniComplete() {
   Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
-  if (drop) later(() => Hud.cardDrop(drop), 1400);
+  Hud.cardDrop(drop);
+  Hud.flush();          // nothing left to cover here
 }
 
 const MINI_CARDS = {
@@ -1513,7 +1514,8 @@ function questComplete() {
   Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
-  if (drop) later(() => Hud.cardDrop(drop), 1400);
+  Hud.cardDrop(drop);
+  Hud.flush();          // nothing left to cover here
 }
 
 // What this quest put in the purse. Gold is the reward now — iPad time is
@@ -1542,6 +1544,7 @@ function questFailed() {
   Sound.gameover();
   Log.endSession({ won: false, gold: earnedThisRun() });
   showScreen('lose');
+  Hud.flush();          // whatever was earned still gets opened
 }
 
 $('winAgainBtn').addEventListener('click', () => {

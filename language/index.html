@@ -2010,9 +2010,7 @@ function playerAttack(double) {
         $('foeSprite').classList.add('ko');
         Hud.applied(Save.awardEvent('foeDefeated'));
         // the monster you just beat may leave its collectible card behind
-        const foe = FOES[state.foeIdx];
-        const drop = Save.awardCard(foe.id);
-        if (drop) setTimeout(() => Hud.cardDrop(drop), 500);
+        Hud.cardDrop(Save.awardCard(FOES[state.foeIdx].id));
         setTimeout(nextFoeOrWin, 900);
       } else {
         setTimeout(newQuestion, 600);
@@ -2044,13 +2042,14 @@ function foeAttack() {
 
 function nextFoeOrWin() {
   state.foeIdx++;
-  if (state.foeIdx >= FOES.length) {
-    winGame();
-  } else {
+  if (state.foeIdx >= FOES.length) return winGame();
+  // Anything earned fighting that monster opens now, while there's no
+  // question on screen for it to cover. The next monster waits for it.
+  Hud.flush(() => {
     $('feedback').textContent = '';
     spawnFoe();
     floatText('New foe!', '#fff', true);
-  }
+  });
 }
 
 /* ==================================================================
@@ -2123,6 +2122,7 @@ function winGame() {
   Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
+  Hud.flush();          // nothing left to cover here
 }
 
 // What this run put in the purse. Gold is the reward now — iPad time is
@@ -2146,6 +2146,7 @@ function gameOver() {
   Voice.play(['P_lose'], 'Oh no! Try again — you can do it!');
   Log.endSession({ won: false, gold: earnedThisRun() });
   showScreen('lose');
+  Hud.flush();          // whatever was earned still gets opened
 }
 
 $('winAgainBtn').addEventListener('click', () => {

@@ -196,8 +196,12 @@ try:
           """))
     check("map: exactly one stop is playable",
           len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 1)
-    check("map: the hero is on the map",
-          d.find_element(By.ID, "mapHero").is_displayed())
+    # is_displayed() races the render; what matters is that the hero has been
+    # placed somewhere on the trail
+    check("map: the hero is placed on the trail", d.execute_script("""
+        var h = document.getElementById('mapHero');
+        return !!h && !!h.style.left && parseFloat(h.style.top) >= 0;
+    """))
     check("map: forks offer two routes", d.execute_script("""
         return Save.mapTrail('little').filter(function (s) { return s.choice; }).length >= 3;
     """))

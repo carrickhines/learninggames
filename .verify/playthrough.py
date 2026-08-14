@@ -333,6 +333,63 @@ try:
         check("the review list keeps the question itself",
               all(m["q"] for m in missed))
 
+    print("\nRewards never cover the question")
+    fresh_hero("BannerRunner")
+    load("math/index.html")
+    click('[data-track="mul"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.0)
+
+    # Force a level-up and a card drop to be earned mid-battle, then play on
+    # and check nothing ever lands on top of a live question.
+    d.execute_script("""
+        window.__overlap = 0;
+        window.__seen = 0;
+        // watch for a banner while a question is on screen
+        window.__watch = setInterval(function () {
+            var banner = document.querySelector('.levelup');
+            if (!banner) return;
+            window.__seen++;
+            var q = document.getElementById('question');
+            var battleUp = document.getElementById('battle').classList.contains('show');
+            var qVisible = q && q.getBoundingClientRect().height > 0;
+            if (battleUp && qVisible && !TEST.state.busy) window.__overlap++;
+        }, 60);
+        // one XP short of a level, so the next right answer crosses it
+        Save.update(function (p) { p.xp = 99; });
+    """)
+
+    for _ in range(90):
+        if showing("endScreen"):
+            break
+        d.execute_script("""
+            if (TEST.state.busy) return;
+            if (document.querySelector('.levelup')) return;   // a banner is up
+            if (TEST.state.choices) {
+                var t = document.querySelectorAll('#tiles .tile');
+                for (var i = 0; i < t.length; i++)
+                    if (t[i].textContent === String(TEST.state.answer)) { t[i].click(); return; }
+            } else {
+                document.getElementById('answer').value = String(TEST.state.answer);
+                document.getElementById('attackBtn').click();
+            }
+        """)
+        time.sleep(0.55)
+
+    res = d.execute_script(
+        "clearInterval(window.__watch);"
+        "return { overlap: window.__overlap, seen: window.__seen };")
+    check("rewards: a banner did appear during the run", res["seen"] > 0,
+          "never saw one, so the check proves nothing")
+    check("rewards: no banner ever covered a live question", res["overlap"] == 0,
+          "%d frames with a banner over a question" % res["overlap"])
+    check("rewards: nothing is left waiting at the end",
+          d.execute_script("return Hud.pending();") == 0)
+    check("rewards: the level was actually gained",
+          d.execute_script("return Save.levelOf(Save.me()).level;") >= 2)
+    check("rewards: no JS errors", errs() == [], str(errs()))
+
     print("\nThe map")
     fresh_hero("MapRunner")
     load("index.html")

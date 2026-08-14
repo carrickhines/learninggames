@@ -292,6 +292,15 @@ try:
     time.sleep(0.3)
     shot("math-battle-dragon")
 
+    # a reward waiting to be opened: the chip shows a badge, the question is clear
+    d.execute_script("Hud.queue({kind:'level', level:4}); Hud.queue({kind:'card', drop:{id:'m-bat', how:'new', foil:false}});")
+    time.sleep(0.3)
+    d.execute_script(NO_ANIM)
+    shot("math-reward-waiting")
+    d.execute_script("Hud.flush();")
+    time.sleep(0.4)
+    shot("math-reward-opened")
+
     # earning: the gold float off the chip, and the level-up banner
     d.execute_script("Hud.gained(4);")
     time.sleep(0.35)
