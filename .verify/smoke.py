@@ -69,7 +69,13 @@ def click(sel):
 
 
 def text(sel):
-    return d.find_element(By.CSS_SELECTOR, sel).text.strip()
+    """Read textContent rather than Selenium's .text, which returns "" for an
+    element the driver considers not yet visible — a screen caught mid
+    fade-in reads as empty and fails a check that has nothing to do with
+    visibility. Where visibility is the point, checks use is_displayed()."""
+    return d.execute_script(
+        "var e = document.querySelector(arguments[0]);"
+        "return e ? e.textContent.trim() : null;", sel)
 
 
 def exists(sel):
