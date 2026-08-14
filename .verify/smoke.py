@@ -16,6 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import ElementNotInteractableException
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -52,7 +53,19 @@ def errs():
 
 
 def click(sel):
-    d.find_element(By.CSS_SELECTOR, sel).click()
+    """Prefer a real click; fall back to a scripted one.
+
+    The menus scroll inside #menu rather than the window, and Firefox's
+    driver refuses to click an element it can't scroll into view by its own
+    rules — even when the element is perfectly reachable. Scrolling the
+    container ourselves and clicking through JS keeps the test honest about
+    what it is doing."""
+    el = d.find_element(By.CSS_SELECTOR, sel)
+    d.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
+    try:
+        el.click()
+    except ElementNotInteractableException:
+        d.execute_script("arguments[0].click();", el)
 
 
 def text(sel):
@@ -293,7 +306,7 @@ try:
     load("story/index.html")
     check("story: styles resolved", styles_resolved())
     booted("story")
-    cards = d.find_elements(By.CSS_SELECTOR, "#menu .choice")
+    cards = d.find_elements(By.CSS_SELECTOR, "#questRow .choice")
     check("story: quest cards listed", len(cards) >= 8, "found %d" % len(cards))
     cards[0].click()
     click("#startBtn")
@@ -301,6 +314,64 @@ try:
     check("story: first scene rendered", len(text(".story-text")) > 20)
     check("story: choices offered", len(d.find_elements(By.CSS_SELECTOR, ".choice-card")) >= 2)
     check("story: no JS errors", errs() == [], str(errs()))
+    print("\nLittle hero story games")
+    load("story/index.html")
+    check("story: the little-hero games are listed",
+          len(d.find_elements(By.CSS_SELECTOR, "#miniRow .choice")) == 2)
+
+    # Story Order: tap the steps in the right order and the round completes
+    d.execute_script("document.querySelector('[data-mini=\"order\"]').click();")
+    time.sleep(0.8)
+    booted("story/order")
+    check("order: the slots match the number of steps",
+          len(d.find_elements(By.CSS_SELECTOR, ".order-slot")) ==
+          d.execute_script("return TEST.state.item.steps.length;"))
+    before = gold()
+    d.execute_script("""
+        var steps = TEST.state.item.steps;
+        function tapNext(i) {
+            if (i >= steps.length) return;
+            var cards = document.querySelectorAll('.order-card');
+            for (var k = 0; k < cards.length; k++) {
+                if (cards[k].querySelector('.pic').textContent === steps[i][0] &&
+                    !cards[k].classList.contains('used')) {
+                    cards[k].click();
+                    break;
+                }
+            }
+            setTimeout(function () { tapNext(i + 1); }, 60);
+        }
+        tapNext(0);
+    """)
+    time.sleep(2.2)
+    check("order: a finished round pays gold", gold() > before, "%d -> %d" % (before, gold()))
+    check("order: the round counter advanced",
+          d.execute_script("return TEST.state.round;") >= 1)
+    check("order: no JS errors", errs() == [], str(errs()))
+
+    # Finish the Story
+    load("story/index.html")
+    d.execute_script("document.querySelector('[data-mini=\"finish\"]').click();")
+    time.sleep(0.8)
+    check("finish: three endings are offered",
+          len(d.find_elements(By.CSS_SELECTOR, ".choice-card")) == 3)
+    before = gold()
+    d.execute_script("""
+        var ok = TEST.state.item.choices.filter(function (c) { return c.ok; })[0];
+        var cards = document.querySelectorAll('.choice-card');
+        for (var i = 0; i < cards.length; i++)
+            if (cards[i].textContent === ok.t) { cards[i].click(); break; }
+    """)
+    time.sleep(1.6)
+    check("finish: the right ending pays gold", gold() > before, "%d -> %d" % (before, gold()))
+    check("finish: no JS errors", errs() == [], str(errs()))
+
+    load("story/index.html")
+    cards = d.find_elements(By.CSS_SELECTOR, "#questRow .choice")
+    cards[0].click()
+    click("#startBtn")
+    time.sleep(1.0)
+
     # click the one choice the scene marks as right
     earns_smoke("story", """
         var ok = TEST.scene().choices.filter(function (c) { return c.ok; })[0];

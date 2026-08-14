@@ -169,6 +169,35 @@ try:
                 bad.append("%s scene %d: chest has a duplicate option" % (q["title"], si + 1))
     check("quests: every chest has 3 distinct options including the answer", not bad, str(bad[:3]))
 
+    # ---- little hero games ----
+    order = js("TEST.ORDER_SETS")
+    check("order: every set has a title and at least 3 steps",
+          all(s_["title"] and len(s_["steps"]) >= 3 for s_ in order))
+    bad = [s_["title"] for s_ in order
+           if len(set(st[0] for st in s_["steps"])) != len(s_["steps"])]
+    check("order: no picture repeats inside a set", not bad,
+          str(bad) + " (a repeat makes two steps indistinguishable)")
+    bad = [s_["title"] for s_ in order if any(not st[1].strip() for st in s_["steps"])]
+    check("order: every step has a label", not bad)
+    check("order: enough sets to fill a game without repeating",
+          len(order) > js("TEST.MINI_ROUNDS"),
+          "%d sets for %d rounds" % (len(order), js("TEST.MINI_ROUNDS")))
+
+    finish = js("TEST.FINISH_STORIES")
+    bad = [f["text"][:40] for f in finish
+           if len([c for c in f["choices"] if c.get("ok")]) != 1]
+    check("finish: every story has exactly one right ending", not bad, str(bad))
+    bad = [f["text"][:40] for f in finish
+           if any(not c.get("ok") and not c.get("oops") for c in f["choices"])]
+    check("finish: every wrong ending explains itself", not bad, str(bad))
+    bad = [f["text"][:40] for f in finish if len(f["choices"]) != 3]
+    check("finish: every story offers three endings", not bad, str(bad))
+    bad = [f["text"][:40] for f in finish
+           if len(set(c["t"] for c in f["choices"])) != 3]
+    check("finish: no two endings read the same", not bad, str(bad))
+    check("finish: enough stories to fill a game without repeating",
+          len(finish) > js("TEST.MINI_ROUNDS"))
+
     check("quests: every quest has a collectible card",
           len(quests) <= len(js("Save.STORY_CARDS")),
           "%d quests, %d cards" % (len(quests), len(js("Save.STORY_CARDS"))))

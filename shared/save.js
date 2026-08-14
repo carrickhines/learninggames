@@ -117,7 +117,11 @@ var Save = (function () {
     { id: 's-robot',   name: 'Baker Bot',     emoji: '🤖' },
     { id: 's-yeti',    name: 'Birthday Yeti', emoji: '🧊' },
     { id: 's-moon',    name: 'Moon Rover',    emoji: '🚀' },
-    { id: 's-volcano', name: 'Cloud Dragon',  emoji: '🌋' }
+    { id: 's-volcano', name: 'Cloud Dragon',  emoji: '🌋' },
+    // the two little-hero games; kept after the quests so the first eight
+    // still line up with QUESTS by index
+    { id: 's-order',   name: 'Story Sorter',  emoji: '🃏' },
+    { id: 's-finish',  name: 'Storyteller',   emoji: '🌱' }
   ];
 
   /* ---------- The shop ----------------------------------------------------

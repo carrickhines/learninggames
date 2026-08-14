@@ -104,6 +104,51 @@
   .choice-card.tried::before { content: "✗ "; color: var(--bad); }
   @keyframes wobble { 25% { transform: rotate(-1.5deg); } 75% { transform: rotate(1.5deg); } }
 
+  /* ---------- Story Order ---------- */
+  .order-slots {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 14px 0 18px;
+    flex-wrap: wrap;
+  }
+  .order-slot {
+    width: 62px;
+    height: 62px;
+    border-radius: 14px;
+    border: 3px dashed rgba(255,255,255,.22);
+    background: rgba(0,0,0,.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+  }
+  .order-tray { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .order-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+    box-shadow: 0 5px 0 rgba(0,0,0,.4), 0 8px 16px rgba(0,0,0,.25);
+    color: #fff;
+    font-family: var(--body);
+    font-size: 13px;
+    min-width: 96px;
+  }
+  .order-card .pic { font-size: 40px; line-height: 1; }
+  .order-card:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+  /* already placed: dimmed rather than removed, so the tray keeps its shape */
+  .order-card.used { opacity: .25; pointer-events: none; }
+  .order-card.wrongPick {
+    animation: wobble .5s;
+    background: linear-gradient(180deg, #ff96ab, var(--bad));
+    box-shadow: 0 5px 0 #c23a55;
+  }
+
   .oops-box {
     border: 2px dashed rgba(255,94,126,.55);
     border-radius: 14px;
@@ -139,7 +184,19 @@
     <h1>Story Quest</h1>
     <div class="subtitle">Read carefully — the story tells you what to do!</div>
 
-    <div class="group-label">Choose your quest</div>
+    <div class="group-label">Little hero games</div>
+    <div class="btn-row" id="miniRow">
+      <button class="choice" data-mini="order">
+        <span class="emoji">🃏</span>Story Order
+        <span class="sub">Tap the pictures in order</span>
+      </button>
+      <button class="choice" data-mini="finish">
+        <span class="emoji">🌱</span>Finish the Story
+        <span class="sub">What happens next?</span>
+      </button>
+    </div>
+
+    <div class="group-label">Big hero quests</div>
     <div class="btn-row" id="questRow"></div>
 
     <div style="margin-top:22px">
@@ -853,6 +910,90 @@ const QUESTS = [
   },
 ];
 
+/* ==================================================================
+   Little hero modes — two short games for the five-year-old.
+
+   Story Quest proper is written for a confident third-grade reader. These
+   two are the same skills one rung down: sequencing and "what happens next",
+   with pictures doing the reading. They share the hearts, the panel, and the
+   win/lose screens; only the middle of the loop differs.
+
+   Authoring rules
+   ---------------
+   ORDER_SETS: the steps must have exactly one sensible order that a
+   five-year-old can reason about from everyday life — no cultural trivia, no
+   two steps that could swap.
+   FINISH_STORIES: the right ending must follow from the text, and the wrong
+   ones must be gently silly rather than plausible-but-wrong, so a miss is
+   funny and never confusing. Every wrong choice carries its own `oops`.
+   ================================================================== */
+
+const ORDER_SETS = [
+  { title: 'Getting up',    steps: [['😴','wake up'], ['👕','get dressed'], ['🥣','eat breakfast'], ['🎒','go to school']] },
+  { title: 'Making toast',  steps: [['🍞','get the bread'], ['🔥','toast it'], ['🧈','spread the butter'], ['😋','eat it up']] },
+  { title: 'Planting',      steps: [['🌱','plant the seed'], ['💧','water it'], ['☀️','wait for sun'], ['🌻','a flower!']] },
+  { title: 'Bath time',     steps: [['🛁','fill the tub'], ['🧼','wash up'], ['🧻','dry off'], ['🛏️','go to bed']] },
+  { title: 'Painting',      steps: [['📄','get the paper'], ['🎨','paint a picture'], ['🖼️','hang it up']] },
+  { title: 'A rainy day',   steps: [['☁️','clouds come'], ['🌧️','rain falls'], ['🌈','a rainbow!']] },
+  { title: 'Baking a cake', steps: [['🥚','mix it up'], ['🎂','bake it'], ['🕯️','light the candles'], ['🥳','make a wish']] },
+  { title: 'A butterfly',   steps: [['🥚','an egg'], ['🐛','a caterpillar'], ['🛖','a cocoon'], ['🦋','a butterfly']] },
+  { title: 'Riding a bike', steps: [['🪖','put on your helmet'], ['🚲','climb on'], ['🦵','start pedalling'], ['🏁','you did it!']] },
+  { title: 'A snowman',     steps: [['❄️','snow falls'], ['⛄','roll the snowballs'], ['🥕','add the nose'], ['💧','it melts']] },
+];
+
+const FINISH_STORIES = [
+  { text: 'Mia planted a little seed and watered it every single day. She waited and waited, and one morning she saw something green.',
+    choices: [ { t: 'A tiny plant had grown!', ok: true },
+               { t: 'A bicycle had grown.', oops: 'Seeds grow into plants, not bicycles!' },
+               { t: 'The seed flew to the moon.', oops: 'Seeds stay in the ground — they are not rockets!' } ] },
+  { text: 'Ben was carrying a tall stack of books. He could not see over the top of them. He took one more step and tripped on a toy.',
+    choices: [ { t: 'The books went everywhere.', ok: true },
+               { t: 'The books turned into birds.', oops: 'Books are not birds, even when they fly off a stack!' },
+               { t: 'Ben grew ten feet tall.', oops: 'Tripping does not make you taller!' } ] },
+  { text: 'The puppy heard the front door open. His tail started to wag so hard his whole back end wiggled. He ran down the hallway.',
+    choices: [ { t: 'He jumped up to say hello.', ok: true },
+               { t: 'He fell fast asleep.', oops: 'A wagging tail means he is excited, not sleepy!' },
+               { t: 'He started reading a book.', oops: 'Puppies cannot read — that is your job!' } ] },
+  { text: 'Ana built a tall tower out of blocks. It wobbled a little. She put one more block right on the very top.',
+    choices: [ { t: 'The tower fell down.', ok: true },
+               { t: 'The tower grew a roof.', oops: 'Blocks do not build themselves!' },
+               { t: 'The blocks ran away.', oops: 'Blocks stay put — they cannot run!' } ] },
+  { text: 'It was very hot. Sam took his ice cream outside and set it down on the sunny step while he tied his shoe.',
+    choices: [ { t: 'The ice cream melted.', ok: true },
+               { t: 'The ice cream froze harder.', oops: 'The hot sun makes ice cream melt, not freeze!' },
+               { t: 'The ice cream tied his shoe.', oops: 'Ice cream has no hands!' } ] },
+  { text: 'The cat crept closer and closer to the bird on the fence. She got very low. Then she stepped on a crunchy dry leaf.',
+    choices: [ { t: 'The bird heard her and flew away.', ok: true },
+               { t: 'The bird fell asleep.', oops: 'A crunchy noise wakes you up, it does not send you to sleep!' },
+               { t: 'The cat turned into a bird.', oops: 'Cats stay cats, however hard they try!' } ] },
+  { text: 'Leo forgot his umbrella. Big grey clouds rolled over the park, and fat drops started falling faster and faster.',
+    choices: [ { t: 'Leo got soaking wet.', ok: true },
+               { t: 'Leo got very dry.', oops: 'Rain makes you wet, not dry!' },
+               { t: 'The rain went back up.', oops: 'Rain only falls down!' } ] },
+  { text: 'Ruby blew and blew into the balloon. It got bigger and bigger and bigger, until it was stretched very thin.',
+    choices: [ { t: 'The balloon popped.', ok: true },
+               { t: 'The balloon got smaller.', oops: 'Blowing in air makes a balloon bigger, not smaller!' },
+               { t: 'The balloon started singing.', oops: 'Balloons cannot sing — but they can squeak!' } ] },
+  { text: 'Theo put his cup right on the edge of the table. Then he reached across for the jug and bumped it with his elbow.',
+    choices: [ { t: 'The cup fell off the table.', ok: true },
+               { t: 'The cup floated in the air.', oops: 'Things fall down when they go over the edge!' },
+               { t: 'The table said sorry.', oops: 'Tables cannot talk!' } ] },
+  { text: 'Nina was very hungry at lunchtime. She opened her lunchbox and found her favourite sandwich waiting inside.',
+    choices: [ { t: 'She ate it all up.', ok: true },
+               { t: 'She threw it in the bin.', oops: 'You would not bin your favourite sandwich when you are hungry!' },
+               { t: 'She wore it as a hat.', oops: 'Sandwiches are for eating, not for wearing!' } ] },
+  { text: 'The baby bird flapped his wings on the edge of the nest. He flapped harder and harder. Then he hopped off.',
+    choices: [ { t: 'He flew for the very first time!', ok: true },
+               { t: 'He swam away.', oops: 'Birds fly with their wings — swimming is for fish!' },
+               { t: 'He built a new nest.', oops: 'He is only just learning to fly!' } ] },
+  { text: 'Max left his snowman in the front garden. The next day the sun came out warm and bright and shone all afternoon.',
+    choices: [ { t: 'The snowman melted away.', ok: true },
+               { t: 'The snowman got bigger.', oops: 'Warm sun melts snow, it does not add more!' },
+               { t: 'The snowman walked to school.', oops: 'Snowmen stay right where you build them!' } ] },
+];
+
+const MINI_ROUNDS = 5;   // rounds to finish a little-hero game
+
 const MAX_HEARTS = 5;
 
 /* ==================================================================
@@ -884,6 +1025,10 @@ const state = {
   tried: new Set(), // wrong choices already tried this scene
   busy: false,
   goldAtStart: 0,     // so the win screen can show what this quest paid
+  mode: 'quest',      // 'quest' | 'order' | 'finish'
+  round: 0,           // little-hero games run rounds, not scenes
+  item: null,         // the current round's set or story
+  placed: [],         // Story Order: the steps tapped so far
 };
 
 // The hero chip, and the gate: no hero picked means back to the hub.
@@ -926,6 +1071,14 @@ $('startBtn').addEventListener('click', () => {
   startQuest();
 });
 
+// The little-hero games have no set-up to choose, so their card starts them.
+document.querySelectorAll('#miniRow .choice[data-mini]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    Sound.unlock(); Sound.click();
+    startMini(btn.dataset.mini);
+  });
+});
+
 function renderMute() {
   $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
   $('muteBtn').classList.toggle('muted', Sound.muted);
@@ -940,6 +1093,7 @@ renderMute();
    Quest flow
    ================================================================== */
 function startQuest() {
+  state.mode = 'quest';
   state.sceneIdx = 0;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
   state.hearts = MAX_HEARTS;
@@ -948,6 +1102,197 @@ function startQuest() {
   showScreen('game');
   renderScene(true);
 }
+
+/* ==================================================================
+   Little hero games
+   ================================================================== */
+function startMini(mode) {
+  state.mode = mode;
+  state.round = 0;
+  state.goldAtStart = (Save.me() || { gold: 0 }).gold;
+  state.hearts = MAX_HEARTS;
+  state.gems = 0;
+  state.busy = false;
+  showScreen('game');
+  nextMiniRound();
+}
+
+function nextMiniRound() {
+  if (state.round >= MINI_ROUNDS) return miniComplete();
+  state.busy = false;
+  state.item = state.mode === 'order'
+    ? pickOne(ORDER_SETS)
+    : pickOne(FINISH_STORIES);
+  renderStats();
+  if (state.mode === 'order') renderOrderRound();
+  else renderFinishRound();
+}
+
+// Don't repeat the same set twice in a row — with ten of them a repeat reads
+// as a bug to a five-year-old.
+let lastMini = null;
+function pickOne(pool) {
+  let item = pool[rand(0, pool.length - 1)];
+  if (pool.length > 1) {
+    while (item === lastMini) item = pool[rand(0, pool.length - 1)];
+  }
+  lastMini = item;
+  return item;
+}
+
+// ---------- Story Order: tap the pictures in the order they happen ----------
+function renderOrderRound() {
+  const set = state.item;
+  state.placed = [];
+  $('art').textContent = '🃏';
+
+  const panel = $('storyPanel');
+  panel.innerHTML = '';
+
+  const txt = document.createElement('div');
+  txt.className = 'story-text chest-q';
+  txt.textContent = set.title + ' — tap the pictures in order!';
+  panel.appendChild(txt);
+
+  // the slots fill up as steps are tapped, so progress is always visible
+  const slots = document.createElement('div');
+  slots.className = 'order-slots';
+  set.steps.forEach(() => {
+    const sl = document.createElement('div');
+    sl.className = 'order-slot';
+    slots.appendChild(sl);
+  });
+  panel.appendChild(slots);
+
+  const tray = document.createElement('div');
+  tray.className = 'order-tray';
+  shuffle(set.steps).forEach(step => {
+    const c = document.createElement('button');
+    c.className = 'order-card';
+    c.innerHTML = `<span class="pic">${step[0]}</span><span class="lbl"></span>`;
+    c.querySelector('.lbl').textContent = step[1];
+    c.addEventListener('click', () => tapOrderCard(c, step, slots));
+    tray.appendChild(c);
+  });
+  panel.appendChild(tray);
+}
+
+function tapOrderCard(card, step, slots) {
+  if (state.busy || card.classList.contains('used')) return;
+  const set = state.item;
+  const want = set.steps[state.placed.length];
+
+  if (step !== want) {
+    // wrong step: cost a heart, say what actually comes next, and re-deal
+    state.busy = true;
+    Sound.wrong();
+    Save.recordAnswer(false);
+    card.classList.add('wrongPick');
+    state.hearts--;
+    renderStats();
+    later(() => {
+      if (state.hearts <= 0) return questFailed();
+      renderOops(`Next comes: ${want[0]}  ${want[1]}. Try the whole order again!`,
+                 () => renderOrderRound());
+    }, 600);
+    return;
+  }
+
+  Sound.tap();
+  card.classList.add('used');
+  slots.children[state.placed.length].textContent = step[0];
+  state.placed.push(step);
+
+  if (state.placed.length === set.steps.length) {
+    state.busy = true;
+    Sound.right();
+    Save.recordAnswer(true);
+    Hud.applied(Save.awardEvent('storyChoice'));
+    state.gems++;
+    renderStats();
+    later(() => { state.round++; nextMiniRound(); }, 900);
+  }
+}
+
+// ---------- Finish the Story: what happens next? ----------
+function renderFinishRound() {
+  const story = state.item;
+  state.order = shuffle(story.choices);
+  state.tried = new Set();
+  $('art').textContent = '🌱📖';
+  drawFinish();
+}
+
+function drawFinish() {
+  const panel = $('storyPanel');
+  panel.innerHTML = '';
+
+  const txt = document.createElement('div');
+  txt.className = 'story-text';
+  txt.textContent = state.item.text;
+  panel.appendChild(txt);
+
+  const prompt = document.createElement('div');
+  prompt.className = 'chest-banner';
+  prompt.textContent = 'What happens next?';
+  panel.appendChild(prompt);
+
+  const box = document.createElement('div');
+  box.className = 'choices';
+  state.order.forEach(choice => {
+    const c = document.createElement('button');
+    c.className = 'choice-card' + (state.tried.has(choice) ? ' tried' : '');
+    c.textContent = choice.t;
+    c.addEventListener('click', () => pickFinish(c, choice));
+    box.appendChild(c);
+  });
+  panel.appendChild(box);
+}
+
+function pickFinish(el, choice) {
+  if (state.busy) return;
+  state.busy = true;
+
+  if (choice.ok) {
+    Sound.right();
+    el.classList.add('right');
+    Save.recordAnswer(true);
+    Hud.applied(Save.awardEvent('storyChoice'));
+    state.gems++;
+    renderStats();
+    later(() => { state.round++; nextMiniRound(); }, 900);
+  } else {
+    Sound.wrong();
+    el.classList.add('wrongPick');
+    Save.recordAnswer(false);
+    state.tried.add(choice);
+    state.hearts--;
+    renderStats();
+    later(() => {
+      if (state.hearts <= 0) return questFailed();
+      renderOops(choice.oops, () => drawFinish());
+    }, 500);
+  }
+}
+
+function miniComplete() {
+  const card = state.mode === 'order' ? MINI_CARDS.order : MINI_CARDS.finish;
+  const drop = Save.awardCard(card.id);
+  Save.recordRunWon('story');
+  const bonus = Save.awardEvent('questDone');
+  Sound.victory();
+  $('winText').textContent =
+    `You got all ${MINI_ROUNDS} right in ${state.mode === 'order' ? 'Story Order' : 'Finish the Story'}!`;
+  showEarnings();
+  showScreen('win');
+  Hud.applied(bonus);
+  if (drop) later(() => Hud.cardDrop(card, drop), 1400);
+}
+
+const MINI_CARDS = {
+  order:  Save.STORY_CARDS.filter(c => c.id === 's-order')[0],
+  finish: Save.STORY_CARDS.filter(c => c.id === 's-finish')[0],
+};
 
 function renderStats() {
   const pips = $('heartPips');
@@ -958,7 +1303,9 @@ function renderStats() {
     pips.appendChild(p);
   }
   $('gemStat').textContent = '💎 ' + state.gems;
-  $('sceneStat').textContent = `📖 ${state.sceneIdx + 1} / ${quest().scenes.length}`;
+  $('sceneStat').textContent = state.mode === 'quest'
+    ? `📖 ${state.sceneIdx + 1} / ${quest().scenes.length}`
+    : `📖 ${state.round + 1} / ${MINI_ROUNDS}`;
 }
 
 function renderScene(fresh) {
@@ -1023,8 +1370,10 @@ function pickChoice(el, choice) {
   }
 }
 
-// a wrong choice: show the consequence, then let them re-read and retry
-function renderOops(text) {
+// A wrong choice: show the consequence, then let them re-read and retry.
+// `again` is what the "read it again" button does — the quest re-renders its
+// scene, the little-hero games re-deal their round.
+function renderOops(text, again) {
   const panel = $('storyPanel');
   panel.innerHTML = '';
 
@@ -1039,7 +1388,10 @@ function renderOops(text) {
   const back = document.createElement('button');
   back.className = 'choice-card';
   back.textContent = '📖 Read the story again';
-  back.addEventListener('click', () => { Sound.page(); renderScene(false); });
+  back.addEventListener('click', () => {
+    Sound.page();
+    if (again) again(); else renderScene(false);
+  });
   panel.appendChild(back);
   state.busy = false;
 }
@@ -1149,9 +1501,13 @@ function questFailed() {
 $('winAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 // Test seam: .verify/ scripts drive the real game and need to know which
 // choice is the right one. Costs nothing in play.
-window.TEST = { state, scene, quest, QUESTS, startQuest, showEarnings };
+window.TEST = { state, scene, quest, QUESTS, startQuest, showEarnings,
+                startMini, ORDER_SETS, FINISH_STORIES, MINI_ROUNDS };
 
-$('retryBtn').addEventListener('click', () => { Sound.click(); startQuest(); });
+$('retryBtn').addEventListener('click', () => {
+  Sound.click();
+  if (state.mode === 'quest') startQuest(); else startMini(state.mode);
+});
 $('loseMenuBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 </script>
 </body>

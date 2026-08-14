@@ -255,6 +255,26 @@ try:
     # ---------- Story Quest ----------
     load("story/index.html")
     shot("story-menu")
+    # the two little-hero games
+    d.execute_script("document.querySelector('[data-mini=\"order\"]').click();")
+    time.sleep(0.8)
+    d.execute_script(NO_ANIM)
+    shot("story-order")
+    d.execute_script("""
+        var steps = TEST.state.item.steps, cards = document.querySelectorAll('.order-card');
+        for (var k = 0; k < cards.length; k++)
+            if (cards[k].querySelector('.pic').textContent === steps[0][0]) { cards[k].click(); break; }
+    """)
+    time.sleep(0.4)
+    shot("story-order-placed")
+
+    load("story/index.html")
+    d.execute_script("document.querySelector('[data-mini=\"finish\"]').click();")
+    time.sleep(0.8)
+    d.execute_script(NO_ANIM)
+    shot("story-finish")
+
+    load("story/index.html")
     d.find_elements(By.CSS_SELECTOR, "#questRow .choice")[0].click()
     click("#startBtn")
     time.sleep(1.0)
