@@ -383,6 +383,7 @@
 
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
 <script>
 (() => {
@@ -1117,8 +1118,11 @@
   function resolveAnswer(given, tile) {
     if (state.busy) return;
     state.busy = true;
+    const took = performance.now() - state.timerStart;
     stopTimer();
     const right = String(given) === String(state.answer);
+    // for the grown-ups: what was asked, what came back, and how long it took
+    Log.answer({ q: el.question.textContent, given: given, ok: right, ms: took });
 
     if (right) {
       const isSuper = isFastAnswer();
@@ -1245,6 +1249,7 @@
     Sound.unlock();
     Sound.click();
     Save.setContext("math");     // the world's gold multiplier applies here
+    Log.startSession({ game: "math", track: state.track, mode: state.mode });
     FOES = Save.foesFor("math");
     GEAR = Save.loadout();
     renderPet();
@@ -1273,6 +1278,7 @@
     el.endText.textContent = "You defeated every monster. You're a math hero!";
     showEarnings();
     Sound.win();
+    Log.endSession({ won: true, gold: earnedThisRun() });
     showScreen("endScreen");
     Hud.applied(bonus);
   }
@@ -1284,14 +1290,18 @@
     el.endTitle.textContent = "Game Over";
     el.endText.textContent = "The monster got you! You still keep your gold.";
     Sound.lose();
+    Log.endSession({ won: false, gold: earnedThisRun() });
     showScreen("endScreen");
   }
 
   // What this run put in the purse. Gold is the reward now — iPad time is
   // bought with it back at the hub.
+  function earnedThisRun() {
+    return Math.max(0, (Save.me() || { gold: 0 }).gold - state.goldAtStart);
+  }
+
   function showEarnings() {
-    const now = (Save.me() || { gold: 0 }).gold;
-    const won = Math.max(0, now - state.goldAtStart);
+    const won = earnedThisRun();
     el.earned.innerHTML =
       '<div class="reward-line">\ud83e\ude99 You earned <b></b> gold this battle!</div>' +
       '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +

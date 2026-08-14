@@ -225,17 +225,39 @@ try:
     check("math: a perfect run reaches the win screen", won)
     check("math: the run banked gold", gold() > 0, "gold %d" % gold())
     check("math: the run earned XP", d.execute_script("return Save.me().xp;") > 0)
-    # Cards are rare now, so a four-foe run usually pays none. What must hold
-    # is that every KO was accounted for: either it dropped a card or it moved
-    # the pity counter along.
+    # Cards are rare now, so a four-foe run usually pays none. A drop resets
+    # the pity counter, so cards+pity isn't the KO count — what must hold is
+    # that the counter tracked the run and stayed inside its limit.
     pity = d.execute_script("return Save.me().progress.koSinceCard;")
-    check("math: every KO either dropped a card or fed the pity counter",
-          cards_held() + pity >= 4, "%d cards, pity %d" % (cards_held(), pity))
+    check("math: the pity counter tracked the run's KOs", pity <= 4,
+          "pity %d after 4 monsters" % pity)
     check("math: the pity counter stays under its limit",
           pity < d.execute_script("return Save.ECONOMY.cardPity;"))
+    check("math: a card drop resets the counter",
+          cards_held() == 0 or pity < 4, "%d cards, pity %d" % (cards_held(), pity))
     check("math: the run was recorded", d.execute_script(
         "return Save.me().progress.runsWon.math;") == 1)
     check("math: no JS errors", errs() == [], str(errs()))
+
+    # the grown-ups' record: one session, one entry per question answered
+    log = d.execute_script("return Log.forProfile();")
+    check("math: the run left exactly one session", len(log["sessions"]) == 1,
+          "%d sessions" % len(log["sessions"]))
+    sess = log["sessions"][0]
+    check("math: one record per question answered, exactly",
+          len(log["answers"]) == sess["r"] + sess["w"],
+          "%d answers vs %d right + %d wrong"
+          % (len(log["answers"]), sess["r"], sess["w"]))
+    check("math: the run actually asked something",
+          len(log["answers"]) >= 6, "%d answers" % len(log["answers"]))
+    check("math: the record knows the game and track",
+          sess["g"] == "math" and sess["k"] == "mul")
+    check("math: a perfect run recorded no wrong answers", sess["w"] == 0)
+    check("math: the questions were recorded, not blanks",
+          all(a["q"] for a in log["answers"]))
+    check("math: how long each answer took was recorded",
+          all(a["ms"] >= 0 for a in log["answers"]))
+    check("math: the session recorded the gold earned", sess["gold"] > 0)
 
     print("\nMath RPG — a tap-to-answer track")
     fresh_hero("PatternRunner")
@@ -248,8 +270,8 @@ try:
     check("language: a perfect run reaches the win screen", won)
     check("language: the run banked gold", gold() > 0, "gold %d" % gold())
     pity = d.execute_script("return Save.me().progress.koSinceCard;")
-    check("language: every KO either dropped a card or fed the pity counter",
-          cards_held() + pity >= 5, "%d cards, pity %d" % (cards_held(), pity))
+    check("language: the pity counter tracked the run's KOs", pity <= 5,
+          "pity %d after 5 monsters" % pity)
     check("language: the run was recorded", d.execute_script(
         "return Save.me().progress.runsWon.language;") == 1)
     check("language: no JS errors", errs() == [], str(errs()))
@@ -263,6 +285,10 @@ try:
         "return Save.me().progress.questsDone.length;") == 1)
     check("story: the quest dropped its card", cards_held() >= 1)
     check("story: no JS errors", errs() == [], str(errs()))
+    log = d.execute_script("return Log.forProfile();")
+    check("story: the quest was recorded as a session", len(log["sessions"]) == 1)
+    check("story: every scene choice was recorded", len(log["answers"]) >= 10,
+          "%d answers" % len(log["answers"]))
 
     print("\nStory Quest — the little-hero games")
     fresh_hero("LittleRunner")
@@ -271,6 +297,33 @@ try:
     fresh_hero("LittleRunner2")
     check("finish: a full game reaches the win screen", play_mini("finish"))
     check("finish: the game banked gold", gold() > 0)
+
+    print("\nThe review list")
+    fresh_hero("MissRunner")
+    load("math/index.html")
+    click('[data-track="mul"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.0)
+    # answer one question wrong on purpose, twice
+    for _ in range(2):
+        d.execute_script("""
+            document.getElementById('answer').value = String(TEST.state.answer + 1);
+            document.getElementById('attackBtn').click();
+        """)
+        time.sleep(2.2)
+    d.execute_script("Log.flush();")
+    missed = d.execute_script("return Log.missed();")
+    check("a missed question reaches the review list", len(missed) > 0,
+          "%d rows" % len(missed))
+    if missed:
+        check("the review list counts the misses",
+              sum(m["misses"] for m in missed) == 2,
+              str([(m["q"], m["misses"]) for m in missed]))
+        check("the review list keeps what was answered instead",
+              all(m["gave"] for m in missed))
+        check("the review list keeps the question itself",
+              all(m["q"] for m in missed))
 
     print("\nProgress survives")
     before = gold()

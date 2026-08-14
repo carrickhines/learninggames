@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>log.js tests</title>
+<style>
+  body { font-family: ui-monospace, Menlo, Consolas, monospace; background: #12091f; color: #eee;
+         padding: 24px; line-height: 1.6; }
+  .pass { color: #5ce8a0; }
+  .fail { color: #ff5e7e; font-weight: bold; }
+  h1 { font-size: 20px; }
+  #summary { margin-top: 18px; font-size: 18px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>shared/log.js</h1>
+<div id="out"></div>
+<div id="summary"></div>
+
+<script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
+<script>
+/* Assertions over the play log — the record a parent reads. It clobbers both
+   the save and the log, so it stashes and restores whatever was there. */
+'use strict';
+
+var stashSave = localStorage.getItem(Save._key);
+var stashLog = localStorage.getItem(Log._key);
+var pass = 0, fail = 0;
+
+function ok(label, cond, detail) {
+  var d = document.createElement('div');
+  d.className = cond ? 'pass' : 'fail';
+  d.textContent = (cond ? 'PASS  ' : 'FAIL  ') + label + (cond || !detail ? '' : '   -- ' + detail);
+  document.getElementById('out').appendChild(d);
+  cond ? pass++ : fail++;
+}
+
+function fresh(name) {
+  Save.reset();
+  var id = Save.createProfile(name || 'Logger', '🦖');
+  Log.clear();
+  Log._reload();
+  return id;
+}
+
+function play(n, rightEvery) {
+  for (var i = 0; i < n; i++) {
+    Log.answer({ q: 'q' + i, given: 'a' + i, ok: i % rightEvery !== 0, ms: 1000 + i });
+  }
+}
+
+try {
+  /* ---------- buffering: the reason the log is a separate module ---------- */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'normal' });
+
+  var writes = 0;
+  var realSet = localStorage.setItem;
+  localStorage.setItem = function (k, v) { if (k === Log._key) writes++; return realSet.call(localStorage, k, v); };
+  for (var i = 0; i < 50; i++) Log.answer({ q: '7 x 8', given: '56', ok: true, ms: 900 });
+  localStorage.setItem = realSet;
+  ok('answering never touches storage', writes === 0, writes + ' writes for 50 answers');
+  ok('the answers are buffered', Log._buffered() === 50);
+
+  Log.endSession({ won: true, gold: 40 });
+  ok('the buffer is empty after the session ends', Log._buffered() === 0);
+  ok('the answers were written', Log.forProfile().answers.length === 50);
+  ok('the session was written', Log.forProfile().sessions.length === 1);
+
+  /* ---------- what a session records ---------- */
+  fresh();
+  Log.startSession({ game: 'language', track: 'fixit', mode: 'expert' });
+  play(10, 3);                      // every 3rd is wrong
+  Log.endSession({ won: false, gold: 12 });
+
+  var s = Log.sessions()[0];
+  ok('the session knows its game', s.game === 'language');
+  ok('the session knows its track', s.track === 'fixit');
+  ok('right and wrong are counted', s.right === 6 && s.wrong === 4, s.right + '/' + s.wrong);
+  ok('accuracy is computed', s.accuracy === 60, String(s.accuracy));
+  ok('the gold earned is recorded', s.gold === 12);
+  ok('a loss is recorded as a loss', s.won === false);
+  ok('the session has a time of day', s.when > 0);
+  ok('the session has a duration', s.minutes >= 1);
+
+  /* ---------- accuracy by track ---------- */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  for (var i = 0; i < 10; i++) Log.answer({ q: 'm' + i, given: 'x', ok: true, ms: 500 });
+  Log.endSession({ won: true, gold: 1 });
+  Log.startSession({ game: 'math', track: 'div', mode: 'easy' });
+  for (var i = 0; i < 10; i++) Log.answer({ q: 'd' + i, given: 'x', ok: i < 3, ms: 500 });
+  Log.endSession({ won: false, gold: 1 });
+
+  var tracks = Log.byTrack();
+  ok('every track played is listed', tracks.length === 2);
+  ok('the weakest track is listed first', tracks[0].track === 'div', tracks[0].track);
+  ok('accuracy is per track',
+     tracks[0].accuracy === 30 && tracks[1].accuracy === 100,
+     tracks[0].accuracy + ' / ' + tracks[1].accuracy);
+  ok('average time is reported', tracks[0].avgSec > 0);
+
+  /* ---------- the review list ---------- */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '54', ok: false, ms: 1000 });
+  Log.answer({ q: '7 x 8', given: '48', ok: false, ms: 1000 });
+  Log.answer({ q: '7 x 8', given: '56', ok: true,  ms: 1000 });
+  Log.answer({ q: '2 x 2', given: '5',  ok: false, ms: 1000 });
+  Log.answer({ q: '3 x 3', given: '9',  ok: true,  ms: 1000 });
+  Log.endSession({ won: true, gold: 5 });
+
+  var miss = Log.missed();
+  ok('only missed questions are listed', miss.length === 2, String(miss.length));
+  ok('the most-missed question comes first', miss[0].q === '7 x 8', miss[0].q);
+  ok('misses are counted', miss[0].misses === 2);
+  ok('what was answered instead is kept',
+     miss[0].gave.indexOf('54') !== -1 && miss[0].gave.indexOf('48') !== -1,
+     miss[0].gave.join('/'));
+  ok('a correct answer is not in the review list',
+     miss.every(function (m) { return m.q !== '3 x 3'; }));
+  ok('times answered correctly is counted too', miss[0].right === 1,
+     String(miss[0].right));
+
+  /* The right-count must include correct answers given BEFORE the first miss,
+     which is easy to get wrong with a single pass. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '9 x 9', given: '81', ok: true,  ms: 1 });
+  Log.answer({ q: '9 x 9', given: '81', ok: true,  ms: 1 });
+  Log.answer({ q: '9 x 9', given: '18', ok: false, ms: 1 });
+  Log.endSession({ won: true, gold: 1 });
+  var m2 = Log.missed()[0];
+  ok('right answers before the first miss are counted', m2.right === 2,
+     String(m2.right));
+  ok('the miss is still counted once', m2.misses === 1);
+  ok('the review list can be limited', Log.missed(null, 1).length === 1);
+
+  /* ---------- the headline numbers ----------
+     Its own setup, so an assertion above can't quietly change what this
+     measures. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: 'a', given: '1', ok: true,  ms: 1 });
+  Log.answer({ q: 'b', given: '2', ok: true,  ms: 1 });
+  Log.answer({ q: 'c', given: '3', ok: false, ms: 1 });
+  Log.answer({ q: 'd', given: '4', ok: false, ms: 1 });
+  Log.answer({ q: 'e', given: '5', ok: false, ms: 1 });
+  Log.endSession({ won: true, gold: 5 });
+
+  var sum = Log.summary();
+  ok('every answer is counted', sum.answers === 5, String(sum.answers));
+  ok('the correct ones are counted', sum.right === 2, String(sum.right));
+  ok('overall accuracy is computed', sum.accuracy === 40, String(sum.accuracy));
+  ok('sessions are counted', sum.sessions === 1);
+  ok('the time played is counted', sum.minutes >= 1);
+
+  /* ---------- per profile ---------- */
+  fresh('Kid1');
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  play(6, 99);
+  Log.endSession({ won: true, gold: 1 });
+  var kid2 = Save.createProfile('Kid2', '🦊');
+  ok('a second hero starts with an empty record', Log.summary().answers === 0);
+  Log.startSession({ game: 'story', track: 'quest 1', mode: '' });
+  play(3, 99);
+  Log.endSession({ won: true, gold: 1 });
+  ok("the second hero's record is their own", Log.summary().answers === 3);
+  Save.setActive(Save.profiles().filter(function (p) { return p.name === 'Kid1'; })[0].id);
+  ok("the first hero's record is untouched", Log.summary().answers === 6);
+
+  /* ---------- the rolling cap ---------- */
+  fresh();
+  var cap = Log._max;
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  for (var i = 0; i < cap + 200; i++) {
+    Log.answer({ q: 'q' + i, given: String(i), ok: true, ms: 10 });
+  }
+  Log.endSession({ won: true, gold: 1 });
+  var kept = Log.forProfile().answers;
+  ok('the record is capped', kept.length === cap, kept.length + ' vs ' + cap);
+  ok('the oldest are dropped, not the newest',
+     kept[kept.length - 1].q === 'q' + (cap + 199), kept[kept.length - 1].q);
+  ok('the very oldest are gone', kept[0].q !== 'q0', kept[0].q);
+
+  /* ---------- CSV ---------- */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: 'has "quotes", and a comma', given: 'x, y', ok: false, ms: 1500 });
+  Log.endSession({ won: true, gold: 1 });
+  var lines = Log.csv().split('\n');
+  ok('the CSV has a header', /^when,game,track,question/.test(lines[0]));
+  ok('the CSV has a row per answer', lines.length === 2, String(lines.length));
+  ok('commas and quotes are escaped',
+     lines[1].indexOf('"has ""quotes"", and a comma"') !== -1, lines[1]);
+  ok('the CSV records right or wrong', /,no,/.test(lines[1]), lines[1]);
+
+  /* ---------- resilience ---------- */
+  fresh();
+  var threw = false;
+  var realSet2 = localStorage.setItem;
+  localStorage.setItem = function () { throw new Error('QuotaExceededError'); };
+  try {
+    Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+    play(20, 2);
+    Log.endSession({ won: true, gold: 1 });
+  } catch (e) { threw = true; }
+  localStorage.setItem = realSet2;
+  ok('a full localStorage never throws mid-game', !threw);
+
+  Log.clear();
+  localStorage.setItem(Log._key, 'not json at all{{{');
+  Log._reload();
+  ok('a corrupt log recovers instead of throwing', Log.summary().answers === 0);
+
+  fresh();
+  Log.answer({ q: 'orphan', given: 'x', ok: true, ms: 1 });
+  Log.flush();
+  ok('an answer outside a session is still recorded',
+     Log.forProfile().answers.length === 1);
+
+  /* a run that is abandoned mid-way still records what was answered */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  play(4, 99);
+  Log.flush();                       // what visibilitychange does
+  ok('an abandoned run still records its answers',
+     Log.forProfile().answers.length === 4);
+  ok('an abandoned run still records the session',
+     Log.forProfile().sessions.length === 1);
+
+  /* starting a new session must not swallow the last one */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  play(3, 99);
+  Log.startSession({ game: 'math', track: 'div', mode: 'easy' });
+  play(2, 99);
+  Log.endSession({ won: true, gold: 1 });
+  ok('a new session flushes the abandoned one',
+     Log.forProfile().sessions.length === 2, String(Log.forProfile().sessions.length));
+  ok('no answers are lost between sessions',
+     Log.forProfile().answers.length === 5);
+} catch (e) {
+  ok('tests ran without throwing', false, e && e.message);
+}
+
+try {
+  if (stashSave === null) localStorage.removeItem(Save._key); else localStorage.setItem(Save._key, stashSave);
+  if (stashLog === null) localStorage.removeItem(Log._key); else localStorage.setItem(Log._key, stashLog);
+} catch (e) { /* nothing to restore into */ }
+
+var el = document.getElementById('summary');
+el.className = fail ? 'fail' : 'pass';
+el.textContent = fail ? (fail + ' FAILED, ' + pass + ' passed')
+                      : ('All ' + pass + ' checks passed.');
+window.RESULT = { pass: pass, fail: fail };
+</script>
+</body>
+</html>

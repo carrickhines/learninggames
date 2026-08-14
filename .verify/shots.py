@@ -127,6 +127,58 @@ try:
     time.sleep(0.6)
     shot("hub-settings")
 
+    # the progress report, with a plausible week of play behind it
+    load("index.html")
+    d.execute_script("""
+        Log.clear();
+        var DAY = 86400000, now = Date.now();
+        var sets = [
+          ['math','mul',  0.62, 14], ['math','add',  0.95, 20],
+          ['math','rule', 0.71, 10], ['language','fixit', 0.80, 15],
+          ['language','sounds', 0.90, 12], ['story','quest 1', 0.88, 9]
+        ];
+        var qs = {
+          mul: ['7 x 8','6 x 7','12 x 4','9 x 6','8 x 8'],
+          add: ['3 + 4','5 + 6','2 + 9','7 + 8','4 + 4'],
+          rule: ['2, 4, 8, 16, ?','20, 17, 14, ?','3, 6, 9, ?'],
+          fixit: ['The hole class went.','She dont know.','Two mouses ran.'],
+          sounds: ['starts like star','starts like moon','starts like frog'],
+          'quest 1': ['A note is nailed to the castle door.','The troll grins at you.']
+        };
+        var wrongs = { mul:['54','48','36'], add:['8','12'], rule:['24','11'],
+                       fixit:['went','dont'], sounds:['duck','ring'],
+                       'quest 1':['Pack your shiniest coins'] };
+        sets.forEach(function (row, i) {
+          var game = row[0], track = row[1], acc = row[2], n = row[3];
+          Log.startSession({ game: game, track: track, mode: 'normal' });
+          for (var k = 0; k < n; k++) {
+            var ok = Math.random() < acc;
+            var pool = qs[track], bad = wrongs[track];
+            Log.answer({ q: pool[k % pool.length],
+                         given: ok ? 'right' : bad[k % bad.length],
+                         ok: ok, ms: 2000 + Math.random() * 6000 });
+          }
+          Log.endSession({ won: true, gold: 40 + i * 7 });
+        });
+        // spread the sessions across the past week
+        var store = JSON.parse(localStorage.getItem(Log._key));
+        var id = Save.load().active;
+        store[id].sessions.forEach(function (s, i) {
+          s.t = now - (6 - i) * DAY + i * 3600000;
+          s.e = s.t + (8 + i) * 60000;
+        });
+        localStorage.setItem(Log._key, JSON.stringify(store));
+        Log._reload();
+        document.getElementById('settingsBtn').click();
+        document.getElementById('parentBtn').click();
+    """)
+    time.sleep(0.8)
+    d.execute_script(NO_ANIM)
+    shot("hub-parent")
+    d.execute_script("document.getElementById('missReport').scrollIntoView({block:'center'});")
+    time.sleep(0.3)
+    shot("hub-parent-missed")
+
     # the collection, part-caught
     load("index.html")
     d.execute_script("""

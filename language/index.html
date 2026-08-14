@@ -314,6 +314,7 @@
 
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
 <script>
 'use strict';
@@ -1236,6 +1237,7 @@ const state = {
   timerId: null, timeLeft: 0, inFastZone: false,
   draw: null,              // deck function for current track
   goldAtStart: 0,          // so the win screen can show what this run paid
+  askedAt: 0,              // when the current question went up
 };
 
 // The hero chip, and the gate: no hero picked means back to the hub.
@@ -1322,6 +1324,7 @@ renderMute();
 function startGame() {
   state.foeIdx = 0;
   Save.setContext('language');   // the world's gold multiplier applies here
+  Log.startSession({ game: 'language', track: state.track, mode: state.mode });
   FOES = Save.foesFor('language');
   GEAR = Save.loadout();
   renderPet();
@@ -1847,12 +1850,28 @@ function pickAnswer(el, correct) {
   }
 }
 
+/* What the parent view reads back: the prompt as it was shown, and the
+   answer the game was looking for. The tracks answer by tapping, so "what he
+   typed" isn't a thing — recording the right answer against a miss is what
+   makes the review list useful. */
+function logAnswer(ok) {
+  const q = state.question;
+  if (!q) return;
+  Log.answer({
+    q: (q.prompt ? q.prompt + ' ' : '') + (q.big || q.word || ''),
+    given: ok ? q.answer : '(missed — answer was ' + q.answer + ')',
+    ok: ok,
+    ms: performance.now() - (state.askedAt || performance.now())
+  });
+}
+
 function resolveCorrect() {
   state.answered = true;
   stopTimer();
   const dbl = state.inFastZone;
   const q = state.question;
   Save.recordAnswer(true);
+  logAnswer(true);
   Hud.applied(Save.awardEvent(dbl ? 'correctFast' : 'correct'));
   // reinforce by saying the word after a correct answer (dad's voice if recorded)
   const praiseId  = dbl ? 'P_double' : 'P_great';
@@ -1870,6 +1889,7 @@ function resolveWrong(msg) {
   stopTimer();
   Sound.wrong();
   Save.recordAnswer(false);   // no gold lost: progress only ever goes up
+  logAnswer(false);
   const q = state.question;
   const reveal = q.isBuilder ? '' :
     q.revealMsg ? q.revealMsg :
@@ -2021,6 +2041,7 @@ function nextFoeOrWin() {
    ================================================================== */
 function startTimer() {
   stopTimer();
+  state.askedAt = performance.now();   // for the grown-ups' record
   const m = MODES[state.mode];
   // a pet buys you a little more time to think, but not a longer fast zone
   // a pet buys thinking time; an hourglass widens the double-hit window
@@ -2074,15 +2095,19 @@ function winGame() {
   Sound.victory();
   Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
   showEarnings();
+  Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
 }
 
 // What this run put in the purse. Gold is the reward now — iPad time is
 // bought with it back at the hub.
+function earnedThisRun() {
+  return Math.max(0, (Save.me() || { gold: 0 }).gold - state.goldAtStart);
+}
+
 function showEarnings() {
-  const now = (Save.me() || { gold: 0 }).gold;
-  const won = Math.max(0, now - state.goldAtStart);
+  const won = earnedThisRun();
   $('earned').innerHTML =
     '<div class="reward-line">\u{1FA99} You earned <b></b> gold this battle!</div>' +
     '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +
@@ -2094,6 +2119,7 @@ function gameOver() {
   stopTimer();
   Sound.gameover();
   Voice.play(['P_lose'], 'Oh no! Try again — you can do it!');
+  Log.endSession({ won: false, gold: earnedThisRun() });
   showScreen('lose');
 }
 

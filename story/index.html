@@ -247,6 +247,7 @@
 
 <script src="../shared/sound.js"></script>
 <script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
 <script>
 'use strict';
@@ -1025,6 +1026,7 @@ const state = {
   tried: new Set(), // wrong choices already tried this scene
   busy: false,
   goldAtStart: 0,     // so the win screen can show what this quest paid
+  shownAt: 0,         // when the current scene went up
   mode: 'quest',      // 'quest' | 'order' | 'finish'
   round: 0,           // little-hero games run rounds, not scenes
   item: null,         // the current round's set or story
@@ -1094,6 +1096,7 @@ renderMute();
    ================================================================== */
 function startQuest() {
   Save.setContext('story');   // no world multiplier here — there's no world
+  Log.startSession({ game: 'story', track: 'quest ' + (state.questIdx + 1), mode: '' });
   state.mode = 'quest';
   state.sceneIdx = 0;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
@@ -1109,6 +1112,7 @@ function startQuest() {
    ================================================================== */
 function startMini(mode) {
   Save.setContext('story');
+  Log.startSession({ game: 'story', track: mode, mode: '' });
   state.mode = mode;
   state.round = 0;
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
@@ -1189,6 +1193,7 @@ function tapOrderCard(card, step, slots) {
     state.busy = true;
     Sound.wrong();
     Save.recordAnswer(false);
+    logChoice(set.title + ' — put the steps in order', step[1], false);
     card.classList.add('wrongPick');
     state.hearts--;
     renderStats();
@@ -1209,6 +1214,7 @@ function tapOrderCard(card, step, slots) {
     state.busy = true;
     Sound.right();
     Save.recordAnswer(true);
+    logChoice(set.title + ' — put the steps in order', 'in order', true);
     Hud.applied(Save.awardEvent('storyChoice'));
     state.gems++;
     renderStats();
@@ -1259,6 +1265,7 @@ function pickFinish(el, choice) {
     Sound.right();
     el.classList.add('right');
     Save.recordAnswer(true);
+    logChoice(state.item.text, choice.t, true);
     Hud.applied(Save.awardEvent('storyChoice'));
     state.gems++;
     renderStats();
@@ -1267,6 +1274,7 @@ function pickFinish(el, choice) {
     Sound.wrong();
     el.classList.add('wrongPick');
     Save.recordAnswer(false);
+    logChoice(state.item.text, choice.t, false);
     state.tried.add(choice);
     state.hearts--;
     renderStats();
@@ -1286,6 +1294,7 @@ function miniComplete() {
   $('winText').textContent =
     `You got all ${MINI_ROUNDS} right in ${state.mode === 'order' ? 'Story Order' : 'Finish the Story'}!`;
   showEarnings();
+  Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
   if (drop) later(() => Hud.cardDrop(drop), 1400);
@@ -1296,7 +1305,17 @@ const MINI_CARDS = {
   finish: Save.STORY_CARDS.filter(c => c.id === 's-finish')[0],
 };
 
+/* For the grown-ups: the scene as it was read, and which choice was taken.
+   The question is trimmed to its first sentence — a whole scene would swamp
+   the review list. */
+function logChoice(text, chose, ok) {
+  const first = String(text || '').split(/(?<=[.!?])\s/)[0];
+  Log.answer({ q: first, given: chose, ok: ok,
+               ms: performance.now() - (state.shownAt || performance.now()) });
+}
+
 function renderStats() {
+  state.shownAt = performance.now();
   const pips = $('heartPips');
   pips.innerHTML = '';
   for (let i = 0; i < MAX_HEARTS; i++) {
@@ -1352,6 +1371,7 @@ function pickChoice(el, choice) {
     Sound.right();
     el.classList.add('right');
     Save.recordAnswer(true);
+    logChoice(scene().text, choice.t, true);
     Hud.applied(Save.awardEvent('storyChoice'));
     later(() => {
       const sc = scene();
@@ -1362,6 +1382,7 @@ function pickChoice(el, choice) {
     Sound.wrong();
     el.classList.add('wrongPick');
     Save.recordAnswer(false);   // a lost heart is punishment enough
+    logChoice(scene().text, choice.t, false);
     state.tried.add(choice);
     state.hearts--;
     renderStats();
@@ -1478,6 +1499,7 @@ function questComplete() {
   $('winText').textContent =
     `You finished ${quest().title} with ${state.gems} of ${total} gems!`;
   showEarnings();
+  Log.endSession({ won: true, gold: earnedThisRun() });
   showScreen('win');
   Hud.applied(bonus);
   if (drop) later(() => Hud.cardDrop(drop), 1400);
@@ -1485,9 +1507,12 @@ function questComplete() {
 
 // What this quest put in the purse. Gold is the reward now — iPad time is
 // bought with it back at the hub.
+function earnedThisRun() {
+  return Math.max(0, (Save.me() || { gold: 0 }).gold - state.goldAtStart);
+}
+
 function showEarnings() {
-  const now = (Save.me() || { gold: 0 }).gold;
-  const won = Math.max(0, now - state.goldAtStart);
+  const won = earnedThisRun();
   $('earned').innerHTML =
     '<div class="reward-line">\u{1FA99} You earned <b></b> gold on this quest!</div>' +
     '<div class="reward-hint">Spend it in the shop \u2014 swords, armor, pets, ' +
@@ -1497,6 +1522,7 @@ function showEarnings() {
 
 function questFailed() {
   Sound.gameover();
+  Log.endSession({ won: false, gold: earnedThisRun() });
   showScreen('lose');
 }
 

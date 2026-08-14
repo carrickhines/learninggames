@@ -276,6 +276,59 @@
   .setrow.done .wfill { background: linear-gradient(90deg, #8affc4, var(--good)); }
   .setrow.done .wperk { color: var(--good); opacity: 1; font-weight: bold; }
 
+  /* ---------- Progress report ----------
+     Denser and plainer than the rest of the site: this one is for an adult
+     skimming it, not a five-year-old tapping it. */
+  .statrow { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .stat {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 10px 18px;
+    min-width: 92px;
+  }
+  .stat .v { display: block; font-family: var(--display); font-size: 24px; color: var(--accent); }
+  .stat .k { display: block; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; opacity: .6; }
+
+  .report { max-width: 660px; margin: 0 auto; text-align: left; }
+
+  .rrow, .srow, .missrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .rrow:nth-child(odd), .srow:nth-child(odd), .missrow:nth-child(odd) {
+    background: rgba(255,255,255,.04);
+  }
+
+  .rrow .rname { font-family: var(--display); min-width: 13em; }
+  .rrow .rbar { flex: 1; height: 8px; border-radius: 5px; background: rgba(0,0,0,.35); overflow: hidden; }
+  .rrow .rfill { display: block; height: 100%; background: linear-gradient(90deg, #8affc4, var(--good)); }
+  .rrow .rpct { font-family: var(--display); min-width: 3em; text-align: right; }
+  .rrow .rsub { min-width: 10em; opacity: .6; font-size: 12px; }
+  /* a track worth looking at */
+  .rrow.weak .rfill { background: linear-gradient(90deg, #ffc9a0, var(--bad)); }
+  .rrow.weak .rpct { color: var(--bad); }
+
+  .missrow .mcount {
+    font-family: var(--display);
+    color: var(--bad);
+    min-width: 2.4em;
+  }
+  .missrow .mq { flex: 1; }
+  .missrow .mgave { opacity: .6; font-size: 12px; min-width: 12em; }
+  .missrow .mright { min-width: 3em; color: var(--good); font-size: 12px; }
+  /* never yet answered correctly — the ones actually worth sitting down over */
+  .missrow.never .mq { color: #ffc9d4; }
+
+  .srow .swhen { font-family: var(--display); min-width: 8.5em; opacity: .8; }
+  .srow .sgame { flex: 1; }
+  .srow .sacc, .srow .smin { min-width: 6em; opacity: .75; }
+  .srow .swon { min-width: 1.4em; }
+
   /* ---------- Settings ---------- */
   .setting-note {
     font-size: 14px;
@@ -377,6 +430,37 @@
     </div>
   </section>
 
+  <!-- ================= PROGRESS REPORT (for grown-ups) ================= -->
+  <section class="screen scrolls" id="parent">
+    <div class="screen-inner">
+      <h1 id="parentTitle">Progress</h1>
+      <div class="subtitle" id="parentSince">No play recorded yet.</div>
+
+      <div class="statrow" id="parentStats"></div>
+
+      <div class="group-label">How each track is going</div>
+      <div class="report" id="trackReport"></div>
+
+      <div class="group-label">Questions being missed</div>
+      <div class="setting-note">Most-missed first, with what was answered
+        instead. This is the review list.</div>
+      <div class="report" id="missReport"></div>
+
+      <div class="group-label">Recent sessions</div>
+      <div class="report" id="sessionReport"></div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="csvBtn" class="ghost-btn">⬇️ Export CSV</button>
+        <button id="clearLogBtn" class="ghost-btn danger-btn">Clear this record</button>
+      </div>
+      <div class="flash" id="parentFlash"></div>
+
+      <div class="btn-row back-row">
+        <button id="parentBackBtn" class="ghost-btn">Back</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= CARD TRADER ================= -->
   <section class="screen scrolls" id="trader">
     <div class="screen-inner">
@@ -467,6 +551,13 @@
       </div>
       <input type="file" id="importFile" accept="application/json,.json">
 
+      <div class="group-label">For grown-ups</div>
+      <div class="setting-note">See what's been played and — more usefully —
+        which questions keep getting missed.</div>
+      <div class="btn-row">
+        <button id="parentBtn">👤 Progress report</button>
+      </div>
+
       <div class="group-label">This hero</div>
       <div class="btn-row">
         <button id="renameBtn" class="ghost-btn">✏️ Rename</button>
@@ -485,6 +576,7 @@
 
 <script src="shared/sound.js"></script>
 <script src="shared/save.js"></script>
+<script src="shared/log.js"></script>
 <script src="shared/reward.js"></script>
 <script>
 'use strict';
@@ -932,6 +1024,138 @@ $('cardsBtn').addEventListener('click', () => {
   showScreen('cards');
 });
 $('cardsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
+
+/* ---------- The progress report ----------
+   Written for a parent skimming it on a phone: the headline numbers, then
+   where he's struggling, then what he actually got wrong. */
+const GAME_NAME = { math: 'Math RPG', language: 'Language RPG', story: 'Story Quest' };
+
+function renderParent() {
+  const me = Save.me();
+  if (!me) return;
+  const sum = Log.summary();
+
+  $('parentTitle').textContent = me.name + "'s progress";
+  $('parentSince').textContent = sum.answers
+    ? `${sum.answers} questions answered across ${sum.sessions} ` +
+      `session${sum.sessions === 1 ? '' : 's'}, since ${dateLabel(sum.since)}.`
+    : 'No play recorded yet — the report fills in as he plays.';
+
+  $('parentStats').innerHTML = '';
+  [
+    ['Questions', sum.answers],
+    ['Correct', sum.accuracy + '%'],
+    ['Sessions', sum.sessions],
+    ['Time played', sum.minutes + ' min'],
+  ].forEach(([label, value]) => {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<span class="v"></span><span class="k"></span>`;
+    d.querySelector('.v').textContent = value;
+    d.querySelector('.k').textContent = label;
+    $('parentStats').appendChild(d);
+  });
+
+  // per track, weakest first
+  const tracks = Log.byTrack();
+  $('trackReport').innerHTML = tracks.length ? '' :
+    '<div class="setting-note">Nothing recorded yet.</div>';
+  tracks.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'rrow';
+    d.innerHTML =
+      `<span class="rname"></span>` +
+      `<span class="rbar"><span class="rfill" style="width:${t.accuracy}%"></span></span>` +
+      `<span class="rpct">${t.accuracy}%</span>` +
+      `<span class="rsub">${t.right}/${t.total} · ${t.avgSec.toFixed(1)}s each</span>`;
+    d.querySelector('.rname').textContent =
+      (GAME_NAME[t.game] || t.game) + ' · ' + (t.track || '—');
+    if (t.accuracy < 70) d.classList.add('weak');
+    $('trackReport').appendChild(d);
+  });
+
+  // the review list
+  const misses = Log.missed(null, 25);
+  $('missReport').innerHTML = misses.length ? '' :
+    '<div class="setting-note">Nothing missed yet. Genuinely.</div>';
+  misses.forEach(m => {
+    const d = document.createElement('div');
+    d.className = 'missrow';
+    d.innerHTML =
+      `<span class="mcount">×${m.misses}</span>` +
+      `<span class="mq"></span>` +
+      `<span class="mgave"></span>` +
+      `<span class="mright">${m.right ? '✓ ' + m.right : ''}</span>`;
+    d.querySelector('.mq').textContent = m.q;
+    d.querySelector('.mgave').textContent =
+      m.gave.length ? 'answered: ' + m.gave.join(', ') : '';
+    d.title = m.right
+      ? `Missed ${m.misses}×, but answered correctly ${m.right}× as well`
+      : `Missed ${m.misses}×, never yet correct`;
+    if (!m.right) d.classList.add('never');
+    $('missReport').appendChild(d);
+  });
+
+  // sessions, newest first
+  const ss = Log.sessions().slice(0, 20);
+  $('sessionReport').innerHTML = ss.length ? '' :
+    '<div class="setting-note">No sessions yet.</div>';
+  ss.forEach(x => {
+    const d = document.createElement('div');
+    d.className = 'srow';
+    d.innerHTML =
+      `<span class="swhen">${dateLabel(x.when)} ${timeLabel(x.when)}</span>` +
+      `<span class="sgame"></span>` +
+      `<span class="sacc">${x.right}/${x.right + x.wrong} · ${x.accuracy}%</span>` +
+      `<span class="smin">${x.minutes} min</span>` +
+      `<span class="swon">${x.won ? '🏆' : ''}</span>`;
+    d.querySelector('.sgame').textContent =
+      (GAME_NAME[x.game] || x.game) + (x.track ? ' · ' + x.track : '');
+    $('sessionReport').appendChild(d);
+  });
+}
+
+function dateLabel(t) {
+  if (!t) return '—';
+  return new Date(t).toLocaleDateString(undefined,
+    { month: 'short', day: 'numeric' });
+}
+function timeLabel(t) {
+  return new Date(t).toLocaleTimeString(undefined,
+    { hour: 'numeric', minute: '2-digit' });
+}
+
+$('parentBtn').addEventListener('click', () => {
+  Sound.click();
+  $('parentFlash').textContent = '';
+  renderParent();
+  showScreen('parent');
+});
+$('parentBackBtn').addEventListener('click', () => { Sound.click(); showScreen('settings'); });
+
+$('csvBtn').addEventListener('click', () => {
+  Sound.click();
+  const me = Save.me();
+  const blob = new Blob([Log.csv()], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${me.name}-questions-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  $('parentFlash').textContent = 'Exported.';
+});
+
+$('clearLogBtn').addEventListener('click', () => {
+  const me = Save.me();
+  Sound.click();
+  if (!confirm(`Clear the play record for ${me.name}? Their gold, cards and gear are not affected.`)) return;
+  Log.clear();
+  renderParent();
+  $('parentFlash').textContent = 'Record cleared.';
+});
 
 $('settingsBtn').addEventListener('click', () => { Sound.click(); flash(''); showScreen('settings'); });
 $('settingsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
