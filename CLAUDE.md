@@ -437,6 +437,26 @@ thinking time to the *total*, but never widens the fast zone.
 
 ---
 
+# Rewards never cover a question
+
+Level-ups and card drops are full-screen banners. They used to fire the
+instant they were earned, which meant landing on top of a question the child
+was still reading.
+
+They're **held** instead. `Hud.queue()` collects them and `Hud.flush(done)`
+releases them one at a time at a moment when there's nothing to cover:
+between monsters, and on the end screens. The next monster waits for the queue
+to drain. While something is held, the hero chip shows a 🎁 badge with a count,
+so the wait is part of the anticipation rather than a loss.
+
+Small feedback stays immediate — the `+4 🪙` float is a corner wisp and never
+covers anything.
+
+**If you add a new banner, queue it.** `.verify/playthrough.py` watches for an
+overlay appearing while a question is on screen and the game isn't busy, and
+fails if it ever happens. It also asserts a banner *did* appear during the run,
+so the check can't pass by never triggering.
+
 # Sound
 
 Every effect is synthesized at runtime with the Web Audio API — no audio files,
