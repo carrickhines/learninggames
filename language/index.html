@@ -1,0 +1,2549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Language RPG">
+<title>LanguageRPG</title>
+<style>
+  /* Shared visual system with Math RPG: same tokens, frame, and components */
+  :root {
+    --sky-top: #241544;
+    --sky-mid: #3a1f5c;
+    --sky-low: #5b2a63;
+    --horizon: #ff6fa5;       /* warm dusk glow at the arena floor */
+    --panel: rgba(15, 8, 30, 0.42);
+    --accent: #ffd23f;
+    --accent-2: #d99312;      /* deeper gold for the button "lip" */
+    --good: #5ce8a0;          /* you / hero / correct */
+    --bad: #ff5e7e;           /* foe / danger */
+    --ink: #1b1230;           /* dark text on gold buttons */
+    --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: var(--body);
+    color: #fff;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app {
+    width: min(900px, 96vw);
+    height: min(720px, 96vh);
+    position: relative;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+    /* twilight quest arena: starfield + warm horizon glow over a violet sky */
+    background:
+      radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
+      radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
+      radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
+  }
+
+  .sound-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    width: 46px;
+    height: 46px;
+    padding: 0;                /* override the base button padding so the icon centers */
+    border-radius: 50%;
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
+    line-height: 1;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: transform .08s, filter .15s;
+  }
+  .sound-toggle:active { transform: translateY(3px); }
+  .sound-toggle.muted { opacity: 0.55; }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.show { display: flex; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(44px, 8.5vw, 76px);
+    margin: 0 0 6px;
+    color: var(--accent);
+    text-shadow:
+      0 3px 0 var(--accent-2),
+      0 5px 0 #9a6a0c,
+      0 10px 22px rgba(0,0,0,.55);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .subtitle {
+    font-size: 19px;
+    color: rgba(255,255,255,.78);
+    margin-bottom: 22px;
+    max-width: 50ch;
+    text-wrap: balance;
+  }
+  .group-label {
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 10px 0 8px;
+    color: var(--accent);
+    opacity: .92;
+  }
+
+  /* the menu can outgrow the frame with both hero rows: center when it
+     fits, scroll when it doesn't (margin:auto does both) */
+  #menu { justify-content: flex-start; overflow-y: auto; scrollbar-width: none; }
+  #menu::-webkit-scrollbar { display: none; }
+  .menu-inner {
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .group-label::before, .group-label::after {
+    content: "";
+    display: inline-block;
+    width: 26px;
+    height: 2px;
+    margin: 0 12px;
+    vertical-align: middle;
+    background: linear-gradient(90deg, transparent, var(--accent));
+    opacity: .55;
+  }
+  .group-label::after { transform: scaleX(-1); }
+
+  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  button {
+    font-family: var(--display);
+    cursor: pointer;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    font-weight: bold;
+    padding: 16px 28px;
+    color: var(--ink);
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
+
+  #startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
+  #startBtn:disabled {
+    filter: grayscale(.6) brightness(.85);
+    cursor: default;
+    box-shadow: 0 5px 0 #777, 0 9px 18px rgba(0,0,0,.3);
+    transform: none;
+  }
+
+  button.choice {
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    font-size: 18px;
+    padding: 13px 14px;
+    min-width: 150px;
+  }
+  button.choice .emoji { font-size: 30px; display: block; margin-bottom: 4px; }
+  button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
+  button.choice.sel {
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    color: var(--ink);
+    border-color: transparent;
+    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
+  }
+  button.choice.sel .sub { opacity: .85; }
+
+  /* ---------- Battle screen ---------- */
+  #game {
+    justify-content: flex-start;
+    padding: 12px 16px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #game::-webkit-scrollbar { display: none; }
+
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+    padding-right: 66px;   /* clear the top-right mute button */
+    flex-shrink: 0;
+  }
+
+  .fighter-info { flex: 1; max-width: 320px; }
+  .fighter-info .name {
+    font-family: var(--display);
+    font-size: 18px;
+    margin-bottom: 6px;
+    text-align: left;
+    text-shadow: 0 2px 4px rgba(0,0,0,.5);
+  }
+  .fighter-info.foe .name { text-align: right; }
+
+  /* HP as countable pips: hearts for the hero, orbs for the foe — true to the
+     small integer HP values and doubles as counting practice. */
+  .pips { display: flex; gap: 7px; min-height: 26px; }
+  .pips.foe { justify-content: flex-end; }
+  .pip {
+    width: 25px;
+    height: 25px;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .pip.heart {
+    background: var(--good);
+    -webkit-mask: var(--heart) center / contain no-repeat;
+    mask: var(--heart) center / contain no-repeat;
+    filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
+  }
+  .pip.orb {
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff9bb2, var(--bad) 65%);
+    box-shadow: 0 0 6px rgba(255,94,126,.6), inset 0 -3px 4px rgba(0,0,0,.3);
+  }
+  .pip.empty {
+    background: rgba(255,255,255,.16);
+    box-shadow: none;
+    filter: none;
+    transform: scale(.82);
+  }
+  .pip.orb.empty { background: rgba(255,255,255,.14); }
+
+  .arena {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6%;
+    min-height: 110px;
+  }
+  /* glowing stage discs under each fighter */
+  .arena::before, .arena::after {
+    content: "";
+    position: absolute;
+    bottom: 10%;
+    width: 200px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(255,210,63,.22), rgba(255,210,63,0) 70%);
+    filter: blur(3px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .arena::before { left: 2%; }
+  .arena::after { right: 2%; background: radial-gradient(ellipse at center, rgba(255,94,126,.22), rgba(255,94,126,0) 70%); }
+
+  .sprite {
+    z-index: 1;
+    font-size: clamp(56px, 10vw, 96px);
+    filter: drop-shadow(0 12px 10px rgba(0,0,0,.45));
+    transition: transform .15s;
+    position: relative;
+  }
+  .sprite.player { animation: idlePlayer 2.4s ease-in-out infinite; }
+  .sprite.foe {
+    animation: idleFoe 2.8s ease-in-out infinite;
+    transform: scaleX(-1);
+    /* per-foe scale evens out emoji glyphs that fill their em-box differently,
+       set via --foe-scale in JS */
+    font-size: calc(clamp(56px, 10vw, 96px) * var(--foe-scale, 1));
+  }
+
+  @keyframes idlePlayer { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes idleFoe { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-12px); } }
+
+  /* attack lunges */
+  .sprite.player.attack { animation: lungeRight .45s ease; }
+  .sprite.foe.attack { animation: lungeLeft .45s ease; }
+  @keyframes lungeRight {
+    0% { transform: translateX(0); }
+    35% { transform: translateX(180px) rotate(-12deg); }
+    55% { transform: translateX(180px) rotate(-12deg); }
+    100% { transform: translateX(0); }
+  }
+  @keyframes lungeLeft {
+    0% { transform: scaleX(-1) translateX(0); }
+    35% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
+    55% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
+    100% { transform: scaleX(-1) translateX(0); }
+  }
+
+  /* getting hit */
+  .sprite.hurt { animation: shake .4s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-12px) rotate(6deg); }
+    40% { transform: translateX(12px) rotate(-6deg); }
+    60% { transform: translateX(-8px) rotate(4deg); }
+    80% { transform: translateX(8px) rotate(-4deg); }
+  }
+  .sprite.foe.hurt { animation: shakeFoe .4s ease; }
+  @keyframes shakeFoe {
+    0%,100% { transform: scaleX(-1) translateX(0); }
+    20% { transform: scaleX(-1) translateX(-12px) rotate(6deg); }
+    40% { transform: scaleX(-1) translateX(12px) rotate(-6deg); }
+    60% { transform: scaleX(-1) translateX(-8px) rotate(4deg); }
+    80% { transform: scaleX(-1) translateX(8px) rotate(-4deg); }
+  }
+
+  .sprite.flash { filter: drop-shadow(0 12px 10px rgba(0,0,0,.45)) brightness(3) saturate(0); }
+  .sprite.super { filter: drop-shadow(0 0 16px var(--accent)) drop-shadow(0 12px 10px rgba(0,0,0,.45)); }
+
+  .sprite.foe.ko { animation: koSpin .8s ease forwards; }
+  @keyframes koSpin { to { transform: scaleX(-1) rotate(360deg) scale(0); opacity: 0; } }
+
+  /* slash effect */
+  .slash {
+    position: absolute;
+    font-size: 80px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 5;
+  }
+  .slash.go { animation: slashFx .5s ease; }
+  @keyframes slashFx {
+    0% { opacity: 0; transform: scale(.3) rotate(-40deg); }
+    30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
+    100% { opacity: 0; transform: scale(1.6) rotate(30deg); }
+  }
+
+  /* floating damage / status text */
+  .float-text {
+    position: absolute;
+    font-size: 38px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 6;
+    text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    animation: floatUp 1s ease forwards;
+  }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translateY(0) scale(.6); }
+    20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-90px) scale(1); }
+  }
+
+  #flashOverlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8;
+  }
+  #flashOverlay.hit { animation: screenFlash .25s ease; }
+  @keyframes screenFlash { 0% { opacity: .5; } 100% { opacity: 0; } }
+
+  /* ---------- Problem panel ---------- */
+  .problem-panel {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 22px;
+    padding: 14px 20px 16px;
+    box-shadow: 0 -2px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.4);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    flex-shrink: 0;            /* never let the panel get squeezed into itself */
+  }
+
+  .timer-row { display: flex; align-items: center; gap: 10px; }
+  .timer-track {
+    position: relative;
+    flex: 1;
+    height: 14px;
+    border-radius: 8px;
+    background: rgba(0,0,0,.3);
+    overflow: hidden;
+  }
+  .timer-track .bar {
+    height: 100%;
+    width: 100%;
+    background: var(--good);
+    border-radius: 8px;
+    transition: width 0.1s linear;
+  }
+  .timer-track .bar.super { background: linear-gradient(90deg, #ffd23f, #ff9500); }
+  .timer-track .bar.warn { background: var(--accent); }
+  .timer-track .bar.danger { background: var(--bad); }
+  .fast-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 3px;
+    margin-left: -1px;
+    background: #fff;
+    box-shadow: 0 0 4px rgba(0,0,0,.9);
+  }
+  /* little banner flag marking the end of the double-hit zone */
+  .fast-marker::before {
+    content: "";
+    position: absolute;
+    top: -6px; left: -3px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #fff;
+  }
+  .super-label {
+    flex: 0 0 auto;
+    min-width: 96px;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--accent);
+    visibility: hidden;
+  }
+  .super-label.show { visibility: visible; animation: superPulse 0.6s ease-in-out infinite; }
+  @keyframes superPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+  /* the question: prompt line + big content (emoji, word, or spelling slots) */
+  .q-box {
+    align-self: center;
+    text-align: center;
+    padding: 6px 22px 10px;
+    border-radius: 16px;
+    background: rgba(0,0,0,.22);
+    border: 1px solid rgba(255,255,255,.08);
+    min-width: min(340px, 100%);
+  }
+  #qPrompt {
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,.75);
+    margin: 2px 0 2px;
+  }
+  #qBig {
+    font-family: var(--display);
+    font-size: clamp(38px, 7vw, 54px);
+    font-weight: bold;
+    letter-spacing: 2px;
+    line-height: 1.25;
+    min-height: 1.25em;
+    text-shadow: 0 2px 6px rgba(0,0,0,.5);
+  }
+  #qBig .slot {
+    display: inline-block; width: 1.05em; height: 1.2em;
+    border-bottom: 4px dashed rgba(255,255,255,.45);
+    margin: 0 .06em; vertical-align: bottom;
+    border-radius: 6px;
+  }
+  #qBig .slot.filled { border-bottom-color: transparent; background: rgba(92,232,160,.22); }
+  #sayBtn {
+    margin-top: 4px;
+    font-size: 22px;
+    width: 56px;
+    height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 3px 0 rgba(0,0,0,.35);
+  }
+  #sayBtn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  /* ---------- Answers: ABC blocks (the signature), word cards, pictures ---------- */
+  #answers { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+  .block {
+    /* a chunky ABC block, tinted per letter — sibling of the math game's
+       Numberblocks-colored counting blocks */
+    --h: 40;
+    width: 64px; height: 64px;
+    padding: 0;
+    font-size: 30px;
+    color: #fff;
+    text-shadow: 0 2px 3px rgba(0,0,0,.45);
+    background: hsl(var(--h) 75% 52%);
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 12px;
+    box-shadow: inset 0 -5px 0 rgba(0,0,0,.25), 0 4px 6px rgba(0,0,0,.35);
+  }
+  .block:active { transform: translateY(3px) scale(.97); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25), 0 1px 2px rgba(0,0,0,.35); }
+  .block.used { opacity: .25; pointer-events: none; }
+  .block.pop { animation: pop .35s; }
+  @keyframes pop { 40% { transform: scale(1.25) rotate(-6deg); } }
+
+  /* Word Forge: the same blocks, but holding word chunks — colored by kind
+     (prefix / root / suffix) instead of by letter */
+  .block.chunk {
+    width: auto;
+    min-width: 64px;
+    padding: 0 16px;
+    font-size: 24px;
+    letter-spacing: 1px;
+    text-transform: lowercase;
+  }
+
+  /* ---------- Fix It!: a tappable sentence ---------- */
+  #qBig.sentence {
+    font-family: var(--body);
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: normal;
+    letter-spacing: normal;
+    line-height: 1.7;
+    max-width: 56ch;
+  }
+  .word-tok {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: bold;
+    color: #fff;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    padding: 2px 8px;
+    display: inline-block;
+  }
+  .word-tok:hover { background: rgba(255,255,255,.12); filter: none; }
+  .word-tok:active { transform: translateY(2px); box-shadow: none; }
+  .word-tok.found {
+    background: rgba(255,94,126,.28);
+    outline: 2px dashed var(--bad);
+    text-decoration: line-through;
+  }
+  .word-tok.fixed {
+    background: rgba(92,232,160,.25);
+    outline: 2px solid var(--good);
+    text-decoration: none;
+  }
+
+  /* ---------- Word Forge: definition + chunk slots ---------- */
+  #qBig.forge { letter-spacing: normal; }
+  .meaning {
+    font-family: var(--body);
+    font-size: clamp(18px, 2.6vw, 24px);
+    font-weight: normal;
+    color: rgba(255,255,255,.9);
+    margin: 6px 0 12px;
+    max-width: 46ch;
+  }
+  .forge-slots { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .fslot {
+    min-width: 78px;
+    height: 48px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border-bottom: 4px dashed rgba(255,255,255,.45);
+    background: rgba(0,0,0,.2);
+    font-family: var(--display);
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .fslot.filled { border-bottom-color: transparent; background: rgba(92,232,160,.22); }
+
+  .wordcard, .picbtn {
+    color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 6px 12px rgba(0,0,0,.25);
+    padding: 12px 22px;
+    font-size: 28px;
+    min-width: 110px;
+  }
+  .picbtn { font-size: 40px; padding: 8px 18px; min-width: 92px; }
+  /* Mark It! end-mark cards: a lone . ? ! needs to be big to read */
+  .wordcard.markcard { font-size: 44px; min-width: 90px; padding: 4px 22px; line-height: 1.2; }
+  .wordcard:hover, .picbtn:hover { filter: brightness(1.18); }
+  .wordcard:active, .picbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+  .right {
+    background: linear-gradient(180deg, #8df3bd, var(--good)) !important;
+    color: var(--ink) !important;
+    text-shadow: none !important;
+    border-color: transparent !important;
+  }
+  .wrongPick { animation: wobble .5s; }
+  @keyframes wobble { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+
+  #feedback { min-height: 1.5em; font-size: 17px; text-align: center; color: rgba(255,255,255,.85); }
+
+  /* ---------- Win / lose ---------- */
+  .end-emoji {
+    font-size: 120px;
+    margin-bottom: 10px;
+    animation: endPop .5s ease;
+    filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
+  }
+  @keyframes endPop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+  .reward {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0 20px;
+  }
+  .reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
+  .reward-line b { color: var(--accent); font-size: 28px; }
+  .reward-hint {
+    font-size: 14px;
+    color: rgba(255,255,255,.6);
+    max-width: 42ch;
+    text-wrap: balance;
+  }
+  #countdown {
+    font-family: var(--display);
+    font-size: clamp(48px, 12vw, 80px);
+    font-weight: bold;
+    color: var(--accent);
+    text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  #countdown:empty { display: none; }
+  #countdown.ringing { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
+  @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
+
+  .ghost-btn {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    box-shadow: 0 5px 0 rgba(0,0,0,.35);
+    font-size: 18px;
+    padding: 12px 22px;
+  }
+  .ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  /* ---------- Quality floor ---------- */
+  button:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- ================= MENU ================= -->
+  <section class="screen show" id="menu">
+    <div class="menu-inner">
+    <h1>Language RPG</h1>
+    <div class="subtitle">Read, spell, and beat the monsters!</div>
+
+    <div class="group-label">Little hero quests</div>
+    <div class="btn-row" id="trackGrid">
+      <button class="choice" data-track="letters">
+        <span class="emoji">🔠</span>Letter Hunt
+        <span class="sub">Hear it, find the letter</span>
+      </button>
+      <button class="choice" data-track="builder">
+        <span class="emoji">🧱</span>Word Builder
+        <span class="sub">Spell it with blocks</span>
+      </button>
+      <button class="choice" data-track="sight">
+        <span class="emoji">⭐</span>Sight Words
+        <span class="sub">Hear it, tap the word</span>
+      </button>
+      <button class="choice" data-track="read">
+        <span class="emoji">🖼️</span>Read It!
+        <span class="sub">Read it, tap the picture</span>
+      </button>
+      <button class="choice" data-track="rhyme">
+        <span class="emoji">🎵</span>Rhyme Time
+        <span class="sub">Hear it, tap the rhyme</span>
+      </button>
+      <button class="choice" data-track="past">
+        <span class="emoji">🕰️</span>Time Machine
+        <span class="sub">Today I... yesterday I...</span>
+      </button>
+    </div>
+
+    <div class="group-label">Big hero quests</div>
+    <div class="btn-row" id="trackGrid2">
+      <button class="choice" data-track="fixit">
+        <span class="emoji">🔍</span>Fix It!
+        <span class="sub">Find and fix the mistake</span>
+      </button>
+      <button class="choice" data-track="forge">
+        <span class="emoji">⚒️</span>Word Forge
+        <span class="sub">Build words from parts</span>
+      </button>
+      <button class="choice" data-track="grammar">
+        <span class="emoji">🏷️</span>Grammar Hunt
+        <span class="sub">Tap the noun or verb</span>
+      </button>
+      <button class="choice" data-track="syllable">
+        <span class="emoji">🔨</span>Syllable Smith
+        <span class="sub">Spell it chunk by chunk</span>
+      </button>
+      <button class="choice" data-track="twins">
+        <span class="emoji">🎭</span>Word Twins
+        <span class="sub">Same or opposite?</span>
+      </button>
+      <button class="choice" data-track="marks">
+        <span class="emoji">✏️</span>Mark It!
+        <span class="sub">Commas and end marks</span>
+      </button>
+    </div>
+
+    <div class="group-label">Choose your speed</div>
+    <div class="btn-row" id="modeRow">
+      <button class="choice" data-mode="easy">
+        <span class="emoji">🐢</span>Easy
+        <span class="sub">Relaxed timer</span>
+      </button>
+      <button class="choice" data-mode="normal">
+        <span class="emoji">🐰</span>Normal
+        <span class="sub">Some time pressure</span>
+      </button>
+      <button class="choice" data-mode="expert">
+        <span class="emoji">🦅</span>Expert
+        <span class="sub">Beat the clock!</span>
+      </button>
+    </div>
+
+    <div style="margin-top:18px">
+      <button id="startBtn" disabled>Start Battle!</button>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= GAME ================= -->
+  <section class="screen" id="game">
+    <div class="topbar">
+      <div class="fighter-info player">
+        <div class="name">🦸 You</div>
+        <div class="pips player" id="playerPips"></div>
+      </div>
+      <div class="fighter-info foe">
+        <div class="name" id="foeName">👾 Monster</div>
+        <div class="pips foe" id="foePips"></div>
+      </div>
+    </div>
+
+    <div class="arena" id="arena">
+      <div class="sprite player" id="playerSprite">🦸</div>
+      <div class="slash" id="slash">💥</div>
+      <div class="sprite foe" id="foeSprite">👾</div>
+    </div>
+
+    <div class="problem-panel">
+      <div class="timer-row">
+        <div class="timer-track">
+          <div class="bar" id="timerBar"></div>
+          <div class="fast-marker" id="fastMark"></div>
+        </div>
+        <div class="super-label" id="superLabel">⚡ DOUBLE! ⚡</div>
+      </div>
+
+      <div class="q-box">
+        <div id="qPrompt">Find the letter!</div>
+        <div id="qBig">🐱</div>
+        <button id="sayBtn" aria-label="Say it again">🔊</button>
+      </div>
+
+      <div id="answers"></div>
+      <div id="feedback"></div>
+    </div>
+
+    <div id="flashOverlay"></div>
+  </section>
+
+  <!-- ================= WIN ================= -->
+  <section class="screen" id="win">
+    <div class="end-emoji">🏆</div>
+    <h1>Victory!</h1>
+    <div class="subtitle">You beat every monster!</div>
+
+    <div class="reward">
+      <div class="reward-line">🎮 You earned <b id="earnedMins">7</b> minutes of iPad game time!</div>
+      <div id="countdown"></div>
+      <button id="timerBtn">⏱️ Start the timer</button>
+      <button id="stopAlarmBtn" class="ghost-btn" style="display:none">🔕 Stop alarm</button>
+      <div class="reward-hint">Keep this screen open so the alarm can ring — or
+        ask Siri to set a timer!</div>
+    </div>
+
+    <button id="winAgainBtn" class="ghost-btn">Play Again</button>
+  </section>
+
+  <!-- ================= LOSE ================= -->
+  <section class="screen" id="lose">
+    <div class="end-emoji">💫</div>
+    <h1>Oh no!</h1>
+    <div class="subtitle">The monsters got you this time.<br>You were SO close — try again!</div>
+    <button id="loseAgainBtn">Try again!</button>
+  </section>
+
+</div>
+
+<!-- Parent-recorded voice clips, generated by record.html. Optional:
+     a 404 here is harmless — the game falls back to speechSynthesis. -->
+<script src="voice.js"></script>
+
+<script>
+'use strict';
+
+/* ==================================================================
+   Sound — all SFX synthesized with Web Audio. No files to host.
+   ================================================================== */
+const Sound = {
+  ctx: null, muted: localStorage.getItem('langrpg_muted') === '1',
+  alarmTimer: null,
+
+  unlock() {  // call on first user gesture (autoplay rules)
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+
+  // one tone: frequency, duration, type, volume, start-delay
+  tone(freq, dur, type = 'square', vol = 0.15, delay = 0) {
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + dur);
+  },
+
+  click()    { this.tone(600, .06, 'square', .08); },
+  tap()      { this.tone(880, .08, 'triangle', .12); },
+  hit()      { this.tone(220, .12, 'sawtooth', .2); this.tone(440, .1, 'square', .15, .06); },
+  superHit() { [660, 880, 1100, 1320].forEach((f, i) => this.tone(f, .12, 'square', .18, i * .07)); },
+  hurt()     { this.tone(160, .25, 'sawtooth', .2); this.tone(110, .3, 'sawtooth', .15, .1); },
+  wrong()    { this.tone(300, .18, 'triangle', .12); this.tone(240, .25, 'triangle', .12, .18); },
+  ko()       { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, .14, 'triangle', .16, i * .09)); },
+  victory()  { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, .2, 'triangle', .16, i * .14)); },
+  gameover() { [392, 330, 262, 196].forEach((f, i) => this.tone(f, .3, 'triangle', .14, i * .25)); },
+
+  startAlarm() {
+    this.stopAlarm();
+    const beep = () => { this.tone(880, .25, 'square', .22); this.tone(660, .25, 'square', .22, .3); };
+    beep();
+    this.alarmTimer = setInterval(beep, 800);
+  },
+  stopAlarm() { if (this.alarmTimer) { clearInterval(this.alarmTimer); this.alarmTimer = null; } }
+};
+
+/* ==================================================================
+   Speech — fallback voice via the browser's built-in speechSynthesis.
+   Free, offline-friendly, no API keys, no files.
+   ================================================================== */
+const Speech = {
+  voice: null, ok: 'speechSynthesis' in window,
+
+  init() {
+    if (!this.ok) return;
+    const pick = () => {
+      const vs = speechSynthesis.getVoices().filter(v => v.lang && v.lang.startsWith('en'));
+      // prefer a natural/local voice when the OS offers one
+      this.voice = vs.find(v => /samantha|google us english|natural/i.test(v.name)) || vs[0] || null;
+    };
+    pick();
+    speechSynthesis.onvoiceschanged = pick;
+  },
+
+  say(text, rate = 0.85) {
+    if (!this.ok || Sound.muted) return;
+    speechSynthesis.cancel();  // never overlap
+    const u = new SpeechSynthesisUtterance(text);
+    if (this.voice) u.voice = this.voice;
+    u.rate = rate; u.pitch = 1.05;
+    speechSynthesis.speak(u);
+  }
+};
+
+/* ==================================================================
+   Voice — the game's REAL voice: clips of a parent reading the
+   prompts, recorded once with record.html into voice.js (data URIs,
+   so it works from file:// too). Robot TTS above is only the
+   fallback for clips that haven't been recorded yet.
+   ================================================================== */
+const Voice = {
+  clips: window.VOICE_CLIPS || {},
+  el: null, queue: [],
+
+  unlock() {  // create + unlock one reusable <audio> inside a user gesture
+    if (this.el) return;
+    this.el = new Audio();
+    // a near-empty wav; a successful play() here unlocks the element on iOS
+    this.el.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+    this.el.play().catch(() => {});
+    this.el.onended = () => this.playNext();
+  },
+
+  // play recorded clips in order; if any is missing, speak the fallback text
+  play(ids, fallbackText) {
+    if (Sound.muted) return;
+    this.stop();
+    if (!this.el || !ids.every(id => this.clips[id])) {
+      Speech.say(fallbackText);
+      return;
+    }
+    this.queue = ids.slice();
+    this.playNext();
+  },
+
+  playNext() {
+    if (!this.queue.length) return;
+    this.el.src = this.clips[this.queue.shift()];
+    this.el.play().catch(() => {});
+  },
+
+  stop() {
+    this.queue = [];
+    if (this.el) this.el.pause();
+    if (Speech.ok) speechSynthesis.cancel();
+  }
+};
+
+/* ==================================================================
+   Content — emoji are the art, so there are no images to host.
+   ================================================================== */
+
+// Letter Hunt: every letter with a cue word + emoji ("B as in ball")
+const LETTERS = [
+  ['A','apple','🍎'],['B','ball','⚽'],['C','cat','🐱'],['D','dog','🐶'],
+  ['E','elephant','🐘'],['F','fish','🐟'],['G','grapes','🍇'],['H','hat','🎩'],
+  ['I','ice','🧊'],['J','juice','🧃'],['K','kite','🪁'],['L','lion','🦁'],
+  ['M','moon','🌙'],['N','nose','👃'],['O','octopus','🐙'],['P','pig','🐷'],
+  ['Q','queen','👸'],['R','rainbow','🌈'],['S','sun','☀️'],['T','tiger','🐯'],
+  ['U','umbrella','☂️'],['V','volcano','🌋'],['W','whale','🐳'],['X','x-ray','🩻'],
+  ['Y','yo-yo','🪀'],['Z','zebra','🦓'],
+];
+
+// Word Builder + Read It!: simple 3-letter words that have a clear emoji
+const WORDS = [
+  ['cat','🐱'],['dog','🐶'],['sun','☀️'],['hat','🎩'],['pig','🐷'],['cup','☕'],
+  ['bed','🛏️'],['fox','🦊'],['bug','🐛'],['ant','🐜'],['cow','🐮'],['hen','🐓'],
+  ['box','📦'],['car','🚗'],['bee','🐝'],['egg','🥚'],['key','🔑'],['bat','🦇'],
+  ['owl','🦉'],['map','🗺️'],['pen','🖊️'],['bus','🚌'],['pie','🥧'],['van','🚐'],
+  ['web','🕸️'],['nut','🥜'],
+];
+
+// Sight Words: Dolch pre-primer core
+const SIGHT = ['the','a','and','to','in','is','it','you','see','we',
+               'can','like','go','my','me','at','up','no','so','on',
+               'big','red','run','play'];
+
+// Rhyme Time: families of rhyming words, each with a clear emoji. A question
+// pairs two words from one family (the cue + the answer) and pulls decoy
+// pictures from other families — so families must be complete: never put two
+// words that rhyme into different families, or a decoy could secretly be a
+// right answer. Words already in WORDS/SIGHT reuse their recorded clips;
+// rhyme-only words get R_ clips (keep the extras in sync with record.html).
+const RHYMES = [
+  [['cat','🐱'], ['hat','🎩'], ['bat','🦇']],
+  [['dog','🐶'], ['frog','🐸'], ['log','🪵']],
+  [['hen','🐓'], ['pen','🖊️'], ['ten','🔟']],
+  [['fox','🦊'], ['box','📦'], ['socks','🧦']],
+  [['bee','🐝'], ['key','🔑'], ['tree','🌳']],
+  [['van','🚐'], ['man','👨'], ['pan','🍳']],
+  [['car','🚗'], ['star','⭐'], ['jar','🫙']],
+  [['bed','🛏️'], ['sled','🛷'], ['bread','🍞']],
+  [['map','🗺️'], ['cap','🧢'], ['clap','👏']],
+  [['pie','🥧'], ['eye','👁️'], ['fly','🪰']],
+  [['sun','☀️'], ['run','🏃'], ['one','1️⃣']],
+  [['goat','🐐'], ['boat','⛵'], ['coat','🧥']],
+  [['cake','🎂'], ['snake','🐍']],
+  [['mouse','🐭'], ['house','🏠']],
+  [['moon','🌙'], ['spoon','🥄']],
+  [['fish','🐟'], ['dish','🍽️']],
+  [['ring','💍'], ['king','🤴']],
+];
+
+// find a word's clip wherever it was recorded: the word list, the sight
+// list, or the rhyme-only extras
+const wordClip = w =>
+  WORDS.some(p => p[0] === w) ? 'W_' + w :
+  SIGHT.includes(w)           ? 'S_' + w : 'R_' + w;
+
+// Time Machine: irregular past tense, entirely by ear. Three kinds of clips
+// compose each question: the V_ sentence stem ("Today I tear. Yesterday
+// I..."), then the two O_ option words in whatever order the cards shuffled
+// into, joined by the P_or connector ("or...?"). Because the options are
+// independent clips, the cards shuffle freely, the correct word is spoken
+// as praise, and a miss gets a spoken reveal ("It was... tore"). Decoy
+// rule: `wrong` is the classic over-regularized kid form, and must never
+// be a defensible real past tense (avoid pay/payed, wake/waked, dive/dived,
+// hang/hanged) or sound identical to the answer; skip homograph pasts
+// (read/read). Keep this list in sync with record.html.
+const PAST = [
+  { now: 'go',     past: 'went',    wrong: 'goed' },
+  { now: 'eat',    past: 'ate',     wrong: 'eated' },
+  { now: 'see',    past: 'saw',     wrong: 'seed' },
+  { now: 'run',    past: 'ran',     wrong: 'runned' },
+  { now: 'come',   past: 'came',    wrong: 'comed' },
+  { now: 'get',    past: 'got',     wrong: 'getted' },
+  { now: 'give',   past: 'gave',    wrong: 'gived' },
+  { now: 'take',   past: 'took',    wrong: 'taked' },
+  { now: 'make',   past: 'made',    wrong: 'maked' },
+  { now: 'ride',   past: 'rode',    wrong: 'rided' },
+  { now: 'write',  past: 'wrote',   wrong: 'writed' },
+  { now: 'drive',  past: 'drove',   wrong: 'drived' },
+  { now: 'sing',   past: 'sang',    wrong: 'singed' },
+  { now: 'drink',  past: 'drank',   wrong: 'drinked' },
+  { now: 'swim',   past: 'swam',    wrong: 'swimmed' },
+  { now: 'sit',    past: 'sat',     wrong: 'sitted' },
+  { now: 'stand',  past: 'stood',   wrong: 'standed' },
+  { now: 'sleep',  past: 'slept',   wrong: 'sleeped' },
+  { now: 'sweep',  past: 'swept',   wrong: 'sweeped' },
+  { now: 'keep',   past: 'kept',    wrong: 'keeped' },
+  { now: 'feel',   past: 'felt',    wrong: 'feeled' },
+  { now: 'leave',  past: 'left',    wrong: 'leaved' },
+  { now: 'mean',   past: 'meant',   wrong: 'meaned' },
+  { now: 'say',    past: 'said',    wrong: 'sayed' },
+  { now: 'hear',   past: 'heard',   wrong: 'heared' },
+  { now: 'tell',   past: 'told',    wrong: 'telled' },
+  { now: 'sell',   past: 'sold',    wrong: 'selled' },
+  { now: 'find',   past: 'found',   wrong: 'finded' },
+  { now: 'think',  past: 'thought', wrong: 'thinked' },
+  { now: 'bring',  past: 'brought', wrong: 'bringed' },
+  { now: 'buy',    past: 'bought',  wrong: 'buyed' },
+  { now: 'catch',  past: 'caught',  wrong: 'catched' },
+  { now: 'teach',  past: 'taught',  wrong: 'teached' },
+  { now: 'fight',  past: 'fought',  wrong: 'fighted' },
+  { now: 'fly',    past: 'flew',    wrong: 'flied' },
+  { now: 'grow',   past: 'grew',    wrong: 'growed' },
+  { now: 'blow',   past: 'blew',    wrong: 'blowed' },
+  { now: 'throw',  past: 'threw',   wrong: 'throwed' },
+  { now: 'know',   past: 'knew',    wrong: 'knowed' },
+  { now: 'draw',   past: 'drew',    wrong: 'drawed' },
+  { now: 'fall',   past: 'fell',    wrong: 'falled' },
+  { now: 'break',  past: 'broke',   wrong: 'breaked' },
+  { now: 'speak',  past: 'spoke',   wrong: 'speaked' },
+  { now: 'steal',  past: 'stole',   wrong: 'stealed' },
+  { now: 'wear',   past: 'wore',    wrong: 'weared' },
+  { now: 'tear',   past: 'tore',    wrong: 'teared' },
+  { now: 'hide',   past: 'hid',     wrong: 'hided' },
+  { now: 'bite',   past: 'bit',     wrong: 'bited' },
+  { now: 'lose',   past: 'lost',    wrong: 'losed' },
+  { now: 'win',    past: 'won',     wrong: 'winned' },
+  { now: 'dig',    past: 'dug',     wrong: 'digged' },
+  { now: 'hold',   past: 'held',    wrong: 'holded' },
+  { now: 'build',  past: 'built',   wrong: 'builded' },
+  { now: 'send',   past: 'sent',    wrong: 'sended' },
+  { now: 'spend',  past: 'spent',   wrong: 'spended' },
+  { now: 'hurt',   past: 'hurt',    wrong: 'hurted' },
+  { now: 'hit',    past: 'hit',     wrong: 'hitted' },
+  { now: 'cut',    past: 'cut',     wrong: 'cutted' },
+  { now: 'feed',   past: 'fed',     wrong: 'feeded' },
+  { now: 'shake',  past: 'shook',   wrong: 'shaked' },
+  { now: 'sting',  past: 'stung',   wrong: 'stinged' },
+  { now: 'swing',  past: 'swung',   wrong: 'swinged' },
+  { now: 'forget', past: 'forgot',  wrong: 'forgetted' },
+  { now: 'freeze', past: 'froze',   wrong: 'freezed' },
+];
+
+/* ------------------------------------------------------------------
+   Big-hero tracks (3rd grade): all text on screen, no voice clips
+   needed — a confident reader drives these entirely by reading.
+   ------------------------------------------------------------------ */
+
+// Fix It!: each sentence has exactly ONE wrong word. The child taps the
+// mistake, then taps the correction. `wrong` must appear exactly once in
+// the sentence (trailing .,!? is ignored when matching; case matters).
+const FIXIT = [
+  // homophones
+  { bad: 'They left there backpacks at school.', wrong: 'there', fix: 'their', decoys: ["they're", 'theirs'] },
+  { bad: 'Your going to love this game.', wrong: 'Your', fix: "You're", decoys: ['Yore', 'Youre'] },
+  { bad: "The dog wagged it's tail.", wrong: "it's", fix: 'its', decoys: ["its'", 'it is'] },
+  { bad: 'We are going two the beach.', wrong: 'two', fix: 'to', decoys: ['too', 'tow'] },
+  { bad: 'Can I come to?', wrong: 'to', fix: 'too', decoys: ['two', 'tow'] },
+  { bad: 'I can here the music.', wrong: 'here', fix: 'hear', decoys: ['hare', 'heer'] },
+  { bad: 'Please come over hear.', wrong: 'hear', fix: 'here', decoys: ['hair', 'heare'] },
+  { bad: 'I got a knew bike for my birthday.', wrong: 'knew', fix: 'new', decoys: ['know', 'gnew'] },
+  { bad: 'Do you want to right a story?', wrong: 'right', fix: 'write', decoys: ['rite', 'wright'] },
+  { bad: 'The night rode a horse into the castle.', wrong: 'night', fix: 'knight', decoys: ['nite', 'nighte'] },
+  // irregular past tense
+  { bad: 'He runned all the way home.', wrong: 'runned', fix: 'ran', decoys: ['runed', 'runn'] },
+  { bad: 'She goed to the store with Mom.', wrong: 'goed', fix: 'went', decoys: ['goned', 'wented'] },
+  { bad: 'I catched the ball with one hand.', wrong: 'catched', fix: 'caught', decoys: ['cought', 'catchd'] },
+  { bad: 'Our teacher teached us fractions.', wrong: 'teached', fix: 'taught', decoys: ['tought', 'teachd'] },
+  { bad: 'The glass breaked into tiny pieces.', wrong: 'breaked', fix: 'broke', decoys: ['broked', 'brake'] },
+  { bad: 'We eated pizza for dinner.', wrong: 'eated', fix: 'ate', decoys: ['eight', 'aten'] },
+  { bad: 'Dad maked pancakes this morning.', wrong: 'maked', fix: 'made', decoys: ['maid', 'maded'] },
+  { bad: 'She taked my pencil by mistake.', wrong: 'taked', fix: 'took', decoys: ['tooked', 'toke'] },
+  { bad: 'I thinked about it all day.', wrong: 'thinked', fix: 'thought', decoys: ['thunk', 'thoght'] },
+  { bad: 'He buyed a comic book.', wrong: 'buyed', fix: 'bought', decoys: ['boughted', 'bot'] },
+  { bad: 'The bird flied over the house.', wrong: 'flied', fix: 'flew', decoys: ['flu', 'flyed'] },
+  { bad: 'I drawed a dragon in art class.', wrong: 'drawed', fix: 'drew', decoys: ['drawn', 'drue'] },
+  // common misspellings
+  { bad: 'My best freind lives next door.', wrong: 'freind', fix: 'friend', decoys: ['frend', 'freend'] },
+  { bad: 'I was late becuase I overslept.', wrong: 'becuase', fix: 'because', decoys: ['becase', 'becouse'] },
+  { bad: "I don't know wich one to pick.", wrong: 'wich', fix: 'which', decoys: ['witch', 'whitch'] },
+  { bad: 'We lernd about volcanoes today.', wrong: 'lernd', fix: 'learned', decoys: ['lerned', 'learnd'] },
+  { bad: 'That roller coaster was really scarry.', wrong: 'scarry', fix: 'scary', decoys: ['scarey', 'skary'] },
+  { bad: 'Can you beleive we won the game?', wrong: 'beleive', fix: 'believe', decoys: ['belive', 'beleave'] },
+  { bad: 'See you tommorow at practice!', wrong: 'tommorow', fix: 'tomorrow', decoys: ['tomorow', 'tommorrow'] },
+  { bad: 'My favorite subject is sceince.', wrong: 'sceince', fix: 'science', decoys: ['sience', 'sciense'] },
+  { bad: 'It was a beutiful sunny day.', wrong: 'beutiful', fix: 'beautiful', decoys: ['beautifull', 'butiful'] },
+  { bad: 'The libary has new books.', wrong: 'libary', fix: 'library', decoys: ['libarry', 'librery'] },
+  // tricky plurals
+  { bad: 'The babys were sleeping in their cribs.', wrong: 'babys', fix: 'babies', decoys: ['babyes', 'babbies'] },
+  { bad: 'Three wolfs howled at the moon.', wrong: 'wolfs', fix: 'wolves', decoys: ['wolfes', 'wolvs'] },
+  { bad: 'The foxs hid in the bushes.', wrong: 'foxs', fix: 'foxes', decoys: ['foxies', 'foxen'] },
+  { bad: 'All the childs lined up for lunch.', wrong: 'childs', fix: 'children', decoys: ['childes', 'childrens'] },
+  { bad: 'Two mouses ran under the door.', wrong: 'mouses', fix: 'mice', decoys: ['mices', 'meese'] },
+  { bad: 'The leafs turned red in fall.', wrong: 'leafs', fix: 'leaves', decoys: ['leafes', 'leves'] },
+  { bad: 'My foots are cold.', wrong: 'foots', fix: 'feet', decoys: ['feets', 'footes'] },
+  { bad: 'The dentist checked my tooths.', wrong: 'tooths', fix: 'teeth', decoys: ['teeths', 'toothes'] },
+  { bad: 'Five sheeps grazed in the field.', wrong: 'sheeps', fix: 'sheep', decoys: ['sheepes', 'shep'] },
+  { bad: 'The mans built a treehouse.', wrong: 'mans', fix: 'men', decoys: ['mens', 'manes'] },
+  // capitalization
+  { bad: 'can you open the window?', wrong: 'can', fix: 'Can', decoys: ['CAN', 'cAn'] },
+  { bad: 'My birthday is in june.', wrong: 'june', fix: 'June', decoys: ['JUNE', 'Junne'] },
+  { bad: 'We visited paris last summer.', wrong: 'paris', fix: 'Paris', decoys: ['PARIS', 'pariS'] },
+  { bad: 'My friend tom is funny.', wrong: 'tom', fix: 'Tom', decoys: ['TOM', 'toM'] },
+  { bad: 'See you on monday!', wrong: 'monday', fix: 'Monday', decoys: ['MONDAY', 'monDay'] },
+  // verb agreement
+  { bad: "He don't like broccoli.", wrong: "don't", fix: "doesn't", decoys: ['doesnt', 'do'] },
+  { bad: 'We was playing outside all day.', wrong: 'was', fix: 'were', decoys: ['wass', 'is'] },
+  { bad: 'She have two cats.', wrong: 'have', fix: 'has', decoys: ['haves', 'had'] },
+  { bad: 'There is five cookies left.', wrong: 'is', fix: 'are', decoys: ['am', 'be'] },
+  { bad: 'The dogs barks at the mail truck.', wrong: 'barks', fix: 'bark', decoys: ['barking', 'barkses'] },
+  // more homophones
+  { bad: 'The bare growled in the woods.', wrong: 'bare', fix: 'bear', decoys: ['bair', 'barre'] },
+  { bad: 'I ate a peace of cake.', wrong: 'peace', fix: 'piece', decoys: ['peese', 'pease'] },
+  { bad: 'The plain landed at the airport.', wrong: 'plain', fix: 'plane', decoys: ['plan', 'plaine'] },
+  { bad: 'We drove down the long rode.', wrong: 'rode', fix: 'road', decoys: ['rowed', 'roade'] },
+  { bad: 'The male carrier brought a package.', wrong: 'male', fix: 'mail', decoys: ['mael', 'maile'] },
+  { bad: 'I herd a strange noise outside.', wrong: 'herd', fix: 'heard', decoys: ['hurd', 'heared'] },
+  { bad: 'The hole class went on a field trip.', wrong: 'hole', fix: 'whole', decoys: ['whol', 'hol'] },
+  { bad: 'Would you like some meet for dinner?', wrong: 'meet', fix: 'meat', decoys: ['mete', 'meit'] },
+  { bad: 'The wind blue the leaves around.', wrong: 'blue', fix: 'blew', decoys: ['bloo', 'blewe'] },
+  { bad: 'I one first place in the race!', wrong: 'one', fix: 'won', decoys: ['wun', 'wonne'] },
+  { bad: 'Their is a spider on the wall.', wrong: 'Their', fix: 'There', decoys: ["They're", 'Theyre'] },
+  { bad: 'The horse ate sum hay.', wrong: 'sum', fix: 'some', decoys: ['som', 'summ'] },
+  { bad: 'My deer grandma bakes cookies.', wrong: 'deer', fix: 'dear', decoys: ['dere', 'deare'] },
+  // more irregular past tense
+  { bad: 'She singed a song at the concert.', wrong: 'singed', fix: 'sang', decoys: ['singd', 'songed'] },
+  { bad: "The dog bited the mailman's bag.", wrong: 'bited', fix: 'bit', decoys: ['bitted', 'bote'] },
+  { bad: 'I falled off my skateboard.', wrong: 'falled', fix: 'fell', decoys: ['falld', 'feld'] },
+  { bad: 'We swimmed in the lake all afternoon.', wrong: 'swimmed', fix: 'swam', decoys: ['swammed', 'swimd'] },
+  { bad: 'He standed in line for an hour.', wrong: 'standed', fix: 'stood', decoys: ['stooded', 'stand'] },
+  { bad: 'The baby sleeped through the storm.', wrong: 'sleeped', fix: 'slept', decoys: ['slepted', 'sleept'] },
+  { bad: 'I finded a dollar on the sidewalk.', wrong: 'finded', fix: 'found', decoys: ['founded', 'fint'] },
+  { bad: 'She telled me a funny joke.', wrong: 'telled', fix: 'told', decoys: ['tolded', 'teld'] },
+  { bad: 'We builded a fort in the backyard.', wrong: 'builded', fix: 'built', decoys: ['bilt', 'builted'] },
+  { bad: 'The kitten drinked all the milk.', wrong: 'drinked', fix: 'drank', decoys: ['drunked', 'drinkt'] },
+  { bad: 'I writed a letter to my cousin.', wrong: 'writed', fix: 'wrote', decoys: ['rote', 'writted'] },
+  { bad: 'He speaked to the principal.', wrong: 'speaked', fix: 'spoke', decoys: ['spoked', 'speeked'] },
+  // more misspellings
+  { bad: 'The resturant was very crowded.', wrong: 'resturant', fix: 'restaurant', decoys: ['restrant', 'restaraunt'] },
+  { bad: 'We had a suprise party for Dad.', wrong: 'suprise', fix: 'surprise', decoys: ['surprize', 'supprise'] },
+  { bad: 'The wether was cold and rainy.', wrong: 'wether', fix: 'weather', decoys: ['wheather', 'wather'] },
+  { bad: 'I definately want to come!', wrong: 'definately', fix: 'definitely', decoys: ['definitly', 'defenitely'] },
+  { bad: 'She is my favrite singer.', wrong: 'favrite', fix: 'favorite', decoys: ['favorit', 'faverite'] },
+  { bad: 'We watched an intresting movie.', wrong: 'intresting', fix: 'interesting', decoys: ['intersting', 'interessting'] },
+  { bad: 'The soop was too hot to eat.', wrong: 'soop', fix: 'soup', decoys: ['sopu', 'soap'] },
+  { bad: 'Look at that enormus pumpkin!', wrong: 'enormus', fix: 'enormous', decoys: ['enormis', 'enourmous'] },
+  { bad: 'My stomache hurts.', wrong: 'stomache', fix: 'stomach', decoys: ['stomack', 'stumach'] },
+  { bad: 'Always say thank you and pleese.', wrong: 'pleese', fix: 'please', decoys: ['pleas', 'pleaze'] },
+  { bad: 'The docter gave me a checkup.', wrong: 'docter', fix: 'doctor', decoys: ['doctar', 'docktor'] },
+  { bad: 'I recieved a letter today.', wrong: 'recieved', fix: 'received', decoys: ['recevied', 'reseived'] },
+  // more tricky plurals
+  { bad: 'The gooses flew south for winter.', wrong: 'gooses', fix: 'geese', decoys: ['geeses', 'goosen'] },
+  { bad: 'Both womans waved hello.', wrong: 'womans', fix: 'women', decoys: ['womens', 'wimen'] },
+  { bad: 'The bunnys hopped across the yard.', wrong: 'bunnys', fix: 'bunnies', decoys: ['bunnyes', 'bunnees'] },
+  { bad: 'We saw two deers in the forest.', wrong: 'deers', fix: 'deer', decoys: ['deeres', 'dear'] },
+  { bad: 'The puppys chewed on the slipper.', wrong: 'puppys', fix: 'puppies', decoys: ['puppyes', 'puppees'] },
+  { bad: 'The shelfs were full of books.', wrong: 'shelfs', fix: 'shelves', decoys: ['shelfes', 'shelvs'] },
+  { bad: 'The partys were both fun.', wrong: 'partys', fix: 'parties', decoys: ['partyes', 'partees'] },
+  { bad: 'Two knifes sat on the counter.', wrong: 'knifes', fix: 'knives', decoys: ['knive', 'knifs'] },
+  { bad: 'The ladys sang in the choir.', wrong: 'ladys', fix: 'ladies', decoys: ['ladyes', 'laddies'] },
+  // more capitalization
+  { bad: 'the movie starts at noon.', wrong: 'the', fix: 'The', decoys: ['THE', 'tHe'] },
+  { bad: 'We celebrate thanksgiving in November.', wrong: 'thanksgiving', fix: 'Thanksgiving', decoys: ['THANKSGIVING', 'ThanksGiving'] },
+  { bad: 'We flew to texas to see Grandpa.', wrong: 'texas', fix: 'Texas', decoys: ['TEXAS', 'texaS'] },
+  { bad: 'My dog rex loves treats.', wrong: 'rex', fix: 'Rex', decoys: ['REX', 'reX'] },
+  { bad: 'december is my favorite month.', wrong: 'december', fix: 'December', decoys: ['DECEMBER', 'decembeR'] },
+  // more grammar
+  { bad: 'Him and I played chess.', wrong: 'Him', fix: 'He', decoys: ['His', 'Himm'] },
+  { bad: 'Me want another sandwich.', wrong: 'Me', fix: 'I', decoys: ['Mee', 'My'] },
+  { bad: 'They was late for the bus.', wrong: 'was', fix: 'were', decoys: ['is', 'wass'] },
+  { bad: 'The childrens played tag.', wrong: 'childrens', fix: 'children', decoys: ['childs', 'childrenes'] },
+  { bad: "I doesn't like scary movies.", wrong: "doesn't", fix: "don't", decoys: ['doesnt', 'not'] },
+  { bad: 'Us kids built a sandcastle.', wrong: 'Us', fix: 'We', decoys: ['Uss', 'Them'] },
+  { bad: 'Everyone are invited to the party.', wrong: 'are', fix: 'is', decoys: ['am', 'were'] },
+  { bad: 'He gots a new video game.', wrong: 'gots', fix: 'got', decoys: ['gotted', 'gotts'] },
+  { bad: 'I seen a shooting star last night.', wrong: 'seen', fix: 'saw', decoys: ['sawed', 'seed'] },
+  { bad: 'She done her homework already.', wrong: 'done', fix: 'did', decoys: ['doned', 'dood'] },
+];
+
+// Word Forge: build a word from chunk blocks to match the meaning.
+// m = meaning shown on screen, p = the parts in order, d = decoy chunks.
+// Only clean joins (no spelling changes like happy+ly) so parts always
+// concatenate into the real word.
+const FORGE = [
+  // warm-up compounds
+  { m: 'a bow of colors in the sky', p: ['rain', 'bow'], d: ['sun', 'drop'] },
+  { m: 'a cake the size of a cup', p: ['cup', 'cake'], d: ['pan', 'pot'] },
+  { m: 'a ball made of snow', p: ['snow', 'ball'], d: ['sun', 'bell'] },
+  { m: 'the light of the sun', p: ['sun', 'light'], d: ['moon', 'lamp'] },
+  { m: 'a house for a dog', p: ['dog', 'house'], d: ['cat', 'home'] },
+  { m: 'the time when you go to bed', p: ['bed', 'time'], d: ['nap', 'clock'] },
+  { m: 'a coat you wear in the rain', p: ['rain', 'coat'], d: ['snow', 'hat'] },
+  { m: 'schoolwork you do at home', p: ['home', 'work'], d: ['house', 'job'] },
+  // un-
+  { m: 'not happy', p: ['un', 'happy'], d: ['dis', 're'] },
+  { m: 'not safe', p: ['un', 'safe'], d: ['non', 'sane'] },
+  { m: 'not fair', p: ['un', 'fair'], d: ['im', 'fare'] },
+  { m: 'not kind', p: ['un', 'kind'], d: ['dis', 'mis'] },
+  { m: 'not lucky', p: ['un', 'lucky'], d: ['in', 'ly'] },
+  { m: 'to do the opposite of lock', p: ['un', 'lock'], d: ['re', 'key'] },
+  // re-
+  { m: 'to read again', p: ['re', 'read'], d: ['un', 'pre'] },
+  { m: 'to tell a story again', p: ['re', 'tell'], d: ['dis', 'talk'] },
+  { m: 'to fill something again', p: ['re', 'fill'], d: ['un', 'full'] },
+  { m: 'to build something again', p: ['re', 'build'], d: ['pre', 'built'] },
+  // in- / im- / dis-
+  { m: 'not able to be seen', p: ['in', 'visible'], d: ['un', 're'] },
+  { m: 'not possible', p: ['im', 'possible'], d: ['un', 'in'] },
+  { m: 'not polite', p: ['im', 'polite'], d: ['dis', 'un'] },
+  { m: 'to not agree', p: ['dis', 'agree'], d: ['un', 'mis'] },
+  { m: 'to vanish from sight', p: ['dis', 'appear'], d: ['re', 'un'] },
+  // mis- / pre-
+  { m: 'to spell a word wrong', p: ['mis', 'spell'], d: ['dis', 'spel'] },
+  { m: 'to behave badly', p: ['mis', 'behave'], d: ['un', 'be'] },
+  { m: 'to heat the oven before', p: ['pre', 'heat'], d: ['re', 'hot'] },
+  // -ful / -less
+  { m: 'full of care', p: ['care', 'ful'], d: ['ly', 'full'] },
+  { m: 'without any fear', p: ['fear', 'less'], d: ['ful', 'un'] },
+  { m: 'full of color', p: ['color', 'ful'], d: ['less', 'ly'] },
+  { m: 'full of help', p: ['help', 'ful'], d: ['less', 'ing'] },
+  { m: 'without a home', p: ['home', 'less'], d: ['ful', 'un'] },
+  { m: 'without any use', p: ['use', 'less'], d: ['ful', 're'] },
+  // -ly / -er / -est
+  { m: 'in a quick way', p: ['quick', 'ly'], d: ['er', 'ful'] },
+  { m: 'in a slow way', p: ['slow', 'ly'], d: ['est', 'less'] },
+  { m: 'a person who teaches', p: ['teach', 'er'], d: ['ly', 'est'] },
+  { m: 'a person who paints', p: ['paint', 'er'], d: ['ing', 'ly'] },
+  { m: 'the most fast of all', p: ['fast', 'est'], d: ['er', 'ly'] },
+  // -able / -ness
+  { m: 'able to be washed', p: ['wash', 'able'], d: ['ible', 'ful'] },
+  { m: 'being very kind', p: ['kind', 'ness'], d: ['ful', 'ly'] },
+  { m: 'being full of dark', p: ['dark', 'ness'], d: ['less', 'ful'] },
+  // three-part builds
+  { m: 'in a way that is full of care', p: ['care', 'ful', 'ly'], d: ['less', 'un'] },
+  { m: 'not full of help', p: ['un', 'help', 'ful'], d: ['re', 'less'] },
+  { m: 'able to be used again', p: ['re', 'use', 'able'], d: ['un', 'ful'] },
+  // more compounds
+  { m: 'a fish shaped like a star', p: ['star', 'fish'], d: ['moon', 'shark'] },
+  { m: 'a room where you take a bath', p: ['bath', 'room'], d: ['bed', 'tub'] },
+  { m: 'a storm with thunder', p: ['thunder', 'storm'], d: ['rain', 'cloud'] },
+  { m: 'a flake of snow', p: ['snow', 'flake'], d: ['rain', 'chip'] },
+  { m: 'a print made by your foot', p: ['foot', 'print'], d: ['hand', 'mark'] },
+  { m: 'a path you walk on beside the road', p: ['side', 'walk'], d: ['road', 'run'] },
+  { m: 'light given by the moon', p: ['moon', 'light'], d: ['sun', 'beam'] },
+  { m: 'a book you write notes in', p: ['note', 'book'], d: ['page', 'pad'] },
+  { m: 'the yard behind the house', p: ['back', 'yard'], d: ['front', 'garden'] },
+  { m: 'a small red bug with black spots', p: ['lady', 'bug'], d: ['bird', 'ant'] },
+  { m: 'corn that pops when you cook it', p: ['pop', 'corn'], d: ['snap', 'seed'] },
+  { m: 'a brush you clean your teeth with', p: ['tooth', 'brush'], d: ['teeth', 'comb'] },
+  { m: 'a nut that grows like a pea', p: ['pea', 'nut'], d: ['pod', 'bean'] },
+  { m: 'holding hands to say hello', p: ['hand', 'shake'], d: ['arm', 'wave'] },
+  { m: 'a pack you carry on your back', p: ['back', 'pack'], d: ['side', 'bag'] },
+  { m: 'the day you were born, every year', p: ['birth', 'day'], d: ['born', 'date'] },
+  { m: 'a big green fruit full of juice', p: ['water', 'melon'], d: ['juice', 'berry'] },
+  { m: 'an insect with big colorful wings', p: ['butter', 'fly'], d: ['bread', 'bee'] },
+  { m: 'a green bug that hops in the grass', p: ['grass', 'hopper'], d: ['leaf', 'jumper'] },
+  { m: 'a place where airplanes take off and land', p: ['air', 'port'], d: ['sky', 'park'] },
+  { m: 'a ship that travels in space', p: ['space', 'ship'], d: ['star', 'boat'] },
+  // more un-
+  { m: 'not true', p: ['un', 'true'], d: ['dis', 'non'] },
+  { m: 'not even', p: ['un', 'even'], d: ['im', 'odd'] },
+  { m: 'to do the opposite of tie', p: ['un', 'tie'], d: ['re', 'knot'] },
+  { m: 'to do the opposite of pack', p: ['un', 'pack'], d: ['re', 'bag'] },
+  { m: 'not well', p: ['un', 'well'], d: ['dis', 'sick'] },
+  { m: 'not able', p: ['un', 'able'], d: ['in', 'ful'] },
+  // more re-
+  { m: 'to play a recording again', p: ['re', 'play'], d: ['pre', 'game'] },
+  { m: 'to do something over again', p: ['re', 'do'], d: ['un', 'pre'] },
+  { m: 'to heat food again', p: ['re', 'heat'], d: ['pre', 'oven'] },
+  { m: 'to visit a place again', p: ['re', 'visit'], d: ['dis', 'trip'] },
+  { m: 'to open again', p: ['re', 'open'], d: ['un', 'shut'] },
+  // more dis- / mis- / pre-
+  { m: 'to not like something', p: ['dis', 'like'], d: ['mis', 'non'] },
+  { m: 'not honest', p: ['dis', 'honest'], d: ['un', 'im'] },
+  { m: 'to stop trusting someone', p: ['dis', 'trust'], d: ['re', 'non'] },
+  { m: 'a match that is wrong', p: ['mis', 'match'], d: ['dis', 'miss'] },
+  { m: 'to read something wrong', p: ['mis', 'read'], d: ['re', 'un'] },
+  { m: 'to put something where it gets lost', p: ['mis', 'place'], d: ['dis', 're'] },
+  { m: 'to pay before', p: ['pre', 'pay'], d: ['re', 'post'] },
+  { m: 'a test you take before the lesson', p: ['pre', 'test'], d: ['re', 'quiz'] },
+  { m: 'to see a movie before it comes out', p: ['pre', 'view'], d: ['re', 'show'] },
+  // over- / under-
+  { m: 'to sleep too late', p: ['over', 'sleep'], d: ['under', 'nap'] },
+  { m: 'to spill over the top', p: ['over', 'flow'], d: ['under', 'pour'] },
+  { m: 'underneath the ground', p: ['under', 'ground'], d: ['over', 'dirt'] },
+  { m: 'to eat too much', p: ['over', 'eat'], d: ['under', 'food'] },
+  // more -ful
+  { m: 'full of joy', p: ['joy', 'ful'], d: ['less', 'ly'] },
+  { m: 'full of hope', p: ['hope', 'ful'], d: ['less', 'ing'] },
+  { m: 'full of thanks', p: ['thank', 'ful'], d: ['less', 'ness'] },
+  { m: 'full of pain', p: ['pain', 'ful'], d: ['less', 'ly'] },
+  { m: 'full of play, like a kitten', p: ['play', 'ful'], d: ['less', 'er'] },
+  // more -less
+  { m: 'without end', p: ['end', 'less'], d: ['ful', 'ly'] },
+  { m: 'without sleep', p: ['sleep', 'less'], d: ['ful', 'over'] },
+  { m: 'without a single spot', p: ['spot', 'less'], d: ['ful', 'y'] },
+  { m: 'without any harm', p: ['harm', 'less'], d: ['ful', 'un'] },
+  // more -ly
+  { m: 'in a brave way', p: ['brave', 'ly'], d: ['est', 'ful'] },
+  { m: 'in a sad way', p: ['sad', 'ly'], d: ['ness', 'er'] },
+  { m: 'in a nice way', p: ['nice', 'ly'], d: ['est', 'ful'] },
+  { m: 'in a proud way', p: ['proud', 'ly'], d: ['est', 'less'] },
+  // more -er
+  { m: 'a person who sings', p: ['sing', 'er'], d: ['ly', 'est'] },
+  { m: 'a person who helps', p: ['help', 'er'], d: ['ful', 'ing'] },
+  { m: 'a machine that toasts bread', p: ['toast', 'er'], d: ['ing', 'ly'] },
+  { m: 'a person who plays', p: ['play', 'er'], d: ['ful', 'ed'] },
+  // more -est
+  { m: 'the most tall of all', p: ['tall', 'est'], d: ['er', 'ly'] },
+  { m: 'the most old of all', p: ['old', 'est'], d: ['er', 'ness'] },
+  { m: 'the most smart of all', p: ['smart', 'est'], d: ['er', 'ly'] },
+  // more -ness
+  { m: 'being very soft', p: ['soft', 'ness'], d: ['ly', 'ful'] },
+  { m: 'being very sick', p: ['sick', 'ness'], d: ['ly', 'less'] },
+  { m: 'being very sad', p: ['sad', 'ness'], d: ['ly', 'ful'] },
+  // more -able
+  { m: 'able to be enjoyed', p: ['enjoy', 'able'], d: ['ible', 'ful'] },
+  { m: 'able to be read', p: ['read', 'able'], d: ['ible', 'ing'] },
+  { m: 'able to break easily', p: ['break', 'able'], d: ['ible', 'ful'] },
+  // -y
+  { m: 'full of rain', p: ['rain', 'y'], d: ['ly', 'ful'] },
+  { m: 'full of snow', p: ['snow', 'y'], d: ['ly', 'less'] },
+  { m: 'full of luck', p: ['luck', 'y'], d: ['ly', 'ful'] },
+  // more three-part builds
+  { m: 'in a way full of hope', p: ['hope', 'ful', 'ly'], d: ['less', 'un'] },
+  { m: 'in a way full of thanks', p: ['thank', 'ful', 'ly'], d: ['less', 're'] },
+  { m: 'in a way without fear', p: ['fear', 'less', 'ly'], d: ['ful', 'un'] },
+  { m: 'not able to be read', p: ['un', 'read', 'able'], d: ['re', 'ful'] },
+  { m: 'in a way full of play', p: ['play', 'ful', 'ly'], d: ['less', 'er'] },
+  { m: 'being without any help', p: ['help', 'less', 'ness'], d: ['ful', 'ly'] },
+];
+
+// chunk kinds, for coloring the forge blocks by role
+const PREFIXES = new Set(['un', 're', 'in', 'im', 'dis', 'pre', 'mis', 'non', 'over', 'under']);
+const SUFFIXES = new Set(['ful', 'less', 'ly', 'er', 'est', 'able', 'ible', 'ness', 'y', 'ing', 'ed']);
+
+// Grammar Hunt: tap the one word of the asked part of speech. Authoring
+// rule: the sentence must contain EXACTLY ONE word of the asked class
+// (other classes may repeat freely), and the target token must appear
+// exactly once (same matching as Fix It!: trailing .,!? ignored,
+// case-sensitive).
+const GRAMMAR = [
+  // verbs (one verb only — no helping-verb pairs)
+  { s: 'The dog chased the ball.', pos: 'verb', a: 'chased' },
+  { s: 'My sister paints beautiful pictures.', pos: 'verb', a: 'paints' },
+  { s: 'The frog jumped into the pond.', pos: 'verb', a: 'jumped' },
+  { s: 'Grandma bakes cookies every Sunday.', pos: 'verb', a: 'bakes' },
+  { s: 'The wind howled all night.', pos: 'verb', a: 'howled' },
+  { s: 'Our team won the big game.', pos: 'verb', a: 'won' },
+  { s: 'The baby giggled at the puppy.', pos: 'verb', a: 'giggled' },
+  { s: 'Dad fixed the broken chair.', pos: 'verb', a: 'fixed' },
+  { s: 'Lightning flashed across the sky.', pos: 'verb', a: 'flashed' },
+  { s: 'She whispered the secret.', pos: 'verb', a: 'whispered' },
+  { s: 'The turtle crawled under the rock.', pos: 'verb', a: 'crawled' },
+  { s: 'My brother collects shiny rocks.', pos: 'verb', a: 'collects' },
+  { s: 'The chef chopped the onions.', pos: 'verb', a: 'chopped' },
+  { s: 'Waves crashed on the shore.', pos: 'verb', a: 'crashed' },
+  { s: 'The crowd cheered for the singer.', pos: 'verb', a: 'cheered' },
+  // nouns (exactly one noun in the sentence)
+  { s: 'My dog runs fast.', pos: 'noun', a: 'dog' },
+  { s: 'The teacher smiled kindly.', pos: 'noun', a: 'teacher' },
+  { s: 'Our house is big and cozy.', pos: 'noun', a: 'house' },
+  { s: 'The rain fell softly.', pos: 'noun', a: 'rain' },
+  { s: 'Her voice is very sweet.', pos: 'noun', a: 'voice' },
+  { s: 'The mountain looked huge.', pos: 'noun', a: 'mountain' },
+  { s: 'That movie was so funny.', pos: 'noun', a: 'movie' },
+  { s: 'My backpack feels really heavy.', pos: 'noun', a: 'backpack' },
+  { s: 'The soup smells delicious.', pos: 'noun', a: 'soup' },
+  { s: 'His jacket is bright red.', pos: 'noun', a: 'jacket' },
+  { s: 'The music sounded lovely.', pos: 'noun', a: 'music' },
+  { s: 'Their garden grows quickly.', pos: 'noun', a: 'garden' },
+  // adjectives (exactly one)
+  { s: 'The fluffy cat slept on the mat.', pos: 'adjective', a: 'fluffy' },
+  { s: 'She wore a purple dress.', pos: 'adjective', a: 'purple' },
+  { s: 'We climbed the steep hill.', pos: 'adjective', a: 'steep' },
+  { s: 'He told a hilarious joke.', pos: 'adjective', a: 'hilarious' },
+  { s: 'The brave knight saved the town.', pos: 'adjective', a: 'brave' },
+  { s: 'I found a shiny coin.', pos: 'adjective', a: 'shiny' },
+  { s: 'They live in a tiny cottage.', pos: 'adjective', a: 'tiny' },
+  { s: 'The spicy chili made me cough.', pos: 'adjective', a: 'spicy' },
+  { s: 'A gentle breeze blew through the window.', pos: 'adjective', a: 'gentle' },
+  { s: 'The ancient castle stood on the cliff.', pos: 'adjective', a: 'ancient' },
+  { s: 'We swam in the freezing lake.', pos: 'adjective', a: 'freezing' },
+  { s: 'He gave a polite answer.', pos: 'adjective', a: 'polite' },
+  // adverbs (exactly one, -ly style)
+  { s: 'The snail moved slowly across the path.', pos: 'adverb', a: 'slowly' },
+  { s: 'She sang sweetly at the concert.', pos: 'adverb', a: 'sweetly' },
+  { s: 'He slammed the door angrily.', pos: 'adverb', a: 'angrily' },
+  { s: 'The children played happily in the yard.', pos: 'adverb', a: 'happily' },
+  { s: 'I tiptoed quietly past the baby.', pos: 'adverb', a: 'quietly' },
+  { s: 'The cheetah ran swiftly.', pos: 'adverb', a: 'swiftly' },
+  { s: 'Grandpa spoke softly to the horse.', pos: 'adverb', a: 'softly' },
+  { s: 'She answered the question correctly.', pos: 'adverb', a: 'correctly' },
+  { s: 'The firefighters acted bravely.', pos: 'adverb', a: 'bravely' },
+  { s: 'He carefully carried the eggs.', pos: 'adverb', a: 'carefully' },
+  { s: 'The stars twinkled brightly.', pos: 'adverb', a: 'brightly' },
+  // pronouns (exactly one)
+  { s: 'She loves chocolate cake.', pos: 'pronoun', a: 'She' },
+  { s: 'The teacher gave him a gold star.', pos: 'pronoun', a: 'him' },
+  { s: 'They built a giant sandcastle.', pos: 'pronoun', a: 'They' },
+  { s: 'Mom told us a bedtime story.', pos: 'pronoun', a: 'us' },
+  { s: 'He plays soccer on Saturdays.', pos: 'pronoun', a: 'He' },
+  { s: 'The puppy followed me home.', pos: 'pronoun', a: 'me' },
+  { s: 'We baked cookies for the party.', pos: 'pronoun', a: 'We' },
+  { s: 'Dad drove them to school.', pos: 'pronoun', a: 'them' },
+  { s: 'It rained all weekend.', pos: 'pronoun', a: 'It' },
+  { s: 'The coach picked her first.', pos: 'pronoun', a: 'her' },
+];
+
+// Syllable Smith: spell a word the child knows orally by building it from
+// syllable chunks (Word Forge mechanic, harder decoys). m = the clue shown,
+// p = the syllables in order, d = misspelled decoy chunks. Rules: the parts
+// concatenate exactly into the word; decoys must not equal any part or
+// combine into a correct spelling.
+const SYLLB = [
+  { m: 'the day after today', p: ['to','mor','row'], d: ['more','tow'] },
+  { m: 'the day before today', p: ['yes','ter','day'], d: ['tur','dae'] },
+  { m: 'to keep something in your mind', p: ['re','mem','ber'], d: ['mim','bur'] },
+  { m: 'where doctors care for sick people', p: ['hos','pi','tal'], d: ['pit','tul'] },
+  { m: 'a huge gray animal with a trunk', p: ['el','e','phant'], d: ['fant','il'] },
+  { m: 'a long yellow fruit', p: ['ba','na','na'], d: ['nan','bu'] },
+  { m: 'it keeps the rain off you', p: ['um','brel','la'], d: ['brell','luh'] },
+  { m: 'a giant reptile from long ago', p: ['di','no','saur'], d: ['sore','now'] },
+  { m: 'a mountain that erupts', p: ['vol','ca','no'], d: ['kay','vul'] },
+  { m: 'a spinning storm of wind', p: ['tor','na','do'], d: ['doe','ter'] },
+  { m: 'the vegetable fries are made from', p: ['po','ta','to'], d: ['toe','tay'] },
+  { m: 'long noodles with sauce', p: ['spa','ghet','ti'], d: ['get','tee'] },
+  { m: 'a fun trip away from school', p: ['va','ca','tion'], d: ['shun','kay'] },
+  { m: 'it shows the months and days', p: ['cal','en','dar'], d: ['der','in'] },
+  { m: 'the day after Friday', p: ['Sat','ur','day'], d: ['er','dey'] },
+  { m: 'something that matters a lot', p: ['im','por','tant'], d: ['tent','per'] },
+  { m: 'very, very pretty', p: ['beau','ti','ful'], d: ['bu','full'] },
+  { m: 'a machine for games and typing', p: ['com','pu','ter'], d: ['pew','tur'] },
+  { m: 'the month before November', p: ['Oc','to','ber'], d: ['tow','bur'] },
+  { m: 'a special day off', p: ['hol','i','day'], d: ['dey','ee'] },
+  { m: 'a building full of books', p: ['li','brar','y'], d: ['berry','brer'] },
+  { m: 'with each other', p: ['to','geth','er'], d: ['gith','ur'] },
+  { m: 'really, really great', p: ['won','der','ful'], d: ['dur','full'] },
+  { m: 'a sandwich with a beef patty', p: ['ham','bur','ger'], d: ['bir','gur'] },
+  { m: 'any living creature', p: ['an','i','mal'], d: ['uh','mul'] },
+  { m: 'parents, kids, and grandparents', p: ['fam','i','ly'], d: ['fem','lee'] },
+  { m: 'the one you like best', p: ['fa','vor','ite'], d: ['ver','it'] },
+  { m: 'not the same', p: ['dif','fer','ent'], d: ['fur','int'] },
+  { m: 'sweet brown candy', p: ['choc','o','late'], d: ['lit','uh'] },
+  { m: 'the leader of a school', p: ['prin','ci','pal'], d: ['si','pul'] },
+  { m: 'to do times in math', p: ['mul','ti','ply'], d: ['tee','pli'] },
+  { m: 'a puzzle no one has solved', p: ['mys','ter','y'], d: ['tur','ee'] },
+  { m: 'a big snapping reptile', p: ['croc','o','dile'], d: ['dial','uh'] },
+  { m: 'it hops and has a pouch', p: ['kan','ga','roo'], d: ['rew','guh'] },
+  { m: 'it flies with spinning blades', p: ['hel','i','cop','ter'], d: ['kop','tur'] },
+  { m: 'you call people on it', p: ['tel','e','phone'], d: ['fone','uh'] },
+  { m: 'the month school starts', p: ['Sep','tem','ber'], d: ['tim','bur'] },
+  { m: 'an exciting journey', p: ['ad','ven','ture'], d: ['chur','vin'] },
+  { m: 'a person in a story', p: ['char','ac','ter'], d: ['ick','tur'] },
+  { m: 'a group of words that ends with a period', p: ['sen','tence'], d: ['tince','cen'] },
+  { m: 'you write with it', p: ['pen','cil'], d: ['sil','cel'] },
+  { m: 'glass you look through', p: ['win','dow'], d: ['doe','dough'] },
+  { m: 'a drawing or a photo', p: ['pic','ture'], d: ['chur','cher'] },
+  { m: 'a scary creature', p: ['mon','ster'], d: ['stur','stir'] },
+  { m: 'the boom after lightning', p: ['thun','der'], d: ['dur','thon'] },
+  { m: 'the coldest season', p: ['win','ter'], d: ['tur','wen'] },
+  { m: 'the hottest season', p: ['sum','mer'], d: ['mur','som'] },
+  { m: 'the start of the day', p: ['morn','ing'], d: ['een','ning'] },
+  { m: 'one single human', p: ['per','son'], d: ['sun','pur'] },
+  { m: 'you write on it', p: ['pa','per'], d: ['pur','pay'] },
+  { m: 'a striped big cat', p: ['ti','ger'], d: ['gur','tie'] },
+  { m: 'it spins a web with eight legs', p: ['spi','der'], d: ['dur','spy'] },
+  { m: 'a fire-breathing beast', p: ['drag','on'], d: ['un','onn'] },
+  { m: 'a hopping animal with long ears', p: ['rab','bit'], d: ['but','rabb'] },
+  { m: 'something a teacher teaches', p: ['les','son'], d: ['sun','liss'] },
+  { m: 'something you have to solve', p: ['prob','lem'], d: ['lum','blem'] },
+  { m: 'an orange crunchy vegetable', p: ['car','rot'], d: ['rut','kar'] },
+  { m: 'your aunt and uncle\'s kid', p: ['cous','in'], d: ['un','couz'] },
+  { m: 'a long trip', p: ['jour','ney'], d: ['nee','jer'] },
+  { m: 'sixty seconds', p: ['min','ute'], d: ['it','nut'] },
+];
+
+// Word Twins: synonyms and antonyms. type 'same' asks for a synonym,
+// 'opp' for the antonym. Decoy rule: a decoy may be tempting (even the
+// antonym on a 'same' question) but must never be a defensible answer.
+const TWINS = [
+  // synonyms
+  { w: 'enormous', type: 'same', a: 'huge', d: ['tiny', 'round'] },
+  { w: 'quick', type: 'same', a: 'fast', d: ['slow', 'tall'] },
+  { w: 'glad', type: 'same', a: 'happy', d: ['angry', 'sleepy'] },
+  { w: 'angry', type: 'same', a: 'mad', d: ['calm', 'silly'] },
+  { w: 'tired', type: 'same', a: 'sleepy', d: ['awake', 'hungry'] },
+  { w: 'scared', type: 'same', a: 'afraid', d: ['brave', 'bored'] },
+  { w: 'smart', type: 'same', a: 'clever', d: ['dull', 'loud'] },
+  { w: 'begin', type: 'same', a: 'start', d: ['finish', 'wait'] },
+  { w: 'shut', type: 'same', a: 'close', d: ['open', 'lift'] },
+  { w: 'yell', type: 'same', a: 'shout', d: ['whisper', 'giggle'] },
+  { w: 'rush', type: 'same', a: 'hurry', d: ['wait', 'rest'] },
+  { w: 'odd', type: 'same', a: 'strange', d: ['normal', 'neat'] },
+  { w: 'silent', type: 'same', a: 'quiet', d: ['noisy', 'bright'] },
+  { w: 'gift', type: 'same', a: 'present', d: ['letter', 'trick'] },
+  { w: 'tiny', type: 'same', a: 'small', d: ['giant', 'wide'] },
+  { w: 'leap', type: 'same', a: 'jump', d: ['crawl', 'sit'] },
+  { w: 'grin', type: 'same', a: 'smile', d: ['frown', 'blink'] },
+  { w: 'sad', type: 'same', a: 'unhappy', d: ['joyful', 'dizzy'] },
+  { w: 'cold', type: 'same', a: 'chilly', d: ['warm', 'dry'] },
+  { w: 'wet', type: 'same', a: 'soaked', d: ['dry', 'dusty'] },
+  { w: 'pretty', type: 'same', a: 'beautiful', d: ['ugly', 'salty'] },
+  { w: 'mistake', type: 'same', a: 'error', d: ['answer', 'secret'] },
+  { w: 'trash', type: 'same', a: 'garbage', d: ['treasure', 'dinner'] },
+  { w: 'street', type: 'same', a: 'road', d: ['river', 'bridge'] },
+  { w: 'kid', type: 'same', a: 'child', d: ['adult', 'puppy'] },
+  { w: 'speak', type: 'same', a: 'talk', d: ['listen', 'sleep'] },
+  { w: 'look', type: 'same', a: 'watch', d: ['ignore', 'smell'] },
+  { w: 'brave', type: 'same', a: 'fearless', d: ['afraid', 'lazy'] },
+  { w: 'real', type: 'same', a: 'true', d: ['fake', 'late'] },
+  { w: 'chilly', type: 'same', a: 'cool', d: ['toasty', 'soggy'] },
+  // antonyms
+  { w: 'hot', type: 'opp', a: 'cold', d: ['sunny', 'soft'] },
+  { w: 'big', type: 'opp', a: 'little', d: ['huge', 'round'] },
+  { w: 'day', type: 'opp', a: 'night', d: ['morning', 'sun'] },
+  { w: 'up', type: 'opp', a: 'down', d: ['over', 'high'] },
+  { w: 'fast', type: 'opp', a: 'slow', d: ['quick', 'speedy'] },
+  { w: 'happy', type: 'opp', a: 'sad', d: ['glad', 'sleepy'] },
+  { w: 'empty', type: 'opp', a: 'full', d: ['hollow', 'open'] },
+  { w: 'loud', type: 'opp', a: 'quiet', d: ['noisy', 'deep'] },
+  { w: 'open', type: 'opp', a: 'closed', d: ['wide', 'broken'] },
+  { w: 'soft', type: 'opp', a: 'hard', d: ['fluffy', 'warm'] },
+  { w: 'clean', type: 'opp', a: 'dirty', d: ['neat', 'shiny'] },
+  { w: 'early', type: 'opp', a: 'late', d: ['soon', 'first'] },
+  { w: 'easy', type: 'opp', a: 'difficult', d: ['simple', 'slow'] },
+  { w: 'dry', type: 'opp', a: 'wet', d: ['dusty', 'warm'] },
+  { w: 'push', type: 'opp', a: 'pull', d: ['lift', 'drop'] },
+  { w: 'front', type: 'opp', a: 'back', d: ['side', 'top'] },
+  { w: 'first', type: 'opp', a: 'last', d: ['next', 'best'] },
+  { w: 'win', type: 'opp', a: 'lose', d: ['tie', 'play'] },
+  { w: 'laugh', type: 'opp', a: 'cry', d: ['smile', 'shout'] },
+  { w: 'friend', type: 'opp', a: 'enemy', d: ['buddy', 'stranger'] },
+  { w: 'above', type: 'opp', a: 'below', d: ['beside', 'inside'] },
+  { w: 'asleep', type: 'opp', a: 'awake', d: ['dreaming', 'resting'] },
+  { w: 'give', type: 'opp', a: 'take', d: ['share', 'bring'] },
+  { w: 'strong', type: 'opp', a: 'weak', d: ['tough', 'tall'] },
+  { w: 'wide', type: 'opp', a: 'narrow', d: ['broad', 'long'] },
+  { w: 'smooth', type: 'opp', a: 'rough', d: ['silky', 'flat'] },
+  { w: 'young', type: 'opp', a: 'old', d: ['little', 'tall'] },
+  { w: 'always', type: 'opp', a: 'never', d: ['often', 'soon'] },
+  { w: 'forget', type: 'opp', a: 'remember', d: ['forgive', 'repeat'] },
+  { w: 'inside', type: 'opp', a: 'outside', d: ['upstairs', 'nearby'] },
+];
+
+// Mark It!: punctuation. Two item shapes:
+//  { end, a }      — the sentence is shown without its end mark; pick . ? !
+//                    (author so only ONE mark is defensible)
+//  { s, after }    — the sentence is missing exactly one comma; tap the word
+//                    the comma goes after (`after` must appear exactly once,
+//                    and never at the end of the sentence). Comma types:
+//                    direct address, introductory word/phrase, and compound
+//                    sentences — no serial lists (Oxford-comma ambiguity).
+const MARKS = [
+  // end marks: statements
+  { end: 'My favorite color is green', a: '.' },
+  { end: 'The library closes at five', a: '.' },
+  { end: 'Our cat sleeps all day', a: '.' },
+  { end: 'We had pancakes for breakfast', a: '.' },
+  { end: 'The museum was quiet today', a: '.' },
+  { end: 'Sam finished his homework', a: '.' },
+  { end: 'The train arrives at noon', a: '.' },
+  { end: 'I left my boots by the door', a: '.' },
+  { end: 'Grandma lives on a farm', a: '.' },
+  { end: 'The moon looked full last night', a: '.' },
+  // end marks: questions
+  { end: 'What time is it', a: '?' },
+  { end: 'Where did you put my shoes', a: '?' },
+  { end: 'Can we go to the park', a: '?' },
+  { end: 'Who ate the last cookie', a: '?' },
+  { end: 'Why is the sky blue', a: '?' },
+  { end: 'Do you want more juice', a: '?' },
+  { end: 'How old is your dog', a: '?' },
+  { end: 'When does school start', a: '?' },
+  { end: 'Which book is your favorite', a: '?' },
+  { end: 'Are we there yet', a: '?' },
+  // end marks: exclamations
+  { end: 'Watch out for that car', a: '!' },
+  { end: 'We won the championship', a: '!' },
+  { end: 'That fireworks show was amazing', a: '!' },
+  { end: 'Look at the size of that pumpkin', a: '!' },
+  { end: 'We get a snow day', a: '!' },
+  { end: 'My kite is flying away', a: '!' },
+  { end: 'What a beautiful rainbow', a: '!' },
+  { end: 'Happy birthday', a: '!' },
+  { end: 'The dragon is right behind you', a: '!' },
+  { end: 'This is the best day ever', a: '!' },
+  // commas: direct address
+  { s: 'Come here Max.', after: 'here' },
+  { s: 'Mom can I have a snack?', after: 'Mom' },
+  { s: 'Good night Grandma.', after: 'night' },
+  { s: 'Ella it is your turn.', after: 'Ella' },
+  { s: 'Thank you Coach.', after: 'you' },
+  { s: 'Ben please feed the fish.', after: 'Ben' },
+  { s: 'That was awesome Leo.', after: 'awesome' },
+  { s: 'Watch this Dad.', after: 'this' },
+  { s: 'Happy birthday Mia.', after: 'birthday' },
+  { s: 'Sit down Rex.', after: 'down' },
+  // commas: introductory words and phrases
+  { s: 'Yes I would love some cake.', after: 'Yes' },
+  { s: 'No the game is not over.', after: 'No' },
+  { s: 'First we mix the flour.', after: 'First' },
+  { s: 'Next add the eggs.', after: 'Next' },
+  { s: 'Finally the pizza was ready.', after: 'Finally' },
+  { s: 'Well that was a surprise.', after: 'Well' },
+  { s: 'Wow that roller coaster was fast.', after: 'Wow' },
+  { s: 'After lunch we played kickball.', after: 'lunch' },
+  { s: 'In the morning we packed the car.', after: 'morning' },
+  { s: 'Later that day it started to rain.', after: 'day' },
+  // commas: compound sentences
+  { s: 'I wanted to stay up but I fell asleep.', after: 'up' },
+  { s: 'She studied hard and she passed the test.', after: 'hard' },
+  { s: 'We can watch a movie or we can play a game.', after: 'movie' },
+  { s: 'The dog barked and the cat ran away.', after: 'barked' },
+  { s: 'I like broccoli but my brother hates it.', after: 'broccoli' },
+  { s: 'You can ride your bike or you can walk.', after: 'bike' },
+  { s: 'It rained all morning so we stayed inside.', after: 'morning' },
+  { s: 'He forgot his lines but the play went great.', after: 'lines' },
+  { s: 'The power went out so we lit candles.', after: 'out' },
+  { s: 'I called her name and she turned around.', after: 'name' },
+];
+
+// Foes: escalating HP; last one is the boss. `scale` evens out emoji glyphs
+// that fill their em-box differently, so the foes read as similar-sized.
+const FOES = [
+  { emoji: '🐌', name: 'Slow Slime',    hp: 3, scale: 0.90 },
+  { emoji: '👾', name: 'Pixel Imp',     hp: 3, scale: 0.95 },
+  { emoji: '👻', name: 'Giggly Ghost',  hp: 4, scale: 0.95 },
+  { emoji: '🦖', name: 'Chompy Rex',    hp: 5, scale: 1.05 },
+  { emoji: '🐉', name: 'The Big Dragon',hp: 6, scale: 1.16 },
+];
+
+// Modes: `total` = seconds on the bar, `fast` = double-hit window,
+// `penalty` = does timing out let the foe attack? (never on Easy)
+const MODES = {
+  easy:   { total: 45, fast: 12, penalty: false },
+  normal: { total: 25, fast: 8,  penalty: true  },
+  expert: { total: 15, fast: 5,  penalty: true  },
+};
+
+const PLAYER_HP = 5;
+
+/* ==================================================================
+   Helpers
+   ================================================================== */
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const shuffle = arr => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+// draw items without repeats until the pool runs dry, then reshuffle
+function makeDeck(pool) {
+  let deck = shuffle(pool);
+  return () => { if (!deck.length) deck = shuffle(pool); return deck.pop(); };
+}
+
+/* ==================================================================
+   State
+   ================================================================== */
+const state = {
+  track: null, mode: null,
+  foeIdx: 0, foeHp: 0, playerHp: PLAYER_HP,
+  question: null,          // current question object
+  answered: false,         // lock input while resolving
+  timerId: null, timeLeft: 0, inFastZone: false,
+  draw: null,              // deck function for current track
+  earnedMins: 0,
+  rewardId: null, rewardEnd: 0,
+};
+
+/* ==================================================================
+   Screens
+   ================================================================== */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+  $(id).classList.add('show');
+}
+
+/* ==================================================================
+   Menu wiring
+   ================================================================== */
+// both quest rows (little + big hero) share one selection
+document.querySelectorAll('#menu .choice[data-track]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    Sound.unlock(); Sound.click();
+    document.querySelectorAll('#menu .choice[data-track]').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    state.track = btn.dataset.track;
+    updateStart();
+  });
+});
+document.querySelectorAll('#menu .choice[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    Sound.unlock(); Sound.click();
+    document.querySelectorAll('#menu .choice[data-mode]').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    state.mode = btn.dataset.mode;
+    updateStart();
+  });
+});
+function updateStart() { $('startBtn').disabled = !(state.track && state.mode); }
+
+$('startBtn').addEventListener('click', () => {
+  Sound.unlock(); Sound.click();
+  Voice.unlock();
+  Speech.init();
+  startGame();
+});
+
+function renderMute() {
+  $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
+  $('muteBtn').classList.toggle('muted', Sound.muted);
+}
+$('muteBtn').addEventListener('click', () => {
+  Sound.muted = !Sound.muted;
+  localStorage.setItem('langrpg_muted', Sound.muted ? '1' : '0');
+  renderMute();
+  if (Sound.muted) Voice.stop();
+});
+renderMute();
+
+/* ==================================================================
+   Game flow
+   ================================================================== */
+function startGame() {
+  clearRewardTimer();
+  state.foeIdx = 0;
+  state.playerHp = PLAYER_HP;
+  state.draw = makeDeck(
+    state.track === 'letters' ? LETTERS :
+    state.track === 'sight'   ? SIGHT   :
+    state.track === 'rhyme'   ? RHYMES  :
+    state.track === 'past'    ? PAST    :
+    state.track === 'fixit'   ? FIXIT   :
+    state.track === 'forge'   ? FORGE   :
+    state.track === 'grammar' ? GRAMMAR :
+    state.track === 'syllable'? SYLLB   :
+    state.track === 'twins'   ? TWINS   :
+    state.track === 'marks'   ? MARKS   : WORDS);
+  showScreen('game');
+  spawnFoe();
+}
+
+function spawnFoe() {
+  const foe = FOES[state.foeIdx];
+  state.foeHp = foe.hp;
+  const sprite = $('foeSprite');
+  sprite.textContent = foe.emoji;
+  sprite.className = 'sprite foe';
+  sprite.style.setProperty('--foe-scale', foe.scale || 1);
+  $('foeName').textContent = foe.emoji + ' ' + foe.name;
+  renderHp();
+  newQuestion();
+}
+
+// HP as countable pips: hearts for the hero, orbs for the foe
+function renderPips(container, cur, max, kind) {
+  container.innerHTML = '';
+  for (let i = 0; i < max; i++) {
+    const p = document.createElement('span');
+    p.className = 'pip ' + kind + (i < cur ? '' : ' empty');
+    container.appendChild(p);
+  }
+}
+function renderHp() {
+  renderPips($('playerPips'), Math.max(0, state.playerHp), PLAYER_HP, 'heart');
+  renderPips($('foePips'), Math.max(0, state.foeHp), FOES[state.foeIdx].hp, 'orb');
+}
+
+/* ==================================================================
+   Questions — one maker per track. Each returns:
+   { prompt, big, choices?, isBlocks?, word?, sayIt(), check(pick) }
+   ================================================================== */
+
+function makeLetterQ() {
+  const [letter, cue, emoji] = state.draw();
+  const decoys = shuffle(LETTERS.filter(l => l[0] !== letter)).slice(0, 3).map(l => l[0]);
+  return {
+    prompt: 'Find the letter!',
+    big: emoji,
+    choices: shuffle([letter, ...decoys]),
+    answer: letter,
+    isBlocks: true,
+    sayIt: () => Voice.play(['L_' + letter], `Find the letter ${letter}! ${letter}, as in ${cue}!`),
+  };
+}
+
+function makeBuilderQ() {
+  const [word, emoji] = state.draw();
+  const decoys = shuffle('abcdefghijklmnopqrstuvwxyz'.split('')
+    .filter(c => !word.includes(c))).slice(0, 2);
+  return {
+    prompt: 'Spell it with blocks!',
+    big: emoji,
+    word,
+    bank: shuffle([...word, ...decoys]),
+    isBuilder: true,
+    sayIt: () => Voice.play(['P_spell', 'W_' + word], `Spell the word ${word}! ${word}!`),
+  };
+}
+
+function makeSightQ() {
+  const word = state.draw();
+  const decoys = shuffle(SIGHT.filter(w => w !== word)).slice(0, 2);
+  return {
+    prompt: 'Find the word!',
+    big: '⭐',
+    choices: shuffle([word, ...decoys]),
+    answer: word,
+    isWords: true,
+    sayIt: () => Voice.play(['P_findword', 'S_' + word], `Find the word... ${word}!`),
+  };
+}
+
+function makeReadQ() {
+  const [word, emoji] = state.draw();
+  const decoys = shuffle(WORDS.filter(w => w[0] !== word)).slice(0, 3).map(w => w[1]);
+  return {
+    prompt: 'Read it! Tap the picture!',
+    big: word,
+    choices: shuffle([emoji, ...decoys]),
+    answer: emoji,
+    word,
+    isPics: true,
+    sayIt: null,   // no audio hint — this track is real reading!
+  };
+}
+
+function makeRhymeQ() {
+  const fam = state.draw();
+  const [t, a] = shuffle(fam).slice(0, 2);   // cue word + the rhyming answer
+  const decoys = shuffle(RHYMES.filter(f => f !== fam)).slice(0, 2)
+    .map(f => f[rand(0, f.length - 1)]);     // one picture from 2 other families
+  return {
+    prompt: 'Tap what rhymes!',
+    big: t[1] + ' ' + t[0],
+    choices: shuffle([a, ...decoys].map(p => p[1])),
+    answer: a[1],
+    tWord: t[0], aWord: a[0],
+    tClip: wordClip(t[0]), aClip: wordClip(a[0]),
+    isPics: true, isRhyme: true,
+    sayIt: () => Voice.play(['P_rhyme', wordClip(t[0])], `What rhymes with... ${t[0]}?`),
+  };
+}
+
+function makePastQ() {
+  const item = state.draw();
+  const opts = shuffle([item.past, item.wrong]);
+  return {
+    prompt: 'Which sounds right?',
+    big: `Today I ${item.now}. Yesterday I ...?`,
+    bigClass: 'sentence',
+    choices: opts,
+    answer: item.past,
+    isPast: true,
+    // the spoken options follow the shuffled card order, left to right
+    sayIt: () => Voice.play(['V_' + item.now, 'O_' + opts[0], 'P_or', 'O_' + opts[1]],
+      `Today I ${item.now}. Yesterday I... ${opts[0]}? or ${opts[1]}?`),
+  };
+}
+
+function makeFixitQ() {
+  const item = state.draw();
+  return {
+    prompt: 'Tap the mistake!',
+    bad: item.bad, wrong: item.wrong, fix: item.fix, decoys: item.decoys,
+    isFixit: true,
+    sayIt: null,   // no audio — big-hero tracks are read from the screen
+  };
+}
+
+function makeForgeQ() {
+  const item = state.draw();
+  return {
+    prompt: 'Build the word!',
+    meaning: item.m,
+    parts: item.p,
+    bank: shuffle([...item.p, ...item.d]),
+    isForge: true,
+    sayIt: null,   // no audio — big-hero tracks are read from the screen
+  };
+}
+
+function makeGrammarQ() {
+  const item = state.draw();
+  return {
+    prompt: `Tap the ${item.pos}!`,
+    s: item.s, target: item.a,
+    revealMsg: `The ${item.pos} was "${item.a}"!`,
+    isTapWord: true,
+    sayIt: null,   // no audio — big-hero tracks are read from the screen
+  };
+}
+
+function makeSyllableQ() {
+  const item = state.draw();
+  return {
+    prompt: 'Spell it with syllables!',
+    meaning: item.m,
+    parts: item.p,
+    bank: shuffle([...item.p, ...item.d]),
+    isForge: true,
+    sayIt: null,
+  };
+}
+
+function makeTwinsQ() {
+  const item = state.draw();
+  const same = item.type === 'same';
+  return {
+    prompt: same ? 'Which means the SAME?' : 'Which means the OPPOSITE?',
+    big: item.w,
+    choices: shuffle([item.a, ...item.d]),
+    answer: item.a,
+    revealMsg: `"${item.w}" ${same ? 'means the same as' : 'is the opposite of'} "${item.a}"!`,
+    sayIt: null,
+  };
+}
+
+const MARK_NAMES = { '.': 'a period', '?': 'a question mark', '!': 'an exclamation point' };
+
+function makeMarksQ() {
+  const item = state.draw();
+  if (item.end) {
+    return {
+      prompt: 'How should this sentence end?',
+      big: item.end,
+      bigClass: 'sentence',
+      choices: shuffle(['.', '?', '!']),
+      answer: item.a,
+      isMarks: true,
+      revealMsg: `It needs ${MARK_NAMES[item.a]}  ${item.a}`,
+      sayIt: null,
+    };
+  }
+  return {
+    prompt: 'Tap the word that needs a comma after it!',
+    s: item.s, target: item.after,
+    revealMsg: `The comma goes after "${item.after}"!`,
+    isTapWord: true, addComma: true,
+    sayIt: null,
+  };
+}
+
+const MAKERS = { letters: makeLetterQ, builder: makeBuilderQ, sight: makeSightQ,
+                 read: makeReadQ, rhyme: makeRhymeQ, past: makePastQ,
+                 fixit: makeFixitQ, forge: makeForgeQ,
+                 grammar: makeGrammarQ, syllable: makeSyllableQ,
+                 twins: makeTwinsQ, marks: makeMarksQ };
+
+/* ==================================================================
+   Render the question + answer area
+   ================================================================== */
+function newQuestion() {
+  const q = state.question = MAKERS[state.track]();
+  state.answered = false;
+  $('feedback').textContent = '';
+  $('qPrompt').textContent = q.prompt;
+  $('qBig').className = '';
+  $('sayBtn').style.display = q.sayIt ? '' : 'none';
+
+  const answers = $('answers');
+  answers.innerHTML = '';
+
+  if (q.isTapWord) {
+    renderTapWord();
+  } else if (q.isFixit) {
+    renderFixit();
+  } else if (q.isForge) {
+    q.filled = [];
+    renderForgeSlots();
+    q.bank.forEach(chunk => {
+      const b = chunkBtn(chunk);
+      b.addEventListener('click', () => {
+        if (state.answered || q.filled.length >= q.parts.length) return;
+        Sound.tap();
+        b.classList.add('used', 'pop');
+        q.filled.push({ chunk, btn: b });
+        renderForgeSlots();
+        if (q.filled.length === q.parts.length) checkForge();
+      });
+      answers.appendChild(b);
+    });
+  } else if (q.isBuilder) {
+    // dashed slots in the card; a bank of ABC blocks below
+    q.filled = [];
+    renderSlots();
+    q.bank.forEach((ch, i) => {
+      const b = blockBtn(ch);
+      b.addEventListener('click', () => {
+        if (state.answered || q.filled.length >= q.word.length) return;
+        Sound.tap();
+        b.classList.add('used', 'pop');
+        q.filled.push({ ch, btn: b });
+        renderSlots();
+        if (q.filled.length === q.word.length) checkBuilder();
+      });
+      answers.appendChild(b);
+    });
+  } else {
+    $('qBig').textContent = q.big;
+    if (q.bigClass) $('qBig').className = q.bigClass;
+    q.choices.forEach(choice => {
+      let el;
+      if (q.isBlocks)      el = blockBtn(choice);
+      else if (q.isPics)   { el = document.createElement('button'); el.className = 'picbtn'; el.textContent = choice; }
+      else                 { el = document.createElement('button'); el.className = 'wordcard'; el.textContent = choice; }
+      if (q.isMarks) el.classList.add('markcard');
+      el.addEventListener('click', () => pickAnswer(el, choice === q.answer));
+      answers.appendChild(el);
+    });
+  }
+
+  startTimer();
+  if (q.sayIt) setTimeout(q.sayIt, 250);
+}
+
+// an ABC block, tinted by its letter's place in the alphabet
+function blockBtn(ch) {
+  const b = document.createElement('button');
+  b.className = 'block';
+  b.textContent = ch.toUpperCase();
+  const idx = ch.toUpperCase().charCodeAt(0) - 65;
+  b.style.setProperty('--h', (idx * 14) % 360);
+  return b;
+}
+
+function renderSlots() {
+  const q = state.question;
+  $('qBig').innerHTML = q.big + '&nbsp; ' + q.word.split('').map((_, i) => {
+    const f = q.filled[i];
+    return `<span class="slot${f ? ' filled' : ''}">${f ? f.ch.toUpperCase() : ''}</span>`;
+  }).join('');
+  // tapping a filled slot puts the block back
+  $('qBig').querySelectorAll('.slot.filled').forEach((el, i) => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      if (state.answered) return;
+      Sound.click();
+      const removed = q.filled.splice(i, 1)[0];
+      removed.btn.classList.remove('used', 'pop');
+      renderSlots();
+    });
+  });
+}
+
+/* ==================================================================
+   Fix It! — tap the wrong word, then tap the correction
+   ================================================================== */
+const coreWord = tok => tok.replace(/[.,!?]+$/, '');
+
+// Grammar Hunt + Mark It! commas: one-phase "tap the right word" — same
+// token matching as Fix It! (trailing .,!? ignored, case-sensitive)
+function renderTapWord() {
+  const q = state.question;
+  const big = $('qBig');
+  big.className = 'sentence';
+  big.innerHTML = '';
+  q.s.split(' ').forEach(tok => {
+    const w = document.createElement('button');
+    w.className = 'word-tok';
+    w.textContent = tok;
+    w.addEventListener('click', () => {
+      if (state.answered) return;
+      if (coreWord(tok) === q.target) {
+        w.classList.add('fixed');
+        if (q.addComma) w.textContent = tok + ',';
+        resolveCorrect();
+      } else {
+        w.classList.add('wrongPick');
+        const right = [...big.querySelectorAll('.word-tok')]
+          .find(x => coreWord(x.textContent) === q.target);
+        if (right) {
+          right.classList.add('fixed');
+          if (q.addComma) right.textContent += ',';
+        }
+        resolveWrong(q.revealMsg);
+      }
+    });
+    big.appendChild(w);
+    big.appendChild(document.createTextNode(' '));
+  });
+}
+
+function renderFixit() {
+  const q = state.question;
+  const big = $('qBig');
+  big.className = 'sentence';
+  big.innerHTML = '';
+  q.bad.split(' ').forEach(tok => {
+    const w = document.createElement('button');
+    w.className = 'word-tok';
+    w.textContent = tok;
+    w.addEventListener('click', () => tapToken(w, tok));
+    big.appendChild(w);
+    big.appendChild(document.createTextNode(' '));
+  });
+}
+
+function tapToken(el, tok) {
+  const q = state.question;
+  if (state.answered || q.found) return;
+  if (coreWord(tok) === q.wrong) {
+    // found it — phase two: pick the correction
+    q.found = true;
+    Sound.tap();
+    el.classList.add('found');
+    $('qPrompt').textContent = 'Now fix it!';
+    shuffle([q.fix, ...q.decoys]).forEach(choice => {
+      const c = document.createElement('button');
+      c.className = 'wordcard';
+      c.textContent = choice;
+      c.addEventListener('click', () => {
+        if (state.answered) return;
+        if (choice === q.fix) {
+          c.classList.add('right');
+          el.textContent = tok.replace(q.wrong, q.fix);
+          el.classList.remove('found');
+          el.classList.add('fixed');
+          resolveCorrect();
+        } else {
+          c.classList.add('wrongPick');
+          resolveWrong(`It should be "${q.fix}"!`);
+        }
+      });
+      $('answers').appendChild(c);
+    });
+  } else {
+    // tapped a fine word — reveal the real mistake
+    el.classList.add('wrongPick');
+    const culprit = [...$('qBig').querySelectorAll('.word-tok')]
+      .find(w => coreWord(w.textContent) === q.wrong);
+    if (culprit) culprit.classList.add('found');
+    resolveWrong(`The mistake was "${q.wrong}" — it should be "${q.fix}"!`);
+  }
+}
+
+/* ==================================================================
+   Word Forge — build a word from prefix / root / suffix chunks
+   ================================================================== */
+function chunkBtn(chunk) {
+  const b = document.createElement('button');
+  b.className = 'block chunk';
+  b.textContent = chunk;
+  // Word Forge colors by role: prefixes blue, suffixes violet, roots green.
+  // Syllable Smith has no roles, so its chunks tint by first letter like
+  // the ABC blocks.
+  b.style.setProperty('--h',
+    state.track === 'syllable'
+      ? ((chunk.toUpperCase().charCodeAt(0) - 65) * 14 % 360 + 360) % 360
+      : PREFIXES.has(chunk) ? 210 : SUFFIXES.has(chunk) ? 285 : 130);
+  return b;
+}
+
+function renderForgeSlots() {
+  const q = state.question;
+  const big = $('qBig');
+  big.className = 'forge';
+  big.innerHTML = `<div class="meaning">“${q.meaning}”</div>` +
+    '<div class="forge-slots">' + q.parts.map((_, i) => {
+      const f = q.filled[i];
+      return `<span class="fslot${f ? ' filled' : ''}">${f ? f.chunk : ''}</span>`;
+    }).join('') + '</div>';
+  // tapping a filled slot puts the chunk back
+  big.querySelectorAll('.fslot.filled').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      if (state.answered) return;
+      Sound.click();
+      const removed = q.filled.splice(i, 1)[0];
+      removed.btn.classList.remove('used', 'pop');
+      renderForgeSlots();
+    });
+  });
+}
+
+function checkForge() {
+  const q = state.question;
+  const built = q.filled.map(f => f.chunk).join('');
+  const word = q.parts.join('');
+  if (built === word) {
+    resolveCorrect();
+  } else {
+    resolveWrong(`It's ${q.parts.join(' + ').toUpperCase()} — ${word}!`);
+    q.filled.forEach(f => f.btn.classList.remove('used', 'pop'));
+    q.filled = [];
+  }
+}
+
+/* ==================================================================
+   Answering
+   ================================================================== */
+function checkBuilder() {
+  const q = state.question;
+  const built = q.filled.map(f => f.ch).join('');
+  if (built === q.word) {
+    resolveCorrect();
+  } else {
+    // gently put all the blocks back and let them retry costs a foe hit
+    resolveWrong(`It spells ${q.word.toUpperCase()} — try again!`);
+    q.filled.forEach(f => f.btn.classList.remove('used', 'pop'));
+    q.filled = [];
+  }
+}
+
+function pickAnswer(el, correct) {
+  if (state.answered) return;
+  if (correct) {
+    el.classList.add('right');
+    resolveCorrect();
+  } else {
+    el.classList.add('wrongPick');
+    resolveWrong();
+  }
+}
+
+function resolveCorrect() {
+  state.answered = true;
+  stopTimer();
+  const dbl = state.inFastZone;
+  const q = state.question;
+  // reinforce by saying the word after a correct answer (dad's voice if recorded)
+  const praiseId  = dbl ? 'P_double' : 'P_great';
+  const praiseTxt = dbl ? 'Double hit!' : 'Great job!';
+  if (q.isRhyme)      Voice.play([q.tClip, q.aClip, praiseId], `${q.tWord}... ${q.aWord}! ${praiseTxt}`);
+  else if (q.isPast)  Voice.play(['O_' + q.answer, praiseId], `${q.answer}! ${praiseTxt}`);
+  else if (q.word)    Voice.play(['W_' + q.word, praiseId], `${q.word}! ${praiseTxt}`);
+  else if (q.isWords) Voice.play(['S_' + q.answer, praiseId], `${q.answer}! ${praiseTxt}`);
+  else                Voice.play([praiseId], praiseTxt);
+  playerAttack(dbl);
+}
+
+function resolveWrong(msg) {
+  state.answered = true;
+  stopTimer();
+  Sound.wrong();
+  const q = state.question;
+  const reveal = q.isBuilder ? '' :
+    q.revealMsg ? q.revealMsg :
+    q.isRhyme ? `${q.tWord} rhymes with ${q.aWord} ${q.answer}` :
+    q.isPast ? `Yesterday I ${q.answer}!` :
+    q.isPics ? `It was ${q.word} ${q.answer}` : `It was ${String(q.answer).toUpperCase()}`;
+  $('feedback').textContent = msg || `Almost! ${reveal}`;
+  // say the right answer out loud (after the buzzer), except on letters
+  // where there's no word clip to play
+  if (q.isRhyme)
+    setTimeout(() => Voice.play(['P_itwas', q.aClip], `It was ${q.aWord}`), 450);
+  else if (q.isPast)
+    setTimeout(() => Voice.play(['P_itwas', 'O_' + q.answer], `It was ${q.answer}`), 450);
+  else if (q.isPics || q.isBuilder)
+    setTimeout(() => Voice.play(['P_itwas', 'W_' + q.word], `It was ${q.word}`), 450);
+  else if (q.isWords)
+    setTimeout(() => Voice.play(['P_itwas', 'S_' + q.answer], `It was ${q.answer}`), 450);
+  setTimeout(() => foeAttack(), 1600);
+}
+
+/* ==================================================================
+   Battle animations — lunge, slash, screen flash, floating text
+   ================================================================== */
+function floatText(text, color, atFoe) {
+  const f = document.createElement('div');
+  f.className = 'float-text';
+  f.textContent = text;
+  f.style.color = color;
+  const rect = $('arena').getBoundingClientRect();
+  f.style.left = (atFoe ? rect.width * 0.72 : rect.width * 0.18) + 'px';
+  f.style.top = rect.height * 0.2 + 'px';
+  $('arena').appendChild(f);
+  setTimeout(() => f.remove(), 1000);
+}
+
+function playSlash(atFoe) {
+  const rect = $('arena').getBoundingClientRect();
+  const slash = $('slash');
+  slash.style.left = (atFoe ? rect.width * 0.68 : rect.width * 0.18) + 'px';
+  slash.style.top = rect.height * 0.18 + 'px';
+  slash.textContent = atFoe ? '💥' : '💢';
+  slash.classList.remove('go');
+  void slash.offsetWidth; // restart animation
+  slash.classList.add('go');
+}
+
+function screenFlash() {
+  const o = $('flashOverlay');
+  o.classList.remove('hit');
+  void o.offsetWidth;
+  o.classList.add('hit');
+}
+
+function animateAttack(attacker, defender, onImpact, onDone) {
+  const atkSprite = attacker === 'player' ? $('playerSprite') : $('foeSprite');
+  const defSprite = defender === 'player' ? $('playerSprite') : $('foeSprite');
+  const atFoe = defender === 'foe';
+
+  atkSprite.classList.add('attack');
+  setTimeout(() => {
+    playSlash(atFoe);
+    screenFlash();
+    defSprite.classList.add('hurt', 'flash');
+    if (onImpact) onImpact();
+    setTimeout(() => defSprite.classList.remove('flash'), 200);
+  }, 180);
+  setTimeout(() => {
+    atkSprite.classList.remove('attack');
+    defSprite.classList.remove('hurt');
+    if (onDone) onDone();
+  }, 600);
+}
+
+/* ==================================================================
+   Combat
+   ================================================================== */
+function playerAttack(double) {
+  const dmg = double ? 2 : 1;
+  if (double) $('playerSprite').classList.add('super');
+
+  animateAttack('player', 'foe',
+    () => {
+      state.foeHp -= dmg;
+      renderHp();
+      double ? Sound.superHit() : Sound.hit();
+      if (double) {
+        floatText('DOUBLE! -' + dmg, '#ffd23f', true);
+        setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
+      } else {
+        floatText('-' + dmg, '#fff', true);
+      }
+      $('feedback').textContent = double ? '⭐ DOUBLE HIT! ⭐' : 'Great hit!';
+    },
+    () => {
+      $('playerSprite').classList.remove('super');
+      if (state.foeHp <= 0) {
+        Sound.ko();
+        floatText('KO!', '#ffd23f', true);
+        $('foeSprite').classList.add('ko');
+        setTimeout(nextFoeOrWin, 900);
+      } else {
+        setTimeout(newQuestion, 600);
+      }
+    }
+  );
+}
+
+function foeAttack() {
+  animateAttack('foe', 'player',
+    () => {
+      state.playerHp -= 1;
+      renderHp();
+      Sound.hurt();
+      floatText('-1', '#ff5e7e', false);
+    },
+    () => {
+      if (state.playerHp <= 0) setTimeout(gameOver, 400);
+      else setTimeout(newQuestion, 400);
+    }
+  );
+}
+
+function nextFoeOrWin() {
+  state.foeIdx++;
+  if (state.foeIdx >= FOES.length) {
+    winGame();
+  } else {
+    $('feedback').textContent = '';
+    spawnFoe();
+    floatText('New foe!', '#fff', true);
+  }
+}
+
+/* ==================================================================
+   Timer — gold fast zone at the start = double damage window
+   ================================================================== */
+function startTimer() {
+  stopTimer();
+  const mode = MODES[state.mode];
+  state.timeLeft = mode.total;
+  state.inFastZone = true;
+  $('fastMark').style.left = (100 * (mode.total - mode.fast) / mode.total) + '%';
+  $('timerBar').style.width = '100%';
+  $('timerBar').className = 'bar super';
+  $('superLabel').classList.add('show');
+
+  state.timerId = setInterval(() => {
+    state.timeLeft -= 0.1;
+    const pct = Math.max(0, state.timeLeft / mode.total * 100);
+    state.inFastZone = (mode.total - state.timeLeft) < mode.fast;
+    const bar = $('timerBar');
+    bar.style.width = pct + '%';
+    bar.className = 'bar' + (state.inFastZone ? ' super' : pct < 25 ? ' danger' : pct < 50 ? ' warn' : '');
+    $('superLabel').classList.toggle('show', state.inFastZone);
+
+    if (state.timeLeft <= 0) {
+      stopTimer();
+      if (mode.penalty && !state.answered) {
+        state.answered = true;
+        $('feedback').textContent = 'Too slow!';
+        Sound.wrong();
+        floatText('Too slow!', '#ffd23f', false);
+        setTimeout(() => foeAttack(), 700);
+      }
+      // Easy mode: nothing bad happens — the bar just sits empty
+    }
+  }, 100);
+}
+
+function stopTimer() {
+  if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+  $('superLabel').classList.remove('show');
+}
+
+/* ==================================================================
+   Win / lose + the iPad-time reward timer
+   ================================================================== */
+function winGame() {
+  stopTimer();
+  Sound.victory();
+  Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
+  state.earnedMins = rand(5, 10);
+  $('earnedMins').textContent = state.earnedMins;
+  $('countdown').textContent = '';
+  $('countdown').classList.remove('ringing');
+  $('timerBtn').style.display = '';
+  $('stopAlarmBtn').style.display = 'none';
+  showScreen('win');
+}
+
+function gameOver() {
+  stopTimer();
+  Sound.gameover();
+  Voice.play(['P_lose'], 'Oh no! Try again — you can do it!');
+  showScreen('lose');
+}
+
+function startRewardTimer() {
+  clearRewardTimer();
+  // track a wall-clock end time so a delayed tick can't drift the total
+  state.rewardEnd = Date.now() + state.earnedMins * 60 * 1000;
+  $('timerBtn').style.display = 'none';
+  const tick = () => {
+    const ms = state.rewardEnd - Date.now();
+    if (ms <= 0) { ringTimer(); return; }
+    const s = Math.ceil(ms / 1000);
+    $('countdown').textContent =
+      Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+  tick();
+  state.rewardId = setInterval(tick, 250);
+}
+
+function ringTimer() {
+  clearRewardTimer();
+  $('countdown').textContent = "TIME'S UP!";
+  $('countdown').classList.add('ringing');
+  $('stopAlarmBtn').style.display = '';
+  Sound.startAlarm();
+}
+
+function clearRewardTimer() {
+  if (state.rewardId) { clearInterval(state.rewardId); state.rewardId = null; }
+  Sound.stopAlarm();
+}
+
+$('timerBtn').addEventListener('click', () => { Sound.click(); startRewardTimer(); });
+$('stopAlarmBtn').addEventListener('click', () => {
+  Sound.stopAlarm();
+  $('stopAlarmBtn').style.display = 'none';
+});
+$('winAgainBtn').addEventListener('click', () => { Sound.click(); clearRewardTimer(); showScreen('menu'); });
+$('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+
+$('sayBtn').addEventListener('click', () => {
+  Sound.unlock();
+  if (state.question && state.question.sayIt) state.question.sayIt();
+});
+</script>
+</body>
+</html>

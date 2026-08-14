@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Math RPG">
+<title>Math RPG</title>
+<style>
+  :root {
+    --sky-top: #241544;
+    --sky-mid: #3a1f5c;
+    --sky-low: #5b2a63;
+    --horizon: #ff6fa5;       /* warm dusk glow at the arena floor */
+    --panel: rgba(15, 8, 30, 0.42);
+    --accent: #ffd23f;
+    --accent-2: #d99312;      /* deeper gold for the button "lip" */
+    --good: #5ce8a0;          /* you / hero */
+    --bad: #ff5e7e;           /* foe / danger */
+    --ink: #1b1230;           /* dark text on gold buttons */
+    --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: var(--body);
+    color: #fff;
+    overflow: hidden;
+  }
+
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app {
+    width: min(900px, 96vw);
+    height: min(720px, 96vh);
+    position: relative;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+    /* twilight quest arena: starfield + warm horizon glow over a violet sky */
+    background:
+      radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
+      radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
+      radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
+  }
+
+  .sound-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    width: 46px;
+    height: 46px;
+    padding: 0;                /* override the base button padding so the icon centers */
+    border-radius: 50%;
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
+    line-height: 1;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: transform .08s, filter .15s;
+  }
+  .sound-toggle:active { transform: translateY(3px); }
+  .sound-toggle.muted { opacity: 0.55; }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.hidden { display: none; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(44px, 8.5vw, 76px);
+    margin: 0 0 6px;
+    color: var(--accent);
+    text-shadow:
+      0 3px 0 var(--accent-2),
+      0 5px 0 #9a6a0c,
+      0 10px 22px rgba(0,0,0,.55);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .subtitle {
+    font-size: 19px;
+    color: rgba(255,255,255,.78);
+    margin-bottom: 30px;
+    max-width: 50ch;       /* wide enough to keep these on one line on tablet/desktop */
+    text-wrap: balance;    /* if it must wrap on a narrow phone, keep the lines even */
+  }
+  .group-label {
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 14px 0 10px;
+    color: var(--accent);
+    opacity: .92;
+  }
+  .group-label::before, .group-label::after {
+    content: "";
+    display: inline-block;
+    width: 26px;
+    height: 2px;
+    margin: 0 12px;
+    vertical-align: middle;
+    background: linear-gradient(90deg, transparent, var(--accent));
+    opacity: .55;
+  }
+  .group-label::after { transform: scaleX(-1); }
+
+  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  button {
+    font-family: var(--display);
+    cursor: pointer;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    font-weight: bold;
+    padding: 16px 28px;
+    color: var(--ink);
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+    user-select: none;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
+
+  #startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
+
+  button.choice {
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    /* compact so the seven tracks wrap to a couple of tidy rows within 720px */
+    font-size: 18px;
+    padding: 13px 14px;
+    min-width: 150px;
+  }
+  button.choice .emoji { font-size: 30px; display: block; margin-bottom: 4px; }
+  button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
+  button.choice.selected {
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    color: var(--ink);
+    border-color: transparent;
+    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
+  }
+  button.choice.selected .sub { opacity: .85; }
+
+  /* ---------- Battle screen ---------- */
+  #battle { justify-content: flex-start; padding: 12px 16px; }
+
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+    padding-right: 66px;   /* clear the top-right mute button (~58px wide) */
+  }
+
+  .fighter-info { flex: 1; max-width: 320px; }
+  .fighter-info .name {
+    font-family: var(--display);
+    font-size: 18px;
+    margin-bottom: 6px;
+    text-align: left;
+    text-shadow: 0 2px 4px rgba(0,0,0,.5);
+  }
+  .fighter-info.foe .name { text-align: right; }
+
+  /* HP as countable pips: hearts for the hero, orbs for the foe — true to the
+     small integer HP values and doubles as counting practice. */
+  .pips { display: flex; gap: 7px; min-height: 26px; }
+  .pips.foe { justify-content: flex-end; }
+  .pip {
+    width: 25px;
+    height: 25px;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .pip.heart {
+    background: var(--good);
+    -webkit-mask: var(--heart) center / contain no-repeat;
+    mask: var(--heart) center / contain no-repeat;
+    filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
+  }
+  .pip.orb {
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff9bb2, var(--bad) 65%);
+    box-shadow: 0 0 6px rgba(255,94,126,.6), inset 0 -3px 4px rgba(0,0,0,.3);
+  }
+  .pip.empty {
+    background: rgba(255,255,255,.16);
+    box-shadow: none;
+    filter: none;
+    transform: scale(.82);
+  }
+  .pip.orb.empty { background: rgba(255,255,255,.14); }
+
+  .arena {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6%;
+    min-height: 170px;
+  }
+  /* glowing stage discs under each fighter */
+  .arena::before, .arena::after {
+    content: "";
+    position: absolute;
+    bottom: 16%;
+    width: 230px;
+    height: 50px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(255,210,63,.22), rgba(255,210,63,0) 70%);
+    filter: blur(3px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .arena::before { left: 2%; }
+  .arena::after { right: 2%; background: radial-gradient(ellipse at center, rgba(255,94,126,.22), rgba(255,94,126,0) 70%); }
+  .sprite { z-index: 1; }
+  #battle.with-blocks .arena::before, #battle.with-blocks .arena::after { display: none; }
+
+  .sprite {
+    font-size: clamp(64px, 13vw, 124px);
+    filter: drop-shadow(0 12px 10px rgba(0,0,0,.45));
+    transition: transform .15s;
+    position: relative;
+  }
+  .sprite.player { animation: idlePlayer 2.4s ease-in-out infinite; }
+  .sprite.foe {
+    animation: idleFoe 2.8s ease-in-out infinite;
+    transform: scaleX(-1);
+    /* per-foe scale evens out emoji glyphs that fill their em-box differently
+       (a solid circle vs a sprawling dragon), set via --foe-scale in JS */
+    font-size: calc(clamp(64px, 13vw, 124px) * var(--foe-scale, 1));
+  }
+
+  @keyframes idlePlayer { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes idleFoe { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-12px); } }
+
+  /* attack lunges */
+  .sprite.player.attack { animation: lungeRight .45s ease; }
+  .sprite.foe.attack { animation: lungeLeft .45s ease; }
+  @keyframes lungeRight {
+    0% { transform: translateX(0); }
+    35% { transform: translateX(180px) rotate(-12deg); }
+    55% { transform: translateX(180px) rotate(-12deg); }
+    100% { transform: translateX(0); }
+  }
+  @keyframes lungeLeft {
+    0% { transform: scaleX(-1) translateX(0); }
+    35% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
+    55% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
+    100% { transform: scaleX(-1) translateX(0); }
+  }
+
+  /* getting hit */
+  .sprite.hurt { animation: shake .4s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-12px) rotate(6deg); }
+    40% { transform: translateX(12px) rotate(-6deg); }
+    60% { transform: translateX(-8px) rotate(4deg); }
+    80% { transform: translateX(8px) rotate(-4deg); }
+  }
+  .sprite.foe.hurt { animation: shakeFoe .4s ease; }
+  @keyframes shakeFoe {
+    0%,100% { transform: scaleX(-1) translateX(0); }
+    20% { transform: scaleX(-1) translateX(-12px) rotate(6deg); }
+    40% { transform: scaleX(-1) translateX(12px) rotate(-6deg); }
+    60% { transform: scaleX(-1) translateX(-8px) rotate(4deg); }
+    80% { transform: scaleX(-1) translateX(8px) rotate(-4deg); }
+  }
+
+  .sprite.flash { filter: drop-shadow(0 12px 10px rgba(0,0,0,.45)) brightness(3) saturate(0); }
+
+  /* slash effect */
+  .slash {
+    position: absolute;
+    font-size: 90px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 5;
+  }
+  .slash.go { animation: slashFx .5s ease; }
+  @keyframes slashFx {
+    0% { opacity: 0; transform: scale(.3) rotate(-40deg); }
+    30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
+    100% { opacity: 0; transform: scale(1.6) rotate(30deg); }
+  }
+
+  /* floating damage / status text */
+  .float-text {
+    position: absolute;
+    font-size: 42px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 6;
+    text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    animation: floatUp 1s ease forwards;
+  }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translateY(0) scale(.6); }
+    20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-90px) scale(1); }
+  }
+
+  #flashOverlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8;
+  }
+  #flashOverlay.hit { animation: screenFlash .25s ease; }
+  @keyframes screenFlash { 0% { opacity: .5; } 100% { opacity: 0; } }
+
+  /* ---------- Problem panel ---------- */
+  .problem-panel {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 22px;
+    padding: 14px 20px 16px;
+    box-shadow: 0 -2px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.4);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    flex-shrink: 0;            /* never let the panel get squeezed into itself */
+  }
+
+  .timer-row { display: flex; align-items: center; gap: 10px; }
+  .timer-track {
+    position: relative;
+    flex: 1;
+    height: 14px;
+    border-radius: 8px;
+    background: rgba(0,0,0,.3);
+    overflow: hidden;
+  }
+  .timer-track .bar {
+    height: 100%;
+    width: 100%;
+    background: var(--good);
+    border-radius: 8px;
+    transition: width 0.05s linear;
+  }
+  .timer-track .bar.super { background: linear-gradient(90deg, #ffd23f, #ff9500); }
+  .timer-track .bar.warn { background: var(--accent); }
+  .timer-track .bar.danger { background: var(--bad); }
+  .fast-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 3px;
+    margin-left: -1px;
+    background: #fff;
+    box-shadow: 0 0 4px rgba(0,0,0,.9);
+  }
+  /* little banner flag marking the end of the double-hit zone */
+  .fast-marker::before {
+    content: "";
+    position: absolute;
+    top: -6px; left: -3px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #fff;
+  }
+  .super-label {
+    flex: 0 0 auto;
+    width: 96px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--accent);
+    visibility: hidden;
+  }
+  .super-label.show { visibility: visible; animation: superPulse 0.6s ease-in-out infinite; }
+  @keyframes superPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  .sprite.super { filter: drop-shadow(0 0 16px var(--accent)) drop-shadow(0 12px 10px rgba(0,0,0,.45)); }
+
+  .question {
+    font-family: var(--display);
+    font-size: clamp(38px, 7vw, 56px);
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    align-self: center;
+    padding: 4px 22px;
+    border-radius: 16px;
+    background: rgba(0,0,0,.22);
+    border: 1px solid rgba(255,255,255,.08);
+    text-shadow: 0 2px 6px rgba(0,0,0,.5);
+  }
+
+  /* ---------- Number blocks (addition only) ---------- */
+  .blocks-area {
+    display: flex;
+    flex-direction: column;   /* towers row on top, push button on its own line */
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0;
+    position: relative;
+  }
+  .blocks-area.hidden { display: none; }
+
+  .blocks-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;      /* keeps the + centered against the towers */
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .tower {
+    display: grid;
+    grid-auto-flow: column;   /* fill top-to-bottom, then start a new column */
+    grid-template-rows: repeat(3, 38px);   /* ~3 big blocks per column, then wrap */
+    grid-auto-columns: 38px;
+    gap: 5px;
+    padding: 6px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    cursor: grab;
+    touch-action: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  .tower.dragging { cursor: grabbing; transition: none; z-index: 3; }
+  .tower.merged-pop { animation: blockPop 0.45s ease; }
+
+  .block {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25), 0 2px 3px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+  .block.count, .block.pulse { animation: blockPop 0.3s ease; }
+  @keyframes blockPop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+
+  /* subtraction: blocks marked to be taken away, then their removal */
+  .block.remove-mark { opacity: .35; border-style: dashed; border-color: rgba(255,255,255,.75); }
+  .block.removing { animation: blockRemove 0.45s ease forwards; }
+  @keyframes blockRemove {
+    0% { transform: scale(1); opacity: .6; }
+    35% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(0) translateY(-26px); opacity: 0; }
+  }
+
+  .blocks-plus { font-size: 34px; font-weight: bold; color: var(--accent); align-self: center; }
+  .push-btn { align-self: center; font-size: 18px; padding: 10px 16px; }
+  .push-btn:disabled { filter: grayscale(0.6) brightness(0.9); cursor: default; box-shadow: 0 5px 0 #777; }
+
+  /* give blocks room: shrink the fight scene in addition mode so nothing collides */
+  #battle.with-blocks { overflow-y: auto; scrollbar-width: none; }
+  #battle.with-blocks::-webkit-scrollbar { display: none; }
+  #battle.with-blocks .topbar { margin-bottom: 4px; }
+  #battle.with-blocks .arena { flex: 0 0 auto; min-height: 0; height: 80px; }
+  #battle.with-blocks .sprite { font-size: clamp(44px, 8vw, 76px); }
+  #battle.with-blocks .sprite.foe { font-size: calc(clamp(44px, 8vw, 76px) * var(--foe-scale, 1)); }
+  #battle.with-blocks .question { font-size: clamp(28px, 5vw, 40px); margin-bottom: 4px; padding: 2px 16px; }
+  #battle.with-blocks .problem-panel { padding: 14px 18px 16px; gap: 7px; }
+  #battle.with-blocks .hint { display: none; }
+
+  .answer-row { display: flex; gap: 12px; justify-content: center; align-items: center; }
+  #answer {
+    font-family: var(--display);
+    font-size: 40px;
+    font-weight: bold;
+    width: 160px;
+    text-align: center;
+    padding: 10px;
+    border-radius: 14px;
+    border: 3px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.28);
+    color: #fff;
+    outline: none;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.4);
+    transition: border-color .15s, background .15s;
+  }
+  #answer:focus { border-color: var(--accent); }
+  #answer.correct { border-color: var(--good); background: rgba(74,222,128,.2); }
+  #answer.wrong { border-color: var(--bad); background: rgba(248,113,113,.2); animation: shake .3s; }
+
+  #answer { caret-color: var(--accent); cursor: default; }
+
+  /* ---------- On-screen number pad ---------- */
+  .key-back-btn {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    box-shadow: 0 5px 0 rgba(0,0,0,.35);
+    font-size: 26px;
+    padding: 14px 18px;
+  }
+  .key-back-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-top: 8px;
+    touch-action: manipulation;
+  }
+  .key {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: bold;
+    padding: 13px 0;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+    box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 6px 12px rgba(0,0,0,.25);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    transition: transform .06s, box-shadow .06s, filter .12s;
+  }
+  .key:hover { filter: brightness(1.18); }
+  .key:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+
+  /* addition mode has the blocks above, so trim the pad only slightly */
+  #battle.with-blocks .keypad { gap: 9px; margin-top: 6px; }
+  #battle.with-blocks .key { font-size: 28px; padding: 12px 0; }
+
+  .end-emoji {
+    font-size: 120px;
+    margin-bottom: 10px;
+    animation: pop .5s ease;
+    filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
+  }
+  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+  .hint { font-size: 16px; color: rgba(255,255,255,.62); margin-top: 8px; }
+
+  /* ---------- Win reward: iPad-time countdown ---------- */
+  .reward {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin: 8px 0 22px;
+  }
+  .reward.hidden, #countdownBox.hidden, #rewardStart.hidden { display: none; }
+  #rewardStart { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
+  .reward-line b { color: var(--accent); font-size: 28px; }
+  .reward-hint {
+    font-size: 14px;
+    color: rgba(255,255,255,.6);
+    max-width: 42ch;
+    text-wrap: balance;
+  }
+
+  #countdownBox { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .countdown {
+    font-family: var(--display);
+    font-size: clamp(56px, 14vw, 92px);
+    font-weight: bold;
+    color: var(--accent);
+    text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  .countdown-label {
+    font-size: 16px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,.72);
+    margin-bottom: 10px;
+  }
+  .ghost-btn {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    box-shadow: 0 5px 0 rgba(0,0,0,.35);
+    font-size: 18px;
+    padding: 12px 22px;
+  }
+  .ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  /* time's up: flash the countdown red to grab attention within the app */
+  #countdownBox.ringing .countdown { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
+  #countdownBox.ringing .countdown-label { color: var(--bad); font-weight: bold; }
+  @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
+
+  /* ---------- Quality floor ---------- */
+  button:focus-visible,
+  .key:focus-visible,
+  .sound-toggle:focus-visible,
+  .tower:focus-visible,
+  #answer:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- MENU -->
+  <section id="menu" class="screen">
+    <h1>Math RPG</h1>
+    <div class="subtitle">Defeat the monster with your math powers!</div>
+
+    <div class="group-label">Choose your power</div>
+    <div class="btn-row" id="trackRow">
+      <button class="choice" data-track="next">
+        <span class="emoji">🔢</span>Next Number
+        <span class="sub">What comes after?</span>
+      </button>
+      <button class="choice" data-track="count">
+        <span class="emoji">👣</span>Count On
+        <span class="sub">Add 1, 2 or 3</span>
+      </button>
+      <button class="choice" data-track="add">
+        <span class="emoji">➕</span>Addition
+        <span class="sub">Ages 5+</span>
+      </button>
+      <button class="choice" data-track="sub">
+        <span class="emoji">➖</span>Subtraction
+        <span class="sub">Take blocks away</span>
+      </button>
+      <button class="choice" data-track="mul">
+        <span class="emoji">✖️</span>Multiplication
+        <span class="sub">Times tables</span>
+      </button>
+      <button class="choice" data-track="div">
+        <span class="emoji">➗</span>Division
+        <span class="sub">Times tables in reverse</span>
+      </button>
+      <button class="choice" data-track="alg">
+        <span class="emoji">🧩</span>Algebra
+        <span class="sub">Solve for x</span>
+      </button>
+    </div>
+
+    <div class="group-label">Choose your difficulty</div>
+    <div class="btn-row" id="modeRow">
+      <button class="choice" data-mode="easy">
+        <span class="emoji">🐢</span>Easy
+        <span class="sub">Relaxed timer</span>
+      </button>
+      <button class="choice" data-mode="normal">
+        <span class="emoji">🐇</span>Normal
+        <span class="sub">Some time pressure</span>
+      </button>
+      <button class="choice" data-mode="expert">
+        <span class="emoji">⚡</span>Expert
+        <span class="sub">Beat the clock!</span>
+      </button>
+    </div>
+
+    <div style="margin-top:22px">
+      <button id="startBtn">Start Battle!</button>
+    </div>
+  </section>
+
+  <!-- BATTLE -->
+  <section id="battle" class="screen hidden">
+    <div class="topbar">
+      <div class="fighter-info player">
+        <div class="name">🦸 You</div>
+        <div class="pips player" id="playerHp"></div>
+      </div>
+      <div class="fighter-info foe">
+        <div class="name" id="foeName">👾 Monster</div>
+        <div class="pips foe" id="foeHp"></div>
+      </div>
+    </div>
+
+    <div class="arena" id="arena">
+      <div class="sprite player" id="playerSprite">🦸</div>
+      <div class="slash" id="slash">💥</div>
+      <div class="sprite foe" id="foeSprite">👾</div>
+    </div>
+
+    <div class="problem-panel">
+      <div class="timer-row">
+        <div class="timer-track" id="timerTrack">
+          <div class="bar" id="timerBar"></div>
+          <div class="fast-marker" id="fastMarker"></div>
+        </div>
+        <div class="super-label" id="superLabel">⚡ DOUBLE! ⚡</div>
+      </div>
+      <div class="question" id="question">2 + 3</div>
+
+      <div class="blocks-area hidden" id="blocksArea">
+        <div class="blocks-row">
+          <div class="tower" id="towerA"></div>
+          <div class="blocks-plus" id="plusSign">+</div>
+          <div class="tower" id="towerB"></div>
+        </div>
+        <button class="push-btn" id="pushBtn">👐 Push together</button>
+      </div>
+
+      <div class="answer-row">
+        <input id="answer" type="text" inputmode="none" readonly autocomplete="off" />
+        <button id="backBtn" class="key-back-btn" aria-label="Delete">⌫</button>
+        <button id="attackBtn">⚔️ Attack!</button>
+      </div>
+
+      <!-- On-screen number pad (so the iPad keyboard never has to appear). -->
+      <div class="keypad" id="keypad">
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key" data-key="4">4</button>
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+        <button class="key" data-key="0">0</button>
+      </div>
+
+      <div class="hint">⚡ Answer before the white line for a DOUBLE hit!</div>
+    </div>
+
+    <div id="flashOverlay"></div>
+  </section>
+
+  <!-- GAME OVER / WIN -->
+  <section id="endScreen" class="screen hidden">
+    <div class="end-emoji" id="endEmoji">🏆</div>
+    <h1 id="endTitle">Victory!</h1>
+    <div class="subtitle" id="endText">You defeated the monster!</div>
+
+    <!-- Win-only reward: earned iPad game time + an in-app countdown timer.
+         (The timer only runs while this screen stays open and in front — iOS
+         freezes background tabs — hence the "ask Siri" nudge.) -->
+    <div id="reward" class="reward hidden">
+      <div class="reward-line">🎮 You earned <b id="rewardMins">7</b> minutes of iPad game time!</div>
+
+      <div id="rewardStart">
+        <button id="startTimerBtn">⏱️ Start the timer</button>
+        <div class="reward-hint">Keep this screen open so the alarm can ring — or
+          ask Siri to set a timer for <span id="rewardMinsHint">7</span> minutes.</div>
+      </div>
+
+      <div id="countdownBox" class="hidden">
+        <div class="countdown" id="countdown">7:00</div>
+        <div class="countdown-label" id="countdownLabel">iPad time left</div>
+        <button id="cancelTimerBtn" class="ghost-btn">Cancel</button>
+      </div>
+    </div>
+
+    <button id="playAgainBtn">Play Again</button>
+  </section>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Sound (synthesized, no audio files) ----------
+  const Sound = (() => {
+    let ctx = null;
+    let muted = (localStorage.getItem("mathrpg_muted") === "1");
+    let alarmTimer = null;
+
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) ctx = new AC();
+      }
+      if (ctx && ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    // A single tone with a quick attack/decay envelope, optional pitch slide.
+    function tone(freq, dur, opts = {}) {
+      const c = ensure();
+      if (!c || muted) return;
+      const { type = "square", vol = 0.2, delay = 0, slideTo = null } = opts;
+      const t0 = c.currentTime + delay;
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(c.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.03);
+    }
+
+    // Decaying white noise burst (impacts, poofs).
+    function noise(dur, opts = {}) {
+      const c = ensure();
+      if (!c || muted) return;
+      const { vol = 0.2, delay = 0 } = opts;
+      const n = Math.floor(c.sampleRate * dur);
+      const buf = c.createBuffer(1, n, c.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const g = c.createGain();
+      g.gain.value = vol;
+      src.connect(g).connect(c.destination);
+      src.start(c.currentTime + delay);
+    }
+
+    return {
+      isMuted: () => muted,
+      toggle() {
+        muted = !muted;
+        localStorage.setItem("mathrpg_muted", muted ? "1" : "0");
+        if (!muted) tone(660, 0.08, { type: "triangle", vol: 0.15 });
+        return muted;
+      },
+      // call once from a user gesture so the audio context is unlocked
+      unlock() { ensure(); },
+
+      click() { tone(660, 0.06, { type: "triangle", vol: 0.12 }); },
+      hit() {
+        tone(190, 0.12, { type: "square", vol: 0.25, slideTo: 90 });
+        noise(0.12, { vol: 0.14 });
+      },
+      super() {
+        tone(523, 0.08, { type: "square", vol: 0.2 });
+        tone(784, 0.08, { type: "square", vol: 0.2, delay: 0.08 });
+        tone(1047, 0.14, { type: "square", vol: 0.22, delay: 0.16 });
+        noise(0.16, { vol: 0.16, delay: 0.16 });
+      },
+      hurt() { tone(150, 0.25, { type: "sawtooth", vol: 0.22, slideTo: 70 }); },
+      wrong() {
+        tone(330, 0.12, { type: "sine", vol: 0.18 });
+        tone(247, 0.18, { type: "sine", vol: 0.18, delay: 0.12 });
+      },
+      ko() {
+        noise(0.25, { vol: 0.2 });
+        tone(420, 0.22, { type: "triangle", vol: 0.18, slideTo: 120 });
+      },
+      win() {
+        [523, 659, 784, 1047].forEach((f, i) =>
+          tone(f, 0.16, { type: "triangle", vol: 0.2, delay: i * 0.14 }));
+      },
+      lose() {
+        [392, 330, 262, 196].forEach((f, i) =>
+          tone(f, 0.24, { type: "triangle", vol: 0.2, delay: i * 0.2 }));
+      },
+      blockTap() { tone(600, 0.08, { type: "triangle", vol: 0.14 }); },
+      count(i) { tone(440 + i * 45, 0.07, { type: "triangle", vol: 0.16 }); },
+      push() { noise(0.3, { vol: 0.12 }); tone(220, 0.3, { type: "sine", vol: 0.12, slideTo: 440 }); },
+
+      // Looping "time's up" alarm: a classic two-tone beep that repeats until
+      // stopAlarm() is called. Respects the mute toggle like every other sound.
+      // (Only rings while the page is in the foreground — iOS suspends audio in
+      // backgrounded tabs.)
+      startAlarm() {
+        this.stopAlarm();
+        const ring = () => {
+          tone(880, 0.18, { type: "square", vol: 0.3 });
+          tone(660, 0.20, { type: "square", vol: 0.3, delay: 0.22 });
+        };
+        ring();
+        alarmTimer = setInterval(ring, 750);
+      },
+      stopAlarm() {
+        if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
+      },
+    };
+  })();
+
+  // ---------- Config ----------
+  // total = full time bar; fast = answer within this for a SUPER double hit;
+  // penalty = does running out of time let the foe counterattack?
+  const MODES = {
+    easy:   { total: 15000, fast: 5000, penalty: false, label: "Easy" },
+    normal: { total: 14000, fast: 5000, penalty: true,  label: "Normal" },
+    expert: { total: 9000,  fast: 3500, penalty: true,  label: "Expert" },
+  };
+
+  // scale evens out how much of the em-box each emoji actually fills, so a
+  // solid circle and a sprawling dragon read as similar-sized foes (with the
+  // boss nudged a touch larger). Tuned by screenshot.
+  const FOES = [
+    { name: "Slime",   emoji: "🟢", maxHp: 3, scale: 0.80 },
+    { name: "Bat",     emoji: "🦇", maxHp: 4, scale: 1.05 },
+    { name: "Ghost",   emoji: "👻", maxHp: 4, scale: 0.92 },
+    { name: "Dragon",  emoji: "🐉", maxHp: 5, scale: 1.16 },
+  ];
+
+  const PLAYER_MAX_HP = 5;
+  const PLAYER_DAMAGE = 1;
+  const FOE_DAMAGE = 1;
+
+  // Numberblocks-style colors: each whole number has its own color.
+  const BLOCK_COLORS = {
+    1: "#ff3b30", 2: "#ff9500", 3: "#ffcc00", 4: "#34c759", 5: "#00c7e6",
+    6: "#0a84ff", 7: "#5e5ce6", 8: "#bf5af2", 9: "#ff2d95", 10: "#aeb4bd",
+  };
+  function blockColor(n) {
+    return BLOCK_COLORS[n] || `hsl(${(n * 47) % 360} 80% 55%)`;
+  }
+
+  // ---------- State ----------
+  const state = {
+    track: "add",
+    mode: "normal",
+    playerHp: PLAYER_MAX_HP,
+    foeIndex: 0,
+    foeHp: 0,
+    answer: 0,
+    a: 0,
+    b: 0,
+    merged: false,
+    taken: false,
+    timerId: null,
+    timerStart: 0,
+    busy: false,
+    earnedMins: 0,
+    countdownId: null,
+    countdownEnd: 0,
+  };
+
+  // ---------- Element refs ----------
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    menu: $("menu"), battle: $("battle"), end: $("endScreen"),
+    trackRow: $("trackRow"), modeRow: $("modeRow"), startBtn: $("startBtn"),
+    playerHp: $("playerHp"), foeHp: $("foeHp"), foeName: $("foeName"),
+    playerSprite: $("playerSprite"), foeSprite: $("foeSprite"),
+    slash: $("slash"), arena: $("arena"),
+    timerTrack: $("timerTrack"), timerBar: $("timerBar"),
+    fastMarker: $("fastMarker"), superLabel: $("superLabel"),
+    question: $("question"), answer: $("answer"), attackBtn: $("attackBtn"),
+    keypad: $("keypad"), backBtn: $("backBtn"),
+    flashOverlay: $("flashOverlay"),
+    blocksArea: $("blocksArea"), towerA: $("towerA"), towerB: $("towerB"),
+    plusSign: $("plusSign"), pushBtn: $("pushBtn"),
+    endEmoji: $("endEmoji"), endTitle: $("endTitle"), endText: $("endText"),
+    playAgainBtn: $("playAgainBtn"), muteBtn: $("muteBtn"),
+    reward: $("reward"), rewardMins: $("rewardMins"), rewardMinsHint: $("rewardMinsHint"),
+    rewardStart: $("rewardStart"), countdownBox: $("countdownBox"),
+    countdown: $("countdown"), countdownLabel: $("countdownLabel"),
+    startTimerBtn: $("startTimerBtn"), cancelTimerBtn: $("cancelTimerBtn"),
+  };
+
+  // reflect saved mute preference on the toggle
+  function renderMute() {
+    el.muteBtn.textContent = Sound.isMuted() ? "🔇" : "🔊";
+    el.muteBtn.classList.toggle("muted", Sound.isMuted());
+  }
+  renderMute();
+
+  // ---------- Menu selection ----------
+  function wireChoices(row, key) {
+    row.addEventListener("click", (e) => {
+      const btn = e.target.closest("button.choice");
+      if (!btn) return;
+      [...row.children].forEach((c) => c.classList.remove("selected"));
+      btn.classList.add("selected");
+      state[key] = btn.dataset[key];
+      Sound.click();
+    });
+  }
+  wireChoices(el.trackRow, "track");
+  wireChoices(el.modeRow, "mode");
+  // defaults
+  el.trackRow.querySelector('[data-track="add"]').classList.add("selected");
+  el.modeRow.querySelector('[data-mode="normal"]').classList.add("selected");
+
+  // ---------- Problem generation ----------
+  function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  // Algebra: solve for x. ~30% of problems are two-step (a × x ± b = c); the
+  // rest are one-step across all four operations. Every form resolves to a
+  // single whole-number answer (the value of x) so it fits the number pad.
+  function makeAlgebra() {
+    if (Math.random() < 0.3) {
+      // two-step: a × x + b = c  (or − b), with c kept positive
+      const a = rand(2, 5), x = rand(2, 9);
+      state.answer = x;
+      if (Math.random() < 0.5) {
+        const b = rand(1, 9);
+        return `${a} × x + ${b} = ${a * x + b}`;
+      }
+      const b = rand(1, Math.min(9, a * x - 1));
+      return `${a} × x − ${b} = ${a * x - b}`;
+    }
+    // one-step, picked evenly across +, −, ×, ÷
+    switch (rand(1, 6)) {
+      case 1: { const x = rand(1, 12), b = rand(1, 12); state.answer = x; return `x + ${b} = ${x + b}`; }
+      case 2: { const x = rand(1, 12), b = rand(1, 12); state.answer = x; return `${b} + x = ${x + b}`; }
+      case 3: { const b = rand(1, 9), c = rand(1, 9); state.answer = b + c; return `x − ${b} = ${c}`; }
+      case 4: { const x = rand(1, 9), c = rand(1, 9); state.answer = x; return `${x + c} − x = ${c}`; }
+      case 5: { const a = rand(2, 9), x = rand(2, 9); state.answer = x; return `${a} × x = ${a * x}`; }
+      default: { const a = rand(2, 9), c = rand(2, 9); state.answer = a * c; return `x ÷ ${a} = ${c}`; }
+    }
+  }
+
+  function newProblem() {
+    let text;
+    if (state.track === "add") {
+      state.a = rand(1, 9); state.b = rand(1, 9);
+      text = `${state.a} + ${state.b}`;
+      state.answer = state.a + state.b;
+    } else if (state.track === "next") {
+      // counting practice: show a number 1-30, type the one that comes next.
+      state.a = rand(1, 30);
+      text = `${state.a} →  ?`;
+      state.answer = state.a + 1;
+    } else if (state.track === "count") {
+      // "count on": add only 1-3 to a starting number — a gentle step up from
+      // counting toward addition. Uses the same push-together blocks as add.
+      state.a = rand(2, 9); state.b = rand(1, 3);
+      text = `${state.a} + ${state.b}`;
+      state.answer = state.a + state.b;
+    } else if (state.track === "alg") {
+      text = makeAlgebra();
+    } else if (state.track === "sub") {
+      // single-digit take-away for the 5-year-old; keep the result >= 1 so
+      // there's always something left to count after taking blocks away.
+      state.a = rand(2, 9); state.b = rand(1, state.a - 1);
+      text = `${state.a} − ${state.b}`;
+      state.answer = state.a - state.b;
+    } else if (state.track === "div") {
+      // clean division, the inverse of the times tables: build the dividend
+      // from two 2-12 factors so it always divides evenly (no remainder).
+      const divisor = rand(2, 12), quotient = rand(2, 12);
+      state.a = divisor * quotient; state.b = divisor;
+      text = `${state.a} ÷ ${state.b}`;
+      state.answer = quotient;
+    } else {
+      state.a = rand(2, 12); state.b = rand(2, 12);
+      text = `${state.a} × ${state.b}`;
+      state.answer = state.a * state.b;
+    }
+    el.question.textContent = text;
+    el.answer.value = "";
+    el.answer.className = "";
+    renderBlocks();
+    el.answer.focus();
+    startTimer();
+  }
+
+  // ---------- Timer ----------
+  // The Double Attack Timer: the bar is shown in every mode. While the bar is
+  // still in the gold "fast" zone (left of the white marker has not been
+  // reached) a correct answer lands a SUPER double hit.
+  function startTimer() {
+    stopTimer();
+    const mode = MODES[state.mode];
+    state.timerStart = performance.now();
+
+    // place the marker at the boundary between the fast zone and the rest
+    el.fastMarker.style.left = (1 - mode.fast / mode.total) * 100 + "%";
+    el.timerBar.style.width = "100%";
+    el.timerBar.className = "bar super";
+
+    const tick = () => {
+      const elapsed = performance.now() - state.timerStart;
+      const left = Math.max(0, mode.total - elapsed);
+      const pct = (left / mode.total) * 100;
+      const isFast = elapsed < mode.fast;
+      el.timerBar.style.width = pct + "%";
+      el.timerBar.className = "bar" + (isFast ? " super" : pct < 25 ? " danger" : pct < 50 ? " warn" : "");
+      el.superLabel.classList.toggle("show", isFast);
+      if (left <= 0) {
+        stopTimer();
+        if (mode.penalty) timeUp();   // easy mode never punishes a slow answer
+      } else {
+        state.timerId = requestAnimationFrame(tick);
+      }
+    };
+    state.timerId = requestAnimationFrame(tick);
+  }
+
+  // Was the answer given while the fast zone was still active?
+  function isFastAnswer() {
+    return (performance.now() - state.timerStart) < MODES[state.mode].fast;
+  }
+
+  function stopTimer() {
+    if (state.timerId) cancelAnimationFrame(state.timerId);
+    state.timerId = null;
+    el.superLabel.classList.remove("show");
+  }
+
+  // ---------- HP pips ----------
+  // HP is a small integer, so we draw it as countable pips (hearts for the
+  // hero, orbs for the foe) instead of a continuous bar — easy to count along.
+  function renderPips(container, cur, max, kind) {
+    container.innerHTML = "";
+    for (let i = 0; i < max; i++) {
+      const p = document.createElement("span");
+      p.className = "pip " + kind + (i < cur ? "" : " empty");
+      container.appendChild(p);
+    }
+  }
+  function renderHp() {
+    const foe = FOES[state.foeIndex];
+    renderPips(el.playerHp, state.playerHp, PLAYER_MAX_HP, "heart");
+    renderPips(el.foeHp, state.foeHp, foe.maxHp, "orb");
+  }
+
+  // ---------- Number blocks ----------
+  function makeBlock(color) {
+    const b = document.createElement("div");
+    b.className = "block";
+    b.style.background = color;
+    return b;
+  }
+
+  function fillTower(tower, count, color) {
+    tower.innerHTML = "";
+    // Use as many rows as we have blocks, capped at 3 — so a short tower stays
+    // short instead of reserving empty rows, and a tall one wraps into columns.
+    tower.style.gridTemplateRows = `repeat(${Math.min(count, 3) || 1}, 38px)`;
+    for (let i = 1; i <= count; i++) tower.appendChild(makeBlock(color));
+  }
+
+  function renderBlocks() {
+    state.merged = false;
+    state.taken = false;
+    if (state.track === "add" || state.track === "count") {
+      el.blocksArea.classList.remove("hidden");
+      el.pushBtn.disabled = false;
+      el.pushBtn.textContent = "👐 Push together";
+      el.plusSign.style.display = "";
+      el.plusSign.style.visibility = "visible";
+      el.towerB.style.display = "";
+      el.towerA.className = "tower";
+      el.towerB.className = "tower";
+      el.towerA.style.cssText = "";
+      el.towerB.style.cssText = "";
+      fillTower(el.towerA, state.a, blockColor(state.a));
+      fillTower(el.towerB, state.b, blockColor(state.b));
+    } else if (state.track === "sub") {
+      // One tower = the minuend. The top `b` blocks are marked as the ones to
+      // take away; pressing the button removes them and counts what's left.
+      // The answer is never printed — the child counts the remaining blocks.
+      el.blocksArea.classList.remove("hidden");
+      el.pushBtn.disabled = false;
+      el.pushBtn.textContent = `✋ Take ${state.b} away`;
+      el.plusSign.style.display = "none";
+      el.towerB.style.display = "none";
+      el.towerA.className = "tower";
+      el.towerA.style.cssText = "";
+      fillTower(el.towerA, state.a, blockColor(state.a));
+      const blocks = [...el.towerA.children];
+      for (let i = state.a - state.b; i < state.a; i++) blocks[i].classList.add("remove-mark");
+    } else {
+      el.blocksArea.classList.add("hidden");
+    }
+  }
+
+  function mergeTowers() {
+    if (state.merged || (state.track !== "add" && state.track !== "count")) return;
+    state.merged = true;
+    Sound.push();
+
+    el.plusSign.style.visibility = "hidden";
+
+    // Tower B's blocks move onto tower A, each keeping its own color and its
+    // own number so the two operands stay visually distinct in the combined
+    // tower. Nothing prints the total, so the child has to count the blocks to
+    // find the sum — the answer is never given away.
+    el.towerA.style.transform = "";
+    const sum = state.a + state.b;
+    el.towerA.style.gridTemplateRows = `repeat(${Math.min(sum, 3) || 1}, 38px)`;
+    while (el.towerB.firstChild) {
+      el.towerA.appendChild(el.towerB.firstChild);
+    }
+    el.towerB.style.display = "none";   // now empty; hide the leftover box
+    el.towerA.classList.remove("merged-pop");
+    void el.towerA.offsetWidth;
+    el.towerA.classList.add("merged-pop");
+
+    el.pushBtn.disabled = true;
+    el.pushBtn.textContent = "✓ Combined!";
+
+    // count up, lighting one block at a time (no total shown)
+    const blocks = [...el.towerA.children];
+    let i = 0;
+    const step = () => {
+      if (i >= blocks.length || !state.merged) return;
+      blocks[i].classList.add("count");
+      Sound.count(i);
+      i++;
+      setTimeout(step, 170);
+    };
+    setTimeout(step, 250);
+  }
+
+  // Subtraction's take-away: remove the marked top `b` blocks one at a time,
+  // then light up the remainder so the child can count what's left. As with
+  // addition, the total is never shown.
+  function takeAway() {
+    if (state.taken || state.track !== "sub") return;
+    state.taken = true;
+    Sound.push();
+    el.pushBtn.disabled = true;
+    el.pushBtn.textContent = "✓ Taken away!";
+
+    const toRemove = [...el.towerA.children].slice(state.a - state.b);
+    toRemove.forEach((blk, i) => {
+      setTimeout(() => {
+        blk.classList.remove("remove-mark");
+        blk.classList.add("removing");
+        Sound.count(state.b - i);
+      }, i * 160);
+    });
+
+    setTimeout(() => {
+      if (!state.taken) return;
+      toRemove.forEach((b) => b.remove());
+      const left = state.a - state.b;
+      el.towerA.style.gridTemplateRows = `repeat(${Math.min(left, 3) || 1}, 38px)`;
+      el.towerA.classList.remove("merged-pop");
+      void el.towerA.offsetWidth;
+      el.towerA.classList.add("merged-pop");
+
+      const rest = [...el.towerA.children];
+      let i = 0;
+      const step = () => {
+        if (i >= rest.length || !state.taken) return;
+        rest[i].classList.add("count");
+        Sound.count(i);
+        i++;
+        setTimeout(step, 170);
+      };
+      setTimeout(step, 250);
+    }, state.b * 160 + 250);
+  }
+
+  function rectsOverlap(elA, elB) {
+    const a = elA.getBoundingClientRect();
+    const b = elB.getBoundingClientRect();
+    return !(a.right < b.left || b.right < a.left || a.bottom < b.top || b.bottom < a.top);
+  }
+
+  // Drag a tower; release it overlapping the other tower to push them together.
+  let dragTower = null, dragStartX = 0, dragStartY = 0, dragMoved = 0;
+  function attachDrag(tower) {
+    tower.addEventListener("pointerdown", (e) => {
+      if (state.merged || state.taken) return;
+      dragTower = tower;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragMoved = 0;
+      tower.classList.add("dragging");
+      tower.setPointerCapture(e.pointerId);
+    });
+    tower.addEventListener("pointermove", (e) => {
+      if (dragTower !== tower) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      dragMoved = Math.max(dragMoved, Math.hypot(dx, dy));
+      tower.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+    tower.addEventListener("pointerup", (e) => {
+      if (dragTower !== tower) return;
+      tower.classList.remove("dragging");
+      dragTower = null;
+      if (dragMoved < 6) {
+        // a tap: pulse the tapped block so it can be counted
+        if (e.target.classList.contains("block")) {
+          e.target.classList.remove("pulse");
+          void e.target.offsetWidth;
+          e.target.classList.add("pulse");
+          Sound.blockTap();
+        }
+        tower.style.transform = "";
+        return;
+      }
+      if ((state.track === "add" || state.track === "count") && rectsOverlap(el.towerA, el.towerB)) mergeTowers();
+      else tower.style.transform = ""; // snap back
+    });
+  }
+
+  // ---------- Animations ----------
+  function floatText(text, color, atFoe) {
+    const f = document.createElement("div");
+    f.className = "float-text";
+    f.textContent = text;
+    f.style.color = color;
+    const rect = el.arena.getBoundingClientRect();
+    f.style.left = (atFoe ? rect.width * 0.72 : rect.width * 0.18) + "px";
+    f.style.top = rect.height * 0.3 + "px";
+    el.arena.appendChild(f);
+    setTimeout(() => f.remove(), 1000);
+  }
+
+  function playSlash(atFoe) {
+    const rect = el.arena.getBoundingClientRect();
+    el.slash.style.left = (atFoe ? rect.width * 0.68 : rect.width * 0.18) + "px";
+    el.slash.style.top = rect.height * 0.28 + "px";
+    el.slash.textContent = atFoe ? "💥" : "💢";
+    el.slash.classList.remove("go");
+    void el.slash.offsetWidth; // restart animation
+    el.slash.classList.add("go");
+  }
+
+  function screenFlash() {
+    el.flashOverlay.classList.remove("hit");
+    void el.flashOverlay.offsetWidth;
+    el.flashOverlay.classList.add("hit");
+  }
+
+  function animateAttack(attacker, defender, onImpact, onDone) {
+    const atkSprite = attacker === "player" ? el.playerSprite : el.foeSprite;
+    const defSprite = defender === "player" ? el.playerSprite : el.foeSprite;
+    const atFoe = defender === "foe";
+
+    atkSprite.classList.add("attack");
+    setTimeout(() => {
+      playSlash(atFoe);
+      screenFlash();
+      defSprite.classList.add("hurt", "flash");
+      if (onImpact) onImpact();
+      setTimeout(() => defSprite.classList.remove("flash"), 200);
+    }, 180);
+    setTimeout(() => {
+      atkSprite.classList.remove("attack");
+      defSprite.classList.remove("hurt");
+      if (onDone) onDone();
+    }, 600);
+  }
+
+  // ---------- Combat flow ----------
+  function playerAttack() {
+    if (state.busy) return;
+    const val = parseInt(el.answer.value, 10);
+    if (el.answer.value.trim() === "" || isNaN(val)) {
+      el.answer.classList.add("wrong");
+      el.answer.focus();
+      return;
+    }
+    state.busy = true;
+    stopTimer();
+
+    if (val === state.answer) {
+      const isSuper = isFastAnswer();
+      const dmg = isSuper ? PLAYER_DAMAGE * 2 : PLAYER_DAMAGE;
+      el.answer.className = "correct";
+      if (isSuper) el.playerSprite.classList.add("super");
+      animateAttack("player", "foe",
+        () => {
+          state.foeHp = Math.max(0, state.foeHp - dmg);
+          renderHp();
+          if (isSuper) Sound.super(); else Sound.hit();
+          if (isSuper) {
+            floatText("DOUBLE! -" + dmg, "#ffd23f", true);
+            setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
+          } else {
+            floatText("-" + dmg, "#fff", true);
+          }
+        },
+        () => {
+          el.playerSprite.classList.remove("super");
+          if (state.foeHp <= 0) return foeDefeated();
+          state.busy = false;
+          newProblem();
+        }
+      );
+    } else {
+      // wrong answer -> foe gets a hit
+      el.answer.className = "wrong";
+      Sound.wrong();
+      wrongOrTimeout();
+    }
+  }
+
+  function timeUp() {
+    if (state.busy) return;
+    state.busy = true;
+    el.answer.className = "wrong";
+    Sound.wrong();
+    floatText("Too slow!", "#fbbf24", false);
+    wrongOrTimeout();
+  }
+
+  function wrongOrTimeout() {
+    setTimeout(() => {
+      animateAttack("foe", "player",
+        () => {
+          state.playerHp = Math.max(0, state.playerHp - FOE_DAMAGE);
+          renderHp();
+          Sound.hurt();
+          floatText("-" + FOE_DAMAGE, "#f87171", false);
+        },
+        () => {
+          if (state.playerHp <= 0) return gameOver();
+          state.busy = false;
+          newProblem();
+        }
+      );
+    }, 400);
+  }
+
+  function foeDefeated() {
+    Sound.ko();
+    floatText("KO!", "#ffd23f", true);
+    el.foeSprite.style.transition = "transform .6s, opacity .6s";
+    el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
+    el.foeSprite.style.opacity = "0";
+
+    setTimeout(() => {
+      state.foeIndex++;
+      if (state.foeIndex >= FOES.length) return win();
+      setupFoe();
+      el.foeSprite.style.transition = "transform .5s, opacity .5s";
+      el.foeSprite.style.transform = "scaleX(-1) scale(1)";
+      el.foeSprite.style.opacity = "1";
+      floatText("New foe!", "#fff", true);
+      state.busy = false;
+      newProblem();
+    }, 900);
+  }
+
+  function setupFoe() {
+    const foe = FOES[state.foeIndex];
+    state.foeHp = foe.maxHp;
+    el.foeSprite.textContent = foe.emoji;
+    el.foeSprite.style.setProperty("--foe-scale", foe.scale || 1);
+    el.foeName.textContent = foe.emoji + " " + foe.name;
+    renderHp();
+  }
+
+  // ---------- Screen transitions ----------
+  function show(screen) {
+    [el.menu, el.battle, el.end].forEach((s) => s.classList.add("hidden"));
+    screen.classList.remove("hidden");
+  }
+
+  function startGame() {
+    Sound.unlock();
+    Sound.click();
+    clearRewardTimer();
+    state.playerHp = PLAYER_MAX_HP;
+    state.foeIndex = 0;
+    state.busy = false;
+    el.foeSprite.style.transform = "scaleX(-1) scale(1)";
+    el.foeSprite.style.opacity = "1";
+    setupFoe();
+    renderHp();
+    el.battle.classList.toggle("with-blocks", state.track === "add" || state.track === "sub" || state.track === "count");
+    show(el.battle);
+    newProblem();
+  }
+
+  function win() {
+    stopTimer();
+    clearRewardTimer();
+    el.endEmoji.textContent = "🏆";
+    el.endTitle.textContent = "Victory!";
+    el.endText.textContent = "You defeated every monster. You're a math hero!";
+    // earned iPad game time: a fun, variable 5–10 minute reward
+    state.earnedMins = rand(5, 10);
+    el.rewardMins.textContent = state.earnedMins;
+    el.rewardMinsHint.textContent = state.earnedMins;
+    el.reward.classList.remove("hidden");
+    el.rewardStart.classList.remove("hidden");
+    el.countdownBox.classList.add("hidden");
+    Sound.win();
+    show(el.end);
+  }
+
+  function gameOver() {
+    stopTimer();
+    clearRewardTimer();
+    el.reward.classList.add("hidden");   // no reward time for a loss
+    el.endEmoji.textContent = "💀";
+    el.endTitle.textContent = "Game Over";
+    el.endText.textContent = "The monster got you! Want to try again?";
+    Sound.lose();
+    show(el.end);
+  }
+
+  // ---------- iPad game-time countdown (win reward) ----------
+  function fmtClock(totalSec) {
+    const m = Math.floor(totalSec / 60), s = totalSec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function clearRewardTimer() {
+    if (state.countdownId) { clearInterval(state.countdownId); state.countdownId = null; }
+    Sound.stopAlarm();
+    el.countdownBox.classList.remove("ringing");
+  }
+
+  function startRewardTimer() {
+    Sound.unlock();
+    Sound.click();
+    el.rewardStart.classList.add("hidden");
+    el.countdownBox.classList.remove("hidden", "ringing");
+    el.cancelTimerBtn.textContent = "Cancel";
+    el.countdownLabel.textContent = "iPad time left";
+    el.countdown.textContent = fmtClock(state.earnedMins * 60);
+    // track against wall-clock end time so a delayed tick can't drift the total
+    state.countdownEnd = Date.now() + state.earnedMins * 60 * 1000;
+    const tick = () => {
+      const left = Math.max(0, Math.round((state.countdownEnd - Date.now()) / 1000));
+      el.countdown.textContent = fmtClock(left);
+      if (left <= 0) ringTimer();
+    };
+    state.countdownId = setInterval(tick, 250);
+  }
+
+  function ringTimer() {
+    if (state.countdownId) { clearInterval(state.countdownId); state.countdownId = null; }
+    el.countdown.textContent = "0:00";
+    el.countdownLabel.textContent = "⏰ TIME'S UP!";
+    el.countdownBox.classList.add("ringing");
+    el.cancelTimerBtn.textContent = "🔕 Stop alarm";
+    Sound.startAlarm();
+  }
+
+  // Cancel (mid-countdown) or silence the alarm, then reset to the start state.
+  function dismissRewardTimer() {
+    Sound.click();
+    clearRewardTimer();
+    el.countdownBox.classList.add("hidden");
+    el.rewardStart.classList.remove("hidden");
+  }
+
+  // ---------- Answer entry (on-screen pad + physical keyboard) ----------
+  // The answer box is readonly so iOS never raises its keyboard; every digit
+  // comes through here instead. Answers cap at 3 digits (max is 9×9 = 81).
+  function pressKey(k) {
+    if (state.busy) return;
+    if (k === "back") {
+      el.answer.value = el.answer.value.slice(0, -1);
+    } else {
+      if (el.answer.value.length >= 3) return;
+      el.answer.value += k;
+    }
+    el.answer.classList.remove("wrong");
+    Sound.click();
+  }
+
+  // ---------- Events ----------
+  el.startBtn.addEventListener("click", startGame);
+  el.playAgainBtn.addEventListener("click", () => { Sound.click(); clearRewardTimer(); show(el.menu); });
+  el.startTimerBtn.addEventListener("click", startRewardTimer);
+  el.cancelTimerBtn.addEventListener("click", dismissRewardTimer);
+  el.attackBtn.addEventListener("click", playerAttack);
+  el.keypad.addEventListener("click", (e) => {
+    const b = e.target.closest("button.key");
+    if (b) pressKey(b.dataset.key);
+  });
+  el.backBtn.addEventListener("click", () => pressKey("back"));
+  // Physical keyboards (laptops) keep working during a battle.
+  document.addEventListener("keydown", (e) => {
+    if (el.battle.classList.contains("hidden")) return;
+    if (e.key === "Enter") { e.preventDefault(); playerAttack(); }
+    else if (e.key === "Backspace") { e.preventDefault(); pressKey("back"); }
+    else if (/^\d$/.test(e.key)) { e.preventDefault(); pressKey(e.key); }
+  });
+  el.muteBtn.addEventListener("click", () => { Sound.toggle(); renderMute(); });
+  el.pushBtn.addEventListener("click", () => {
+    if (state.track === "sub") takeAway(); else mergeTowers();
+  });
+  attachDrag(el.towerA);
+  attachDrag(el.towerB);
+
+  show(el.menu);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.claude/
+__pycache__/
+.verify/venv/
+.verify/geckodriver
+.verify/*.tar.gz
+.verify/shots/
+.verify/scratch/

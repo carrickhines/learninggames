@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LanguageRPG — Voice Studio</title>
+<style>
+  :root {
+    --sky:   #3b2d6e;
+    --sky2:  #6a4fc9;
+    --card:  #fff9ec;
+    --ink:   #2b2350;
+    --gold:  #ffc53d;
+    --grass: #58c15c;
+    --berry: #ff5d73;
+    --white: #fffdf7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Chalkboard SE', 'Comic Sans MS', ui-rounded, 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(180deg, var(--sky), var(--sky2));
+    color: var(--white);
+    min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  main { width: 100%; max-width: 640px; padding: 16px 16px 110px; }
+  h1 { margin-top: 24px; text-align: center; text-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  .intro {
+    background: rgba(255,255,255,.12); border-radius: 16px;
+    padding: 14px 18px; margin: 16px 0; font-size: .95rem; line-height: 1.5;
+  }
+  .intro b { color: var(--gold); }
+  h2 { margin: 26px 0 10px; font-size: 1.2rem; color: var(--gold); }
+
+  .controls {
+    position: sticky; top: 8px; z-index: 5;
+    display: flex; gap: 10px; margin-bottom: 14px; padding: 10px;
+    background: rgba(43,35,80,.88); border-radius: 16px;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .controls input {
+    flex: 1; min-width: 0; font-family: inherit; font-size: 1rem;
+    padding: 10px 14px; border-radius: 999px; border: none;
+  }
+  .controls button {
+    font-family: inherit; font-size: .95rem; border: none; cursor: pointer;
+    padding: 10px 16px; border-radius: 999px; white-space: nowrap;
+    background: rgba(255,255,255,.15); color: var(--white);
+  }
+  .controls button.on { background: var(--gold); color: var(--ink); }
+
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); color: var(--ink);
+    border-radius: 14px; padding: 8px 12px; margin-bottom: 8px;
+  }
+  .row .txt { flex: 1; font-size: 1.05rem; }
+  .row button {
+    font-family: inherit; font-size: 1.3rem; border: none; cursor: pointer;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(43,35,80,.08);
+  }
+  .row button:disabled { opacity: .3; cursor: default; }
+  .row button.live { background: var(--berry); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.12); } }
+  .row .ok { width: 28px; font-size: 1.2rem; text-align: center; }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--ink); padding: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,.3);
+  }
+  #progress { font-size: 1.1rem; }
+  #downloadBtn {
+    font-family: inherit; font-size: 1.15rem; border: none; cursor: pointer;
+    background: var(--gold); color: var(--ink);
+    padding: 12px 26px; border-radius: 999px; box-shadow: 0 4px 0 #c9922a;
+  }
+  #downloadBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #c9922a; }
+</style>
+</head>
+<body>
+
+<!-- If a voice.js already exists next to this page, its clips prefill below
+     so you can record in more than one sitting. A 404 here is harmless. -->
+<script src="voice.js"></script>
+
+<main>
+  <h1>🎙️ Voice Studio</h1>
+  <div class="intro">
+    Record <b>your own voice</b> for the game — the best narrator a kid can have.
+    <br><br>
+    1. Tap 🎙️ on a line, <b>read it out loud</b>, tap ⏹ to stop (auto-stops at 6s).<br>
+    2. Tap ▶ to check it; re-record any time.<br>
+    3. Tap <b>Download voice.js</b> and put the file in the same folder as
+    <b>index.html</b> (commit it to the repo for GitHub Pages).<br><br>
+    Tip: record on the device the kids play on (e.g. the iPad, via the live
+    site) for the most compatible audio. Use the built-in or a wired mic —
+    <b>Bluetooth headsets record in telephone quality</b>. You can stop and
+    come back — already recorded lines show ✅ and are kept when you download
+    again. To <b>re-record one line</b>, just tap its 🎙️ again — only that
+    clip changes, and the next download includes everything.
+  </div>
+  <div class="controls">
+    <input id="filterBox" type="search" placeholder="Find a line… (e.g. cat, tear, victory)">
+    <button id="missingBtn">🎯 Missing only</button>
+  </div>
+  <div id="sections"></div>
+</main>
+
+<footer>
+  <span id="progress"></span>
+  <button id="downloadBtn">Download voice.js</button>
+</footer>
+
+<script>
+'use strict';
+
+/* Keep these five lists in sync with index.html */
+const LETTERS = [
+  ['A','apple'],['B','ball'],['C','cat'],['D','dog'],['E','elephant'],
+  ['F','fish'],['G','grapes'],['H','hat'],['I','ice'],['J','juice'],
+  ['K','kite'],['L','lion'],['M','moon'],['N','nose'],['O','octopus'],
+  ['P','pig'],['Q','queen'],['R','rainbow'],['S','sun'],['T','tiger'],
+  ['U','umbrella'],['V','volcano'],['W','whale'],['X','x-ray'],
+  ['Y','yo-yo'],['Z','zebra'],
+];
+const WORDS = ['cat','dog','sun','hat','pig','cup','bed','fox','bug','ant',
+               'cow','hen','box','car','bee','egg','key','bat','owl','map',
+               'pen','bus','pie','van','web','nut'];
+const SIGHT = ['the','a','and','to','in','is','it','you','see','we',
+               'can','like','go','my','me','at','up','no','so','on',
+               'big','red','run','play'];
+// Rhyme Time words that aren't already in WORDS or SIGHT (those reuse
+// their W_/S_ clips — no need to record them twice)
+const RHYME_WORDS = ['frog','log','ten','socks','tree','man','pan','star',
+                     'jar','sled','bread','cap','clap','eye','fly','one',
+                     'goat','boat','coat','cake','snake','mouse','house',
+                     'moon','spoon','fish','dish','ring','king'];
+// Time Machine verbs: each needs a V_ sentence stem plus O_ clips for
+// both option words (the game shuffles the cards and chains the clips)
+const PAST = [
+  { now: 'go',     past: 'went',    wrong: 'goed' },
+  { now: 'eat',    past: 'ate',     wrong: 'eated' },
+  { now: 'see',    past: 'saw',     wrong: 'seed' },
+  { now: 'run',    past: 'ran',     wrong: 'runned' },
+  { now: 'come',   past: 'came',    wrong: 'comed' },
+  { now: 'get',    past: 'got',     wrong: 'getted' },
+  { now: 'give',   past: 'gave',    wrong: 'gived' },
+  { now: 'take',   past: 'took',    wrong: 'taked' },
+  { now: 'make',   past: 'made',    wrong: 'maked' },
+  { now: 'ride',   past: 'rode',    wrong: 'rided' },
+  { now: 'write',  past: 'wrote',   wrong: 'writed' },
+  { now: 'drive',  past: 'drove',   wrong: 'drived' },
+  { now: 'sing',   past: 'sang',    wrong: 'singed' },
+  { now: 'drink',  past: 'drank',   wrong: 'drinked' },
+  { now: 'swim',   past: 'swam',    wrong: 'swimmed' },
+  { now: 'sit',    past: 'sat',     wrong: 'sitted' },
+  { now: 'stand',  past: 'stood',   wrong: 'standed' },
+  { now: 'sleep',  past: 'slept',   wrong: 'sleeped' },
+  { now: 'sweep',  past: 'swept',   wrong: 'sweeped' },
+  { now: 'keep',   past: 'kept',    wrong: 'keeped' },
+  { now: 'feel',   past: 'felt',    wrong: 'feeled' },
+  { now: 'leave',  past: 'left',    wrong: 'leaved' },
+  { now: 'mean',   past: 'meant',   wrong: 'meaned' },
+  { now: 'say',    past: 'said',    wrong: 'sayed' },
+  { now: 'hear',   past: 'heard',   wrong: 'heared' },
+  { now: 'tell',   past: 'told',    wrong: 'telled' },
+  { now: 'sell',   past: 'sold',    wrong: 'selled' },
+  { now: 'find',   past: 'found',   wrong: 'finded' },
+  { now: 'think',  past: 'thought', wrong: 'thinked' },
+  { now: 'bring',  past: 'brought', wrong: 'bringed' },
+  { now: 'buy',    past: 'bought',  wrong: 'buyed' },
+  { now: 'catch',  past: 'caught',  wrong: 'catched' },
+  { now: 'teach',  past: 'taught',  wrong: 'teached' },
+  { now: 'fight',  past: 'fought',  wrong: 'fighted' },
+  { now: 'fly',    past: 'flew',    wrong: 'flied' },
+  { now: 'grow',   past: 'grew',    wrong: 'growed' },
+  { now: 'blow',   past: 'blew',    wrong: 'blowed' },
+  { now: 'throw',  past: 'threw',   wrong: 'throwed' },
+  { now: 'know',   past: 'knew',    wrong: 'knowed' },
+  { now: 'draw',   past: 'drew',    wrong: 'drawed' },
+  { now: 'fall',   past: 'fell',    wrong: 'falled' },
+  { now: 'break',  past: 'broke',   wrong: 'breaked' },
+  { now: 'speak',  past: 'spoke',   wrong: 'speaked' },
+  { now: 'steal',  past: 'stole',   wrong: 'stealed' },
+  { now: 'wear',   past: 'wore',    wrong: 'weared' },
+  { now: 'tear',   past: 'tore',    wrong: 'teared' },
+  { now: 'hide',   past: 'hid',     wrong: 'hided' },
+  { now: 'bite',   past: 'bit',     wrong: 'bited' },
+  { now: 'lose',   past: 'lost',    wrong: 'losed' },
+  { now: 'win',    past: 'won',     wrong: 'winned' },
+  { now: 'dig',    past: 'dug',     wrong: 'digged' },
+  { now: 'hold',   past: 'held',    wrong: 'holded' },
+  { now: 'build',  past: 'built',   wrong: 'builded' },
+  { now: 'send',   past: 'sent',    wrong: 'sended' },
+  { now: 'spend',  past: 'spent',   wrong: 'spended' },
+  { now: 'hurt',   past: 'hurt',    wrong: 'hurted' },
+  { now: 'hit',    past: 'hit',     wrong: 'hitted' },
+  { now: 'cut',    past: 'cut',     wrong: 'cutted' },
+  { now: 'feed',   past: 'fed',     wrong: 'feeded' },
+  { now: 'shake',  past: 'shook',   wrong: 'shaked' },
+  { now: 'sting',  past: 'stung',   wrong: 'stinged' },
+  { now: 'swing',  past: 'swung',   wrong: 'swinged' },
+  { now: 'forget', past: 'forgot',  wrong: 'forgetted' },
+  { now: 'freeze', past: 'froze',   wrong: 'freezed' },
+];
+
+const SECTIONS = [
+  { title: 'Game phrases', items: [
+    { id: 'P_spell',    text: 'Spell this word!' },
+    { id: 'P_findword', text: 'Find the word!' },
+    { id: 'P_rhyme',    text: 'What rhymes with...?' },
+    { id: 'P_or',       text: 'or...?' },
+    { id: 'P_great',    text: 'Great job!' },
+    { id: 'P_double',   text: 'Double hit!' },
+    { id: 'P_itwas',    text: 'It was...' },
+    { id: 'P_win',      text: 'Victory! You beat every monster!' },
+    { id: 'P_lose',     text: 'Oh no! Try again — you can do it!' },
+  ]},
+  { title: 'Letters (say the whole line)', items:
+    LETTERS.map(([l, cue]) => ({ id: 'L_' + l, text: `Find the letter ${l}! ${l}, as in ${cue}!` })) },
+  { title: 'Words (just the word)', items:
+    WORDS.map(w => ({ id: 'W_' + w, text: w })) },
+  { title: 'Sight words (just the word)', items:
+    SIGHT.map(w => ({ id: 'S_' + w, text: w })) },
+  { title: 'Rhyme words (just the word)', items:
+    RHYME_WORDS.map(w => ({ id: 'R_' + w, text: w })) },
+  { title: 'Time Machine sentences (stop after the dots)', items:
+    PAST.map(v => ({ id: 'V_' + v.now, text: `Today I ${v.now}. Yesterday I...` })) },
+  { title: 'Time Machine words (just the word, real and silly alike)', items:
+    // pairs: the real past then its silly form, deduped by clip id
+    [...new Set(PAST.flatMap(v => [v.past, v.wrong]))]
+      .map(w => ({ id: 'O_' + w, text: w })) },
+];
+const ALL = SECTIONS.flatMap(s => s.items);
+
+// start from whatever voice.js already holds, so sessions are incremental
+const clips = Object.assign({}, window.VOICE_CLIPS || {});
+
+/* ---------- build the rows ---------- */
+const sectionsEl = document.getElementById('sections');
+SECTIONS.forEach(sec => {
+  const h = document.createElement('h2');
+  sec.h = h;                                  // kept for the filter + counts
+  sectionsEl.appendChild(h);
+  sec.items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML =
+      `<button class="rec" aria-label="Record">🎙️</button>` +
+      `<button class="play" aria-label="Play" disabled>▶</button>` +
+      `<span class="txt">${item.text}</span><span class="ok"></span>`;
+    row.querySelector('.rec').addEventListener('click', e => toggleRecord(item.id, e.currentTarget));
+    row.querySelector('.play').addEventListener('click', () => new Audio(clips[item.id]).play());
+    row.id = 'row_' + item.id;
+    sectionsEl.appendChild(row);
+    refreshRow(item.id);
+  });
+});
+refreshProgress();
+
+function refreshRow(id) {
+  const row = document.getElementById('row_' + id);
+  const has = !!clips[id];
+  row.querySelector('.play').disabled = !has;
+  row.querySelector('.ok').textContent = has ? '✅' : '';
+}
+function refreshProgress() {
+  const done = ALL.filter(i => clips[i.id]).length;
+  document.getElementById('progress').textContent = `${done} / ${ALL.length} recorded`;
+  SECTIONS.forEach(sec => {
+    const d = sec.items.filter(i => clips[i.id]).length;
+    sec.h.textContent = `${sec.title} — ${d}/${sec.items.length}`;
+  });
+}
+
+/* ---------- find a line: search + missing-only filter ----------
+   Filters only apply when a control changes, so a row you just recorded
+   stays visible for the ▶ check even in "missing only" mode. */
+const filterBox = document.getElementById('filterBox');
+const missingBtn = document.getElementById('missingBtn');
+let missingOnly = false;
+
+function applyFilter() {
+  const q = filterBox.value.trim().toLowerCase();
+  SECTIONS.forEach(sec => {
+    let shown = 0;
+    sec.items.forEach(item => {
+      const show = (!missingOnly || !clips[item.id]) &&
+                   (!q || item.text.toLowerCase().includes(q));
+      document.getElementById('row_' + item.id).style.display = show ? '' : 'none';
+      if (show) shown++;
+    });
+    sec.h.style.display = shown ? '' : 'none';
+  });
+}
+filterBox.addEventListener('input', applyFilter);
+missingBtn.addEventListener('click', () => {
+  missingOnly = !missingOnly;
+  missingBtn.classList.toggle('on', missingOnly);
+  applyFilter();
+});
+
+/* ---------- recording (MediaRecorder, built into the browser) ---------- */
+// mp4/AAC first: it plays back everywhere, including iPads
+const MIME = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
+  .find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+
+let stream = null, recorder = null, activeId = null, chunks = [], stopTimer = null;
+
+async function toggleRecord(id, btn) {
+  if (activeId === id) { recorder.stop(); return; }   // second tap = stop
+  if (activeId) return;                               // one at a time
+
+  if (!stream) {
+    try {
+      // the defaults (echo cancellation, noise suppression, auto-gain) are
+      // tuned for video calls and mangle a clean read-aloud recording
+      stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1,
+      } });
+    } catch (e) {
+      alert('Microphone access is blocked. Allow the mic for this page, then try again.');
+      return;
+    }
+  }
+
+  activeId = id;
+  chunks = [];
+  recorder = new MediaRecorder(stream,
+    MIME ? { mimeType: MIME, audioBitsPerSecond: 128000 } : undefined);
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    clearTimeout(stopTimer);
+    btn.textContent = '🎙️';
+    btn.classList.remove('live');
+    // release the mic between takes: iPadOS ducks playback volume to near
+    // zero while a capture track is live, making the ▶ check inaudible
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    const blob = new Blob(chunks, { type: recorder.mimeType });
+    const fr = new FileReader();
+    fr.onload = () => {           // store as a data URI → one portable JS file
+      clips[id] = fr.result;
+      activeId = null;
+      refreshRow(id);
+      refreshProgress();
+    };
+    fr.readAsDataURL(blob);
+  };
+  recorder.start();
+  btn.textContent = '⏹';
+  btn.classList.add('live');
+  stopTimer = setTimeout(() => { if (activeId === id) recorder.stop(); }, 6000);
+}
+
+/* ---------- download voice.js ---------- */
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const content = '// Generated by record.html — keep next to index.html.\n' +
+                  'window.VOICE_CLIPS = ' + JSON.stringify(clips) + ';\n';
+  const blob = new Blob([content], { type: 'text/javascript' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'voice.js';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>

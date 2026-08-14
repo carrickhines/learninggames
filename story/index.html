@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Story Quest">
+<title>Story Quest</title>
+<style>
+  /* Shared visual system with Math RPG / Language RPG: same tokens & frame */
+  :root {
+    --sky-top: #241544;
+    --sky-mid: #3a1f5c;
+    --sky-low: #5b2a63;
+    --horizon: #ff6fa5;
+    --panel: rgba(15, 8, 30, 0.42);
+    --accent: #ffd23f;
+    --accent-2: #d99312;
+    --good: #5ce8a0;
+    --bad: #ff5e7e;
+    --ink: #1b1230;
+    --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: var(--body);
+    color: #fff;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app {
+    width: min(900px, 96vw);
+    height: min(720px, 96vh);
+    position: relative;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+    background:
+      radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
+      radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
+      radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
+      radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
+  }
+
+  .sound-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
+    line-height: 1;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: transform .08s, filter .15s;
+  }
+  .sound-toggle:active { transform: translateY(3px); }
+  .sound-toggle.muted { opacity: 0.55; }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.show { display: flex; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(44px, 8.5vw, 76px);
+    margin: 0 0 6px;
+    color: var(--accent);
+    text-shadow:
+      0 3px 0 var(--accent-2),
+      0 5px 0 #9a6a0c,
+      0 10px 22px rgba(0,0,0,.55);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .subtitle {
+    font-size: 19px;
+    color: rgba(255,255,255,.78);
+    margin-bottom: 22px;
+    max-width: 50ch;
+    text-wrap: balance;
+  }
+  .group-label {
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 10px 0 8px;
+    color: var(--accent);
+    opacity: .92;
+  }
+  .group-label::before, .group-label::after {
+    content: "";
+    display: inline-block;
+    width: 26px;
+    height: 2px;
+    margin: 0 12px;
+    vertical-align: middle;
+    background: linear-gradient(90deg, transparent, var(--accent));
+    opacity: .55;
+  }
+  .group-label::after { transform: scaleX(-1); }
+
+  /* the menu can outgrow the frame with many quest cards: center when it
+     fits, scroll when it doesn't (margin:auto does both) */
+  #menu { justify-content: flex-start; overflow-y: auto; scrollbar-width: none; }
+  #menu::-webkit-scrollbar { display: none; }
+  .menu-inner {
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  button {
+    font-family: var(--display);
+    cursor: pointer;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    font-weight: bold;
+    padding: 16px 28px;
+    color: var(--ink);
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
+
+  #startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
+  #startBtn:disabled {
+    filter: grayscale(.6) brightness(.85);
+    cursor: default;
+    box-shadow: 0 5px 0 #777, 0 9px 18px rgba(0,0,0,.3);
+    transform: none;
+  }
+
+  button.choice {
+    background: var(--panel);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    font-size: 18px;
+    padding: 13px 18px;
+    min-width: 190px;
+  }
+  button.choice .emoji { font-size: 34px; display: block; margin-bottom: 4px; }
+  button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
+  button.choice.sel {
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    color: var(--ink);
+    border-color: transparent;
+    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
+  }
+  button.choice.sel .sub { opacity: .85; }
+
+  .ghost-btn {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    box-shadow: 0 5px 0 rgba(0,0,0,.35);
+    font-size: 18px;
+    padding: 12px 22px;
+  }
+  .ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  /* ---------- Story screen ---------- */
+  #game {
+    justify-content: flex-start;
+    padding: 12px 16px 16px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #game::-webkit-scrollbar { display: none; }
+
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 6px;
+    padding-right: 66px;   /* clear the mute button */
+    flex-shrink: 0;
+  }
+  .pips { display: flex; gap: 7px; min-height: 26px; }
+  .pip {
+    width: 25px;
+    height: 25px;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .pip.heart {
+    background: var(--good);
+    -webkit-mask: var(--heart) center / contain no-repeat;
+    mask: var(--heart) center / contain no-repeat;
+    filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
+  }
+  .pip.empty {
+    background: rgba(255,255,255,.16);
+    filter: none;
+    transform: scale(.82);
+  }
+  .quest-stats {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,.5);
+    display: flex;
+    gap: 16px;
+  }
+  .quest-stats .gems { color: var(--accent); }
+
+  #art {
+    font-size: clamp(48px, 9vw, 84px);
+    line-height: 1.2;
+    margin: 6px 0 10px;
+    filter: drop-shadow(0 10px 10px rgba(0,0,0,.45));
+    flex-shrink: 0;
+    animation: artIn .45s ease;
+  }
+  @keyframes artIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+
+  #storyPanel {
+    width: 100%;
+    max-width: 700px;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 22px;
+    padding: 18px 22px 20px;
+    box-shadow: 0 -2px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.4);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+    animation: fadeIn .35s ease;
+  }
+
+  .story-text {
+    font-size: clamp(18px, 2.6vw, 22px);
+    line-height: 1.65;
+    text-align: left;
+    color: rgba(255,255,255,.95);
+  }
+  .story-text.oops-text { color: #ffc9d4; }
+  .story-text.chest-q { text-align: center; font-weight: bold; }
+
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choice-card {
+    font-family: var(--body);
+    font-size: clamp(17px, 2.4vw, 20px);
+    font-weight: bold;
+    text-align: left;
+    color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 6px 12px rgba(0,0,0,.25);
+    padding: 13px 18px;
+  }
+  .choice-card::before { content: "▸ "; color: var(--accent); }
+  .choice-card:hover { filter: brightness(1.18); }
+  .choice-card:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+  .choice-card.right {
+    background: linear-gradient(180deg, #8df3bd, var(--good));
+    color: var(--ink);
+    border-color: transparent;
+  }
+  .choice-card.right::before { content: "✓ "; color: var(--ink); }
+  .choice-card.wrongPick { animation: wobble .5s; }
+  .choice-card.tried {
+    opacity: .35;
+    pointer-events: none;
+    text-decoration: line-through;
+  }
+  .choice-card.tried::before { content: "✗ "; color: var(--bad); }
+  @keyframes wobble { 25% { transform: rotate(-1.5deg); } 75% { transform: rotate(1.5deg); } }
+
+  .oops-box {
+    border: 2px dashed rgba(255,94,126,.55);
+    border-radius: 14px;
+    padding: 12px 16px;
+    background: rgba(255,94,126,.12);
+  }
+  .chest-banner {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .chest-reward {
+    text-align: center;
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--good);
+    min-height: 1.4em;
+  }
+
+  /* ---------- Win / lose ---------- */
+  .end-emoji {
+    font-size: 120px;
+    margin-bottom: 10px;
+    animation: endPop .5s ease;
+    filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
+  }
+  @keyframes endPop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+  .reward {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0 20px;
+  }
+  .reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
+  .reward-line b { color: var(--accent); font-size: 28px; }
+  .reward-hint {
+    font-size: 14px;
+    color: rgba(255,255,255,.6);
+    max-width: 42ch;
+    text-wrap: balance;
+  }
+  #countdown {
+    font-family: var(--display);
+    font-size: clamp(48px, 12vw, 80px);
+    font-weight: bold;
+    color: var(--accent);
+    text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  #countdown:empty { display: none; }
+  #countdown.ringing { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
+  @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
+
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- ================= MENU ================= -->
+  <section class="screen show" id="menu">
+    <div class="menu-inner">
+    <h1>Story Quest</h1>
+    <div class="subtitle">Read carefully — the story tells you what to do!</div>
+
+    <div class="group-label">Choose your quest</div>
+    <div class="btn-row" id="questRow"></div>
+
+    <div style="margin-top:22px">
+      <button id="startBtn" disabled>Begin the Quest!</button>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= STORY ================= -->
+  <section class="screen" id="game">
+    <div class="topbar">
+      <div class="pips" id="heartPips"></div>
+      <div class="quest-stats">
+        <span class="gems" id="gemStat">💎 0</span>
+        <span id="sceneStat">📖 1 / 12</span>
+      </div>
+    </div>
+
+    <div id="art">🏰📜</div>
+    <div id="storyPanel"></div>
+  </section>
+
+  <!-- ================= WIN ================= -->
+  <section class="screen" id="win">
+    <div class="end-emoji">🏆</div>
+    <h1>Quest Complete!</h1>
+    <div class="subtitle" id="winText">You finished the quest!</div>
+
+    <div class="reward">
+      <div class="reward-line">🎮 You earned <b id="earnedMins">7</b> minutes of iPad game time!</div>
+      <div id="countdown"></div>
+      <button id="timerBtn">⏱️ Start the timer</button>
+      <button id="stopAlarmBtn" class="ghost-btn" style="display:none">🔕 Stop alarm</button>
+      <div class="reward-hint">Keep this screen open so the alarm can ring — or
+        ask Siri to set a timer!</div>
+    </div>
+
+    <button id="winAgainBtn" class="ghost-btn">Back to quests</button>
+  </section>
+
+  <!-- ================= LOSE ================= -->
+  <section class="screen" id="lose">
+    <div class="end-emoji">💫</div>
+    <h1>Out of hearts!</h1>
+    <div class="subtitle">Every hero re-reads. The clues are always in the story —
+      look for them and try again!</div>
+    <div class="btn-row">
+      <button id="retryBtn">Try the quest again!</button>
+      <button id="loseMenuBtn" class="ghost-btn">Back to quests</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ==================================================================
+   Sound — all SFX synthesized with Web Audio. No files to host.
+   ================================================================== */
+const Sound = {
+  ctx: null, muted: localStorage.getItem('storyquest_muted') === '1',
+  alarmTimer: null,
+
+  unlock() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+
+  tone(freq, dur, type = 'square', vol = 0.15, delay = 0) {
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(this.ctx.destination);
+    osc.start(t); osc.stop(t + dur);
+  },
+
+  click()  { this.tone(600, .06, 'square', .08); },
+  right()  { this.tone(660, .1, 'triangle', .16); this.tone(990, .14, 'triangle', .16, .09); },
+  wrong()  { this.tone(300, .18, 'triangle', .12); this.tone(240, .25, 'triangle', .12, .18); },
+  chest()  { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, .12, 'triangle', .16, i * .08)); },
+  page()   { this.tone(880, .05, 'triangle', .08); },
+  victory(){ [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, .2, 'triangle', .16, i * .14)); },
+  gameover(){ [392, 330, 262, 196].forEach((f, i) => this.tone(f, .3, 'triangle', .14, i * .25)); },
+
+  startAlarm() {
+    this.stopAlarm();
+    const beep = () => { this.tone(880, .25, 'square', .22); this.tone(660, .25, 'square', .22, .3); };
+    beep();
+    this.alarmTimer = setInterval(beep, 800);
+  },
+  stopAlarm() { if (this.alarmTimer) { clearInterval(this.alarmTimer); this.alarmTimer = null; } }
+};
+
+/* ==================================================================
+   Quests — the stories ARE the game. Authoring rules (see CLAUDE.md):
+   each scene has exactly one `ok` choice, and the story text must
+   contain the clue that makes it the right one. Wrong choices carry a
+   short, funny `oops` consequence. Optional treasure `chest` questions
+   (recall / vocabulary / inference / sequencing) reward a gem and heal
+   one heart.
+   ================================================================== */
+const QUESTS = [
+  {
+    emoji: '🌉', title: 'The Troll Bridge', sub: 'Win back the Golden Bell!',
+    scenes: [
+      { art: '🏰📜',
+        text: "A note is nailed to the castle door: 'The troll of Miller's Bridge stole the Golden Bell! Bring a rope. Do NOT bring anything shiny — trolls grab shiny things.' You pack your bag for the quest.",
+        choices: [
+          { t: 'Pack the rope', ok: true },
+          { t: 'Pack your shiniest coins', oops: 'The note said NO shiny things! The coins jingle-jangle... you put them back.' },
+          { t: 'Pack a fluffy pillow', oops: 'Comfy! But the note asked for rope, not naps.' },
+        ],
+        chest: { q: 'What did the troll steal?', a: ['The Golden Bell', 'A golden crown', 'A pile of coins'], right: 'The Golden Bell' } },
+      { art: '🌲🐿️🌲',
+        text: "A squirrel points at two paths. 'Left is short, but the mud is deep and sticky. Right is longer, but dry.' You look down at your boots — they are full of holes.",
+        choices: [
+          { t: 'Take the dry path on the right', ok: true },
+          { t: 'Take the short muddy path', oops: 'SQUISH. Cold mud pours right through the holes in your boots.' },
+          { t: 'Ask the squirrel to carry you', oops: 'The squirrel is the size of your shoe. Nice try.' },
+        ],
+        chest: { q: 'Why was the muddy path extra bad for YOU?', a: ['My boots have holes in them', 'It was too long', 'Squirrels live there'], right: 'My boots have holes in them' } },
+      { art: '🌉😴',
+        text: 'You reach the bridge. The troll is snoozing under it, hugging the Golden Bell like a teddy bear. A sign says: QUIET ZONE — TROLL WAKES AT LOUD SOUNDS.',
+        choices: [
+          { t: 'Tiptoe onto the bridge', ok: true },
+          { t: "Shout 'GOOD MORNING!'", oops: 'The sign said QUIET! One yellow troll eye opens... you freeze until it shuts.' },
+          { t: 'Stomp across in your boots', oops: 'STOMP STOMP. The troll snorts and rolls over. Too loud!' },
+        ],
+        chest: { q: "What does 'snoozing' mean?", a: ['Sleeping', 'Eating', 'Hiding'], right: 'Sleeping' } },
+      { art: '🌉🕳️🪢',
+        text: 'Halfway across, a plank is missing! The gap is far too wide to step over. A metal hook sticks out of the bridge post — and you remember what you packed.',
+        choices: [
+          { t: 'Tie your rope to the hook and swing across', ok: true },
+          { t: 'Jump as far as you can', oops: 'Your fingers barely catch the far edge. You pull yourself up, heart pounding.' },
+          { t: 'Go home and forget the bell', oops: 'But the whole town needs that bell! You turn back around.' },
+        ] },
+      { art: '🐐🥕',
+        text: "A goat blocks the path. 'I move for food,' says the goat, 'but ONLY crunchy food.' In your bag you find a crunchy carrot, a squishy marshmallow, and one old sock.",
+        choices: [
+          { t: 'Feed the goat the carrot', ok: true },
+          { t: 'Offer the marshmallow', oops: "'SQUISHY!' The goat is insulted and bonks you with its head." },
+          { t: 'Offer the sock', oops: "'That is laundry, not lunch.' The goat looks very disappointed in you." },
+        ],
+        chest: { q: "Why didn't the goat want the marshmallow?", a: ['It was squishy, not crunchy', 'It was too small', 'Goats only eat socks'], right: 'It was squishy, not crunchy' } },
+      { art: '⛰️🕳️',
+        text: "The troll's cave door is locked by magic. Chalk letters spell out: 'PASSWORD = the season when the leaves fall from the trees.'",
+        choices: [
+          { t: "Say 'Autumn'", ok: true },
+          { t: "Say 'Summer'", oops: 'The door buzzes like an angry bee. Wrong season!' },
+          { t: "Say 'Pancakes'", oops: "The door says: 'Delicious. But no.'" },
+        ],
+        chest: { q: 'What happened FIRST on your quest?', a: ['I read the note on the castle door', 'I met the goat', 'I crossed the bridge'], right: 'I read the note on the castle door' } },
+      { art: '🗝️🗝️🗝️',
+        text: "Three keys hang inside: a big iron key, a golden key, and a small silver key. A riddle is carved on the wall: 'The right key is NOT the biggest, and it is NOT gold.'",
+        choices: [
+          { t: 'Take the small silver key', ok: true },
+          { t: 'Take the big iron key', oops: "It doesn't fit. The riddle said NOT the biggest!" },
+          { t: 'Take the golden key', oops: 'It melts into butter in your hand. Troll magic! The riddle warned you.' },
+        ] },
+      { art: '🐟🪜',
+        text: "Deep in the cave, the path splits. A tunnel to the left smells strongly of fish. A ladder leads up. You remember the squirrel's warning: 'Trolls keep pet fish — right next to where they sleep.'",
+        choices: [
+          { t: 'Climb the ladder', ok: true },
+          { t: 'Follow the fishy tunnel', oops: 'You find a bathtub full of grumpy fish — and troll slippers. TOO close for comfort!' },
+          { t: 'Take a nap first', oops: 'No time! Heroes nap AFTER the quest.' },
+        ],
+        chest: { q: 'Why is the fishy smell a warning?', a: ['Trolls keep fish near where they sleep', 'Fish are dangerous', 'The tunnel is muddy'], right: 'Trolls keep fish near where they sleep' } },
+      { art: '🔔✨',
+        text: "There it is — the Golden Bell, resting on a pillow. A little tag hangs on it: 'CAUTION: very heavy. Lift slowly, with two hands.'",
+        choices: [
+          { t: 'Lift it slowly with two hands', ok: true },
+          { t: 'Snatch it quick with one hand', oops: 'CLANG! You almost drop it. Somewhere below, the snoring... stops for a second.' },
+          { t: 'Ring it to test the sound', oops: 'DING! Beautiful sound. TERRIBLE idea. You hug the bell until it goes quiet.' },
+        ] },
+      { art: '🧌❗',
+        text: 'A shadow fills the doorway — the troll is awake! He blocks the only way out and holds out a giant hand. You remember the note: trolls just cannot stop themselves from grabbing shiny things.',
+        choices: [
+          { t: 'Toss the silver key into the corner', ok: true },
+          { t: 'Fight the troll', oops: 'He is the size of a garbage truck. You bounce off his tummy.' },
+          { t: 'Hide under the pillow', oops: 'Your feet stick out. The troll politely taps your boot.' },
+        ],
+        chest: { q: 'What can trolls NOT stop themselves from doing?', a: ['Grabbing shiny things', 'Singing loudly', 'Eating carrots'], right: 'Grabbing shiny things' } },
+      { art: '🏃💨🌉',
+        text: "'OOH, SHINY!' The troll dives for the key. You run! At the bridge, your rope still hangs over the gap. The troll thunders behind you — far too heavy for the old wooden planks.",
+        choices: [
+          { t: 'Swing across, then untie the rope', ok: true },
+          { t: 'Stop and say sorry', oops: "'SORRY DOESN'T RETURN BELLS,' the troll booms. You keep running!" },
+          { t: 'Hide under the bridge', oops: "Wait — that's the troll's HOUSE. Worst hiding spot ever." },
+        ] },
+      { art: '🏰🔔🎉',
+        text: 'You did it! The Golden Bell rings across the valley again. Far away, a grumpy troll happily plays with a tiny silver key. The town cheers your name!',
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🐉', title: "The Dragon's Library", sub: 'Return the overdue book!',
+    scenes: [
+      { art: '🏛️📕',
+        text: "A dragon has moved into the town library! The mayor hands you an overdue book called 'Dragon Snacks.' 'Careful,' he says. 'She breathes fire when people are LOUD, or when a book goes on the WRONG shelf.'",
+        choices: [
+          { t: 'Walk in quietly, book in hand', ok: true },
+          { t: 'March in playing your trumpet', oops: "The dragon's nostrils glow orange. You back out very, very slowly." },
+          { t: 'Throw the book through the window', oops: 'It bounces off the glass and bonks you on the head.' },
+        ],
+        chest: { q: 'What TWO things make the dragon breathe fire?', a: ['Loud noises and books on wrong shelves', 'Rain and thunder', 'Muffins and tea'], right: 'Loud noises and books on wrong shelves' } },
+      { art: '📚🔤',
+        text: "Inside, it is quiet as snow. A sign reads: 'SHELVES GO IN ABC ORDER.' Your book is called 'Dragon Snacks.' You walk past shelf A... then shelf B... then shelf C...",
+        choices: [
+          { t: 'Stop at the very next shelf', ok: true },
+          { t: 'Keep going to shelf Z', oops: 'Z is for Zebras, not Dragons. You tiptoe back.' },
+          { t: 'Go back to shelf A', oops: 'A is too early. D comes after C, remember?' },
+        ] },
+      { art: '🐉😾',
+        text: "A giant tail lies across shelf D! The dragon's name tag says SPARKY. On the floor, a library card reads: 'Sparky purrs like a kitten when someone reads her a story.'",
+        choices: [
+          { t: 'Read a story out loud, very softly', ok: true },
+          { t: "Poke the tail and say 'excuse me'", oops: 'The tail twitches and knocks over a whole cart of books. Yikes.' },
+          { t: "Yell 'MOVE, PLEASE!'", oops: "LOUD! Smoke curls from Sparky's nose. You hold your breath..." },
+        ],
+        chest: { q: "What does 'purrs like a kitten' mean?", a: ['Makes a soft, happy sound', 'Scratches the furniture', 'Falls fast asleep'], right: 'Makes a soft, happy sound' } },
+      { art: '📖🐲',
+        text: "You read softly, and Sparky purrs — the tail slides away. On shelf D you spot a gap right between 'Dinosaur Jokes' and 'Dragons Next Door.' ABC order... perfect.",
+        choices: [
+          { t: "Slide 'Dragon Snacks' into the gap", ok: true },
+          { t: 'Put it on shelf A instead', oops: "WRONG SHELF! Sparky's eyes snap open, glowing. You grab the book back fast!" },
+          { t: "Balance it on Sparky's head", oops: 'It slides off her horn. Books are not hats.' },
+        ] },
+      { art: '🍪🐉',
+        text: "Sparky sniffs the air and taps a cookbook with one claw: 'Marshmallow Muffins.' Her tummy rumbles like far-away thunder. She looks at you with big hopeful eyes.",
+        choices: [
+          { t: 'Offer to bake her the muffins', ok: true },
+          { t: 'Tell her to take a nap', oops: 'Her tummy growls louder. That is NOT a sleepy sound.' },
+          { t: 'Wave goodbye and leave', oops: 'She whimpers like a puppy. A very large, slightly smoky puppy.' },
+        ],
+        chest: { q: 'How can you tell Sparky is hungry?', a: ['Her tummy rumbles like thunder', 'She is asleep on the shelf', 'She breathes fire at you'], right: 'Her tummy rumbles like thunder' } },
+      { art: '🧁🔥',
+        text: "The recipe says: 'Bake until golden. Do NOT overbake — burnt muffins taste like old socks.' Sparky offers her fire breath to help with the baking.",
+        choices: [
+          { t: 'Ask for one tiny, gentle puff of fire', ok: true },
+          { t: 'Ask for a FULL blast', oops: 'WHOOSH! The muffins turn black as midnight. They taste exactly like old socks.' },
+          { t: 'Skip baking and eat raw batter', oops: 'Blegh. Raw batter belongs in the oven, not in heroes.' },
+        ] },
+      { art: '🧁😊',
+        text: "Sparky munches twelve golden muffins and sighs a happy, smoky sigh. 'I only moved into the library,' she rumbles softly, 'because my cave FLOODED. My bed is a swimming pool now.'",
+        choices: [
+          { t: 'Offer to help fix her cave', ok: true },
+          { t: 'Tell her to learn to swim', oops: "'I am a dragon, not a duck,' she sniffs. A tiny sad smoke ring floats up." },
+          { t: 'Call the mayor to shoo her away', oops: "Sparky's eyes get watery. A crying dragon is a VERY soggy problem. You apologize." },
+        ],
+        chest: { q: 'Why did Sparky move into the library?', a: ['Her cave flooded', 'She loves muffins', 'She works there'], right: 'Her cave flooded' } },
+      { art: '🕳️💧',
+        text: "In her cave, water drips from a thin crack in the ceiling — drip, drip, drip — landing right on Sparky's bed. By the wall you see a wide flat stone, a feather, and a teacup.",
+        choices: [
+          { t: 'Push the flat stone over the crack', ok: true },
+          { t: 'Plug the crack with the feather', oops: 'The feather goes soggy and flops out. Drip... drip...' },
+          { t: 'Catch the drips in the teacup', oops: "The teacup fills up in ten seconds. You'd be emptying it forever!" },
+        ],
+        chest: { q: 'What was flooding the cave?', a: ['Water dripping through a crack', 'A leaky teacup', 'Rain coming in the door'], right: 'Water dripping through a crack' } },
+      { art: '🗝️🐉',
+        text: "The cave is warm and dry! Sparky yawns and hands you a small brass key. 'The library key,' she says. 'I borrowed it so I wouldn't get locked out. It belongs with someone important now.'",
+        choices: [
+          { t: 'Return the key to the mayor', ok: true },
+          { t: 'Keep it in your pocket', oops: "It's not yours to keep — and the mayor is waiting. You take it out again." },
+          { t: 'Bury it for safekeeping', oops: 'Buried treasure is for pirates. Librarians need doors that open!' },
+        ] },
+      { art: '🎉📚',
+        text: 'The library reopens with a party! Every Saturday, Sparky comes back for story time — very quietly — and the whole town bakes marshmallow muffins. THE END.',
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '👻', title: 'The Ghost Ship', sub: "Find the captain's lost compass!",
+    scenes: [
+      { art: '⚓🌫️',
+        text: "A foggy ship drifts into the harbor with nobody aboard — nobody alive, anyway. A ghostly voice moans: 'My compass... I cannot sail on without my compass. It sank near the OLD LIGHTHOUSE.' You grab your rowboat.",
+        choices: [
+          { t: 'Row toward the old lighthouse', ok: true },
+          { t: 'Row out to the open sea', oops: 'The open sea is BIG. The compass sank near the lighthouse, remember?' },
+          { t: 'Climb aboard the ghost ship', oops: "Brrr! It's freezing and foggy up there. The compass isn't on the ship — it SANK." },
+        ],
+        chest: { q: 'Where did the compass sink?', a: ['Near the old lighthouse', 'In the open sea', 'Under the ship'], right: 'Near the old lighthouse' } },
+      { art: '🚣🌊',
+        text: "The water near the lighthouse is shallow and clear as glass. Your grandpa always said: 'Shiny things on the seafloor twinkle when the sun hits them.' The sun is just coming out.",
+        choices: [
+          { t: 'Wait for the sun and watch for a twinkle', ok: true },
+          { t: 'Dive in right away with your eyes shut', oops: 'You bonk your head on the sandy bottom. Maybe LOOK first?' },
+          { t: 'Fish for it with a banana', oops: 'A crab takes the banana. It does not pay you back.' },
+        ] },
+      { art: '✨🌊',
+        text: "There! A twinkle below — but a grumpy octopus sits on top of it, hugging it with all eight arms. A sign on a rock reads: 'OCTOPUS TRADING POST. Will trade treasure for SHINY SHELLS ONLY.'",
+        choices: [
+          { t: 'Look for a shiny shell to trade', ok: true },
+          { t: 'Grab the compass and swim fast', oops: 'Eight arms are faster than two. The octopus wags an arm at you: tsk, tsk.' },
+          { t: 'Offer the octopus your soggy sandwich', oops: 'The sign said SHINY SHELLS. The octopus is insulted by bread.' },
+        ],
+        chest: { q: 'What will the octopus trade for?', a: ['Shiny shells only', 'Sandwiches', 'Bananas'], right: 'Shiny shells only' } },
+      { art: '🐚✨',
+        text: 'On the beach you find three shells: a dull brown shell, a cracked gray shell, and a pearly shell that shines like a rainbow.',
+        choices: [
+          { t: 'Take the pearly, shiny shell', ok: true },
+          { t: 'Take the dull brown shell', oops: "The octopus wanted SHINY. Brown and dull won't do." },
+          { t: 'Take the cracked gray shell', oops: 'It crumbles in your pocket. Oops.' },
+        ] },
+      { art: '🐙🧭',
+        text: "The octopus turns the pearly shell over and over, then hands you the compass — and taps the glass. Inside, the needle spins wildly. A tiny label says: 'GHOST COMPASS. Points to its OWNER, not north.'",
+        choices: [
+          { t: 'Follow wherever the needle points', ok: true },
+          { t: 'Head north', oops: "The needle isn't pointing north — the label says it points to its OWNER." },
+          { t: 'Shake it until it stops', oops: 'Ghost compasses do not like being shaken. It squeaks at you.' },
+        ],
+        chest: { q: 'What does the ghost compass point to?', a: ['Its owner', 'North', 'Treasure'], right: 'Its owner' } },
+      { art: '🌫️⛵',
+        text: "The needle points straight into the fog bank. Your rowboat has one lantern with one candle left. The fog is thick as soup, and it's getting dark.",
+        choices: [
+          { t: 'Light the lantern before rowing in', ok: true },
+          { t: 'Row into the dark fog and hope', oops: 'You row in a big circle and end up where you started. Dizzy!' },
+          { t: 'Wait for the fog to clear', oops: 'Ghost fog never clears. The moaning is getting sadder...' },
+        ] },
+      { art: '🕯️👻',
+        text: "Inside the fog, pale green ghost-lights bob around your boat. Grandpa's warning pops into your head: 'Ghost-lights copy whatever you do. Wave, and they wave back — and drift closer.'",
+        choices: [
+          { t: 'Sit very still and let them drift past', ok: true },
+          { t: 'Wave hello with both arms', oops: 'All the lights wave back — and ZOOM closer! You freeze until they get bored.' },
+          { t: 'Splash water at them', oops: "They splash back. Now you're soaked AND surrounded." },
+        ],
+        chest: { q: 'What happens if you wave at ghost-lights?', a: ['They wave back and come closer', 'They disappear', 'They light your way home'], right: 'They wave back and come closer' } },
+      { art: '⛵🪜',
+        text: 'The ghost ship looms out of the fog. A rope ladder hangs down — but its bottom rungs are rotted and snapped. Higher up, the rungs look strong. Your boat has a barrel you could stand on.',
+        choices: [
+          { t: 'Stand on the barrel to reach the strong rungs', ok: true },
+          { t: 'Climb the rotted bottom rungs', oops: 'CRACK! You get a boot full of splinters and plop back into the boat.' },
+          { t: 'Yell for the ghost to carry you', oops: "Ghosts can't carry things. That's sort of their whole problem." },
+        ] },
+      { art: '👻🧭',
+        text: "The ghost captain drifts to meet you, cold as winter. 'My compass!' he cries. Then he sighs: 'But my hands... things fall right through them. You must SET it into the ship's wheel yourself — it fits like a puzzle piece.'",
+        choices: [
+          { t: "Fit the compass into the ship's wheel", ok: true },
+          { t: 'Hand it to the captain', oops: 'It falls right through his fingers — you catch it just in time! He DID warn you.' },
+          { t: 'Put it in your pocket for later', oops: 'The captain gives you the saddest ghost-look ever invented.' },
+        ] },
+      { art: '⛵✨',
+        text: "CLICK. The compass snaps into the wheel, glows gold, and the whole ship hums like a happy cat. The captain tips his hat: 'One last thing — my crew's old treasure chest on the beach. It's yours! The key is under the WELCOME mat, like always.'",
+        choices: [
+          { t: 'Look under the welcome mat', ok: true },
+          { t: 'Smash the chest with a rock', oops: "It's ghost-wood. The rock bounces. The mat is RIGHT THERE." },
+          { t: 'Dig a hole next to the chest', oops: 'You find a worm. The worm is not a key.' },
+        ],
+        chest: { q: 'What happened FIRST on this quest?', a: ['A ghost asked for his lost compass', 'I met the octopus', 'I climbed the rope ladder'], right: 'A ghost asked for his lost compass' } },
+      { art: '🌅⛵🎉',
+        text: "The ghost ship sails into the sunrise, the captain singing an old sea song. On the beach, your treasure chest pops open: it's full of pearly shells — and one tiny golden rowboat charm. What a night!",
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🧙', title: "The Wizard's Maze", sub: 'Deliver the potion before sunset!',
+    scenes: [
+      { art: '🧙⚗️',
+        text: "Wizard Wobblebeard hands you a purple potion. 'My friend the giant has a terrible cold. Take this through the hedge maze to her house. Two rules: keep the potion OUT of sunlight, and NEVER run — shaking ruins it.'",
+        choices: [
+          { t: 'Walk carefully, potion tucked in the shade of your cloak', ok: true },
+          { t: 'Run as fast as you can', oops: 'The potion fizzes angrily from the shaking. You stop and let it settle. Walk!' },
+          { t: 'Hold the potion up to the sun to admire it', oops: 'It starts bubbling in the sunlight! You yank it back into the shade.' },
+        ],
+        chest: { q: 'What are the TWO potion rules?', a: ['Keep it out of sunlight and never run', 'Keep it cold and shake it', 'Sing to it and skip'], right: 'Keep it out of sunlight and never run' } },
+      { art: '🚪🚪',
+        text: "The maze gate has two doors. A carved sign says: 'The LEFT door lies. The RIGHT door tells the truth.' The right door says: 'The maze begins through me.'",
+        choices: [
+          { t: 'Go through the right door', ok: true },
+          { t: 'Go through the left door', oops: 'It opens into a broom closet. The left door snickers. It LIES, remember?' },
+          { t: 'Knock politely and wait', oops: 'You wait. The doors wait. Everyone is waiting. The sign already told you which to trust!' },
+        ] },
+      { art: '🐌💬',
+        text: "A giant snail slimes past wearing a mail bag. 'Shortcut tip!' she says. 'Follow the WHITE pebbles. The gray pebbles go in circles. I should know — I've been circling for a year.'",
+        choices: [
+          { t: 'Follow the white pebbles', ok: true },
+          { t: 'Follow the gray pebbles', oops: "An hour later you pass the same snail. 'Circles,' she sighs. 'Told you.'" },
+          { t: 'Follow the snail herself', oops: 'Snails are... not fast. The sun is getting lower.' },
+        ],
+        chest: { q: 'Which pebbles go in circles?', a: ['The gray ones', 'The white ones', 'The shiny ones'], right: 'The gray ones' } },
+      { art: '🌳🚪',
+        text: "The white pebbles end at a talking tree with a door in its trunk. 'Password?' it rumbles. A wooden plaque reads: 'HINT: Say the opposite of NIGHT.'",
+        choices: [
+          { t: "Say 'Day'", ok: true },
+          { t: "Say 'Dark'", oops: "'Dark is not the OPPOSITE of night — it's night's best friend,' the tree yawns." },
+          { t: "Say 'Moon'", oops: "The tree shakes its leaves. 'The moon works the night shift. Try again.'" },
+        ] },
+      { art: '🦔☂️',
+        text: "Inside, rain falls from a tiny magic cloud stuck to the ceiling. A hedgehog under a leaf umbrella squeaks: 'Water makes purple potions turn to jelly! Yours is starting to wiggle!'",
+        choices: [
+          { t: 'Tuck the potion under your cloak and walk through quickly', ok: true },
+          { t: 'Stop and taste the jelly', oops: 'It tastes like grape... homework. And the giant needs MEDICINE, not jelly!' },
+          { t: 'Ask the cloud to stop raining', oops: 'The cloud rains harder. Clouds are terrible listeners.' },
+        ] },
+      { art: '🪞🪞',
+        text: "A hall of mirrors! Every mirror shows a you. The hedgehog's parting words: 'The REAL door never copies you. Mirrors always copy.' One door ahead stays perfectly still as you wave.",
+        choices: [
+          { t: "Go through the door that doesn't copy you", ok: true },
+          { t: 'Walk into the waving mirror', oops: 'BONK. The mirror-you rubs their nose too.' },
+          { t: 'Make faces until something laughs', oops: "Mirror-yous make the same faces. It's a very silly stand-off." },
+        ],
+        chest: { q: 'How do you spot the real door?', a: ["It doesn't copy your moves", 'It is the shiniest', 'It laughs at your faces'], right: "It doesn't copy your moves" } },
+      { art: '🌻🐝',
+        text: "A field of sneezing-flowers blocks the path — their pollen makes ANYONE sneeze like a thunderstorm. A bee offers: 'Hold your nose and tiptoe — sneezes come from NOSES, you know.'",
+        choices: [
+          { t: 'Hold your nose and tiptoe through', ok: true },
+          { t: 'March through sniffing the flowers', oops: 'AH-CHOO! You sneeze so hard your hat lands three hedges away. The potion barely survives the shaking!' },
+          { t: 'Turn around and find another way', oops: 'The maze has closed the path behind you. Hedge magic is rude like that.' },
+        ] },
+      { art: '🌉🐢',
+        text: "A rickety rope bridge crosses a stream. A turtle tollkeeper holds up a sign: 'TOLL = ONE kind word. (Coins sink. Trust me.)'",
+        choices: [
+          { t: 'Tell the turtle he has a magnificent shell', ok: true },
+          { t: 'Pay with a coin', oops: 'PLOP. The coin sinks. The turtle points at his sign, very slowly.' },
+          { t: 'Sneak across behind him', oops: 'Turtles are slow, not blind. He clears his throat for five whole minutes.' },
+        ],
+        chest: { q: "You called the shell 'magnificent.' What does magnificent mean?", a: ['Wonderful and impressive', 'Old and dusty', 'Slow and green'], right: 'Wonderful and impressive' } },
+      { art: '🌇⏳',
+        text: "The sun is nearly down! Through the last archway you can see the giant's front porch. Wobblebeard's voice echoes in your memory: 'NEVER run...' But the potion must arrive before sunset.",
+        choices: [
+          { t: 'Walk as fast as you can without running', ok: true },
+          { t: 'Sprint for the porch', oops: 'The potion fizzes like an angry soda! You skid to a stop and walk the last steps, heart pounding.' },
+          { t: "Wait for tomorrow's sunrise", oops: 'The potion is needed TONIGHT. The giant sneezes so hard a tree falls over.' },
+        ],
+        chest: { q: 'What happened FIRST in the maze?', a: ['I chose the truth-telling door', "I crossed the turtle's bridge", 'I met the snail'], right: 'I chose the truth-telling door' } },
+      { art: '🏠🤧',
+        text: "You reach the porch as the last sliver of sun disappears. The giant opens the door — her nose is red as a strawberry, and her hands are as big as bathtubs. On the porch sits a giant-sized spoon.",
+        choices: [
+          { t: 'Pour the potion into the giant spoon', ok: true },
+          { t: 'Toss the bottle up to her', oops: 'Her bathtub-hands fumble it — you catch it on the bounce. Phew!' },
+          { t: 'Tell her to sip from the tiny bottle', oops: 'The bottle disappears up her nostril by mistake. She sneezes it back, ew.' },
+        ],
+        chest: { q: 'Why use the giant spoon?', a: ['Her hands are too big for the tiny bottle', 'The potion tastes better from a spoon', 'Spoons are lucky'], right: 'Her hands are too big for the tiny bottle' } },
+      { art: '🌈🏠🎉',
+        text: "One gulp and — POOF — her cold turns into a shower of glitter. 'THANK YOU, little maze-walker!' she booms happily. Wizard Wobblebeard appears in a puff of smoke to walk you home the SHORT way.",
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🤖', title: 'The Robot Bakery', sub: 'Fix the mixed-up baking robot!',
+    scenes: [
+      { art: '🤖🧁',
+        text: "The bakery robot, Chef Sprocket, is baking DISASTERS — pickle cupcakes, sock bread. The baker wrings his hands: 'His recipe chip is scrambled! The spare chip is in the BLUE toolbox, down in the cellar.'",
+        choices: [
+          { t: 'Go to the cellar and find the blue toolbox', ok: true },
+          { t: 'Ask the robot for directions', oops: "'DIRECTIONS: ADD MUSTARD,' beeps Chef Sprocket. He is NOT okay." },
+          { t: 'Taste a pickle cupcake first', oops: 'It tastes exactly how it sounds. Your tongue files a complaint.' },
+        ],
+        chest: { q: 'Where is the spare chip?', a: ['In the blue toolbox in the cellar', 'In the oven', "In the robot's hat"], right: 'In the blue toolbox in the cellar' } },
+      { art: '🔦🧰',
+        text: "The cellar is dark and your flashlight is dying. Three toolboxes sit on the shelf in a row: red first, blue in the middle, green last. The light flickers out — but you saw where the blue one sits.",
+        choices: [
+          { t: 'Take the middle toolbox', ok: true },
+          { t: 'Take the first toolbox', oops: "Red! That's the plumber's box. It's full of very confused rubber ducks." },
+          { t: 'Take the last toolbox', oops: "Green — the gardener's. A tomato rolls out." },
+        ] },
+      { art: '🤖💾',
+        text: "Chip in hand! Chef Sprocket's chest panel has a note taped on: 'IMPORTANT: Power OFF before changing the chip. Robots get the hiccups otherwise.'",
+        choices: [
+          { t: 'Press the power button OFF first', ok: true },
+          { t: "Swap the chip while he's on", oops: 'HIC-BEEP! HIC-BEEP! Robot hiccups. He bakes a muffin inside a muffin inside a muffin.' },
+          { t: 'Ask him to hold still', oops: "'HOLDING: STILL,' he beeps, while stirring the air with a spoon he isn't holding." },
+        ],
+        chest: { q: 'What happens if you skip powering off?', a: ['The robot gets the hiccups', 'The chip melts', 'The oven locks'], right: 'The robot gets the hiccups' } },
+      { art: '🍌⚡',
+        text: "New chip in! Chef Sprocket boots up: 'HELLO. FIRST BATCH: BANANA BREAD. I REQUIRE: ripe bananas. Ripe bananas are YELLOW WITH BROWN SPOTS.' The fruit bowl holds green bananas, spotted yellow bananas, and one orange.",
+        choices: [
+          { t: 'Hand him the yellow bananas with brown spots', ok: true },
+          { t: 'Hand him the green bananas', oops: "'UNRIPE. TASTES LIKE GRASS,' beeps the chef, offended." },
+          { t: 'Hand him the orange', oops: "'THAT IS AN ORANGE.' The robot's eyebrow gears squeak upward." },
+        ] },
+      { art: '🥣📖',
+        text: "The recipe says: 'Step 1: mash bananas. Step 2: mix in flour. Step 3: bake.' Chef Sprocket finishes mashing and asks: 'CONFIRM: WHICH STEP COMES SECOND?'",
+        choices: [
+          { t: 'Mix in the flour', ok: true },
+          { t: 'Bake it right now', oops: "'BAKING... EMPTY PAN.' The pan glows sadly. Steps have an ORDER." },
+          { t: 'Mash the bananas again', oops: "'BANANAS: ALREADY MASHED. NOW SOUP.' Hmm." },
+        ],
+        chest: { q: 'What is step 3 of the recipe?', a: ['Bake', 'Mash bananas', 'Mix in flour'], right: 'Bake' } },
+      { art: '🧂🍬',
+        text: "Two jars sit by the mixer, both full of white powder. One label says SUGAR, the other says SALT. The baker whispers: 'Last week someone swapped the labels as a prank — taste a TINY pinch to be sure.'",
+        choices: [
+          { t: 'Taste a tiny pinch from the SUGAR jar first', ok: true },
+          { t: 'Dump the whole SUGAR jar in without checking', oops: 'BLEH! It was the salt! The batch tastes like the ocean. Chef Sprocket starts over, beeping sadly.' },
+          { t: 'Use neither, just in case', oops: "'BREAD WITHOUT SUGAR: SAD BREAD,' beeps the chef." },
+        ],
+        chest: { q: 'Why taste a tiny pinch first?', a: ['The labels might be swapped', 'Because sugar is yummy', 'To make the robot laugh'], right: 'The labels might be swapped' } },
+      { art: '🔥⏲️',
+        text: "The oven dial says: 'BANANA BREAD: 45 MINUTES. NO PEEKING — opening the door lets the heat escape and the middle stays gooey.'",
+        choices: [
+          { t: 'Set the timer for 45 minutes and wait', ok: true },
+          { t: 'Peek every two minutes', oops: 'WHOOSH, out goes the heat. The middle is goo. Goo bread. Chef Sprocket bakes a re-do.' },
+          { t: 'Take it out after 10 minutes', oops: "It's basically warm banana soup in a crust. Patience, baker!" },
+        ] },
+      { art: '🍞😋',
+        text: "DING! Golden banana bread! Chef Sprocket's screen flashes: 'FINAL TASK: DELIVERY. ADDRESS: THE FIREHOUSE — THE RED BUILDING WITH THE TALL TOWER.' Down the street you see a red building with a tall tower, a blue house, and a red barn.",
+        choices: [
+          { t: 'Deliver to the red building with the tall tower', ok: true },
+          { t: 'Deliver to the red barn', oops: 'A cow sniffs the bread politely. Cows are not firefighters.' },
+          { t: 'Deliver to the blue house', oops: 'A grandma offers you cookies. Tempting! But wrong.' },
+        ] },
+      { art: '🚒😄',
+        text: "The firefighters cheer — it's Chief Ember's birthday! 'One slice for you too,' she says, 'and one for the robot chef. Does he... eat?' Chef Sprocket's screen prints: 'I RUN ON COMPLIMENTS.'",
+        choices: [
+          { t: 'Tell Chef Sprocket his bread is the best in town', ok: true },
+          { t: 'Feed the robot a slice', oops: "The slice sits on his head like a delicious hat. 'I RUN ON COMPLIMENTS,' he repeats." },
+          { t: 'Say nothing and eat your slice', oops: "Chef Sprocket's battery icon droops. He told you what he runs on!" },
+        ],
+        chest: { q: 'What does Chef Sprocket run on?', a: ['Compliments', 'Banana bread', 'Batteries'], right: 'Compliments' } },
+      { art: '🧁🤖🎉',
+        text: "'COMPLIMENT RECEIVED. POWER: 100%!' Chef Sprocket does a little robot dance and bakes a tray of perfect birthday cupcakes — not a pickle in sight. The whole firehouse sings. THE END.",
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🧊', title: "The Yeti's Birthday", sub: 'Throw a surprise party on Frost Mountain!',
+    scenes: [
+      { art: '🏔️✉️',
+        text: "A snowy owl delivers a letter: 'The yeti of Frost Mountain turns 100 tomorrow — and nobody EVER comes to his parties, because everyone thinks he's scary. He is actually very shy, and he loves two things: HONEY CAKE and HUMMING.' Signed, the owl.",
+        choices: [
+          { t: 'Plan to bake him a honey cake', ok: true },
+          { t: 'Pack firecrackers for fun', oops: 'Loud bangs + shy yeti = the worst party ever. You leave them home.' },
+          { t: 'Bring a scary mask as a joke', oops: "He's already worried people find HIM scary. Not kind. You put it back." },
+        ],
+        chest: { q: 'What TWO things does the yeti love?', a: ['Honey cake and humming', 'Firecrackers and dancing', 'Snowballs and shouting'], right: 'Honey cake and humming' } },
+      { art: '🐻🍯',
+        text: "Your honey jar is empty! The beekeeper leans on her fence: 'Bears took my honey up the mountain. But the bees will share with anyone who walks SLOWLY and never swats.'",
+        choices: [
+          { t: 'Walk slowly to the hive with calm hands', ok: true },
+          { t: 'Run to the hive waving your arms', oops: 'The bees form an arrow shape pointing AWAY. Message received.' },
+          { t: 'Chase the bears instead', oops: "Bears outrun third graders. Every time. It's science." },
+        ] },
+      { art: '🐝👑',
+        text: "The queen bee buzzes: 'Honey for a favor! Our smallest bee, Pip, is stuck in a spider web by the OLD PINE TREE. Free her gently and the honey is yours.'",
+        choices: [
+          { t: 'Go to the old pine tree and free Pip', ok: true },
+          { t: 'Search the flower field for Pip', oops: 'Pip is not in the flowers. The queen said the OLD PINE TREE.' },
+          { t: 'Ask for the honey first', oops: 'Ten thousand bees give you a very disappointed look at the same time.' },
+        ],
+        chest: { q: 'Where is Pip stuck?', a: ['In a web by the old pine tree', 'In the flower field', 'In the honey jar'], right: 'In a web by the old pine tree' } },
+      { art: '🕸️🐝',
+        text: 'Pip is wrapped in sticky web threads. You know how spider webs work: they tear easily if you pull ONE thread at a time — but grab the whole web and it sticks to everything.',
+        choices: [
+          { t: 'Pull one thread at a time', ok: true },
+          { t: 'Grab the whole web at once', oops: 'Now the web is stuck to Pip, your mittens, AND your hair. One. Thread. At. A. Time.' },
+          { t: 'Blow on it really hard', oops: "Pip spins like a tiny propeller. 'Wheee—no!' she squeaks." },
+        ] },
+      { art: '🍯🧁',
+        text: "Honey earned! Back home you mix the cake. The recipe card warns: 'Honey cakes rise ONLY in a quiet kitchen. Loud noises make them flat as a pancake.'",
+        choices: [
+          { t: 'Bake it quietly, humming very softly', ok: true },
+          { t: 'Bake it during your drum practice', oops: 'BOOM-flat. The cake is a cookie now. You start again, shhh.' },
+          { t: 'Slam the oven door to be quick', oops: 'SLAM-flop. Flat cake. Quiet kitchen, remember?' },
+        ],
+        chest: { q: "The recipe says loud noise makes the cake 'flat as a pancake.' What does that mean?", a: ['Very flat — it will not rise', 'Tasty like pancakes', 'Round and golden'], right: 'Very flat — it will not rise' } },
+      { art: '🥾🏔️',
+        text: "Time to climb Frost Mountain. The owl's letter had a P.S.: 'The mountain path is icy. Boots with SPIKES grip ice; smooth boots slide.' By the door sit your smooth rain boots, your spiky ice boots, and your fuzzy slippers.",
+        choices: [
+          { t: 'Wear the spiky ice boots', ok: true },
+          { t: 'Wear the smooth rain boots', oops: 'WHEE—oof. You slide backward all the way to the mailbox.' },
+          { t: 'Wear the fuzzy slippers', oops: 'Warm! Cozy! Zero grip. The mountain giggles, probably.' },
+        ] },
+      { art: '🌨️🕳️',
+        text: 'Halfway up, snow starts falling thick and fast. Through the white you spot a cave. Big pawprints lead into it — and out again. The prints leading OUT look fresh and new.',
+        choices: [
+          { t: 'Shelter in the cave — the owner just left', ok: true },
+          { t: 'Keep climbing through the blizzard', oops: "You can't see your own mittens. Back to the cave idea!" },
+          { t: 'Follow the fresh prints to say hi', oops: 'Following a big mystery animal through a blizzard? Your mittens vote NO.' },
+        ],
+        chest: { q: 'How can you tell the cave is empty?', a: ['Fresh prints lead OUT of the cave', 'It smells like flowers', 'The owl said so'], right: 'Fresh prints lead OUT of the cave' } },
+      { art: '🧊🚪',
+        text: "The snow stops. At the mountaintop stands a beautiful door made of ice, with a knocker and a sign: 'PLEASE KNOCK SOFTLY. LOUD KNOCKS CRACK THE ICE.'",
+        choices: [
+          { t: 'Knock softly — three gentle taps', ok: true },
+          { t: 'Pound with both fists', oops: 'CRRRACK. A hairline crack zigzags up the door. You hold your breath... it holds.' },
+          { t: 'Kick the door', oops: 'Ice: 1. Your toe: 0.' },
+        ] },
+      { art: '🦣😲',
+        text: "The door opens. The yeti is HUGE — and hiding behind his own hands. 'Are you here to yell at me?' he whispers. You remember the letter: he's shy, and he loves humming.",
+        choices: [
+          { t: 'Hum a soft happy-birthday tune', ok: true },
+          { t: "Yell 'SURPRISE!!!'", oops: 'He dives behind the sofa. The whole mountain shakes. Too loud for a shy yeti!' },
+          { t: "Ask if he's really 100 years old", oops: "He peeks through his fingers: 'Is that... a trick question?'" },
+        ],
+        chest: { q: 'Why did the yeti hide at first?', a: ['He is shy and feared being yelled at', "He wasn't dressed yet", 'He hates birthdays'], right: 'He is shy and feared being yelled at' } },
+      { art: '🎂🦣🎉',
+        text: "The yeti peeks out... then hums along, deep and warm like a friendly avalanche. You share honey cake as the northern lights dance. 'Best party in 100 years,' he whispers. 'Also the only one. Also the BEST.'",
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🚀', title: 'The Moon Rescue', sub: 'Bring Captain Whiskers home!',
+    scenes: [
+      { art: '📡🐱',
+        text: "The space center radio crackles: 'This is Captain Whiskers, first cat on the moon. My ship lost a wheel in a crater. Send help — and TUNA.' The launch director points at you: 'Suit up! The checklist is on the wall.'",
+        choices: [
+          { t: 'Read the checklist on the wall', ok: true },
+          { t: 'Jump straight into the rocket', oops: 'The rocket door is locked. The CHECKLIST probably mentions the key, hmm?' },
+          { t: 'Pack tuna and nothing else', oops: 'Tuna: important. Air: more important. Checklist first!' },
+        ],
+        chest: { q: 'What did Captain Whiskers lose?', a: ['A wheel, in a crater', 'His helmet', 'The radio'], right: 'A wheel, in a crater' } },
+      { art: '📋🚀',
+        text: "The checklist reads: '1. HELMET. 2. AIR TANK. 3. TUNA (for the captain). P.S. The rocket key is inside the helmet.' You grab the helmet and — clink! — there's the key.",
+        choices: [
+          { t: 'Put on the helmet and air tank, then pack the tuna', ok: true },
+          { t: 'Skip the air tank, it looks heavy', oops: 'Space has NO air. That tank IS your breathing. Back on it goes.' },
+          { t: 'Eat the tuna for launch energy', oops: "That's the CAPTAIN'S tuna. You pack a sandwich for yourself instead." },
+        ],
+        chest: { q: 'What is item 2 on the checklist?', a: ['Air tank', 'Helmet', 'Tuna'], right: 'Air tank' } },
+      { art: '🚀🌎',
+        text: "Liftoff! The flight computer beeps: 'MOON ROUTE: follow the BLINKING satellites. The steady-light satellites orbit Earth — they will loop you home in circles.'",
+        choices: [
+          { t: 'Steer toward the blinking satellites', ok: true },
+          { t: 'Follow the steady lights', oops: 'You loop around Earth twice. Nice view of your house, though. BLINK-ing lights!' },
+          { t: 'Turn off the computer and fly by feel', oops: 'Space is very big and very dark. The computer clears its robot throat.' },
+        ] },
+      { art: '🌑🕳️',
+        text: "The moon! Craters everywhere. The radio crackles: 'I'm in the crater shaped like a PAW PRINT — you can't miss it.' Below you see a star-shaped crater, a paw-shaped crater, and one shaped like grandma's teapot.",
+        choices: [
+          { t: 'Land beside the paw-shaped crater', ok: true },
+          { t: 'Land at the star-shaped crater', oops: 'Empty. Well — one moon rock that looks judgy.' },
+          { t: 'Land by the teapot crater', oops: "No cat here. But it REALLY looks like grandma's teapot. Focus!" },
+        ] },
+      { art: '🐱🚩',
+        text: "Captain Whiskers salutes with his tail. 'The spare wheel is in my ship's trunk — but the trunk button only works with a FINGER. Paws are useless on it. That, my friend, is genuinely why I called.'",
+        choices: [
+          { t: 'Press the trunk button with your finger', ok: true },
+          { t: 'Ask him to press it one more time', oops: 'He stares at his paw, then at you, for a long, long time.' },
+          { t: 'Pry the trunk open with a moon rock', oops: 'The trunk is fine! It just needs its BUTTON pressed. With a FINGER.' },
+        ],
+        chest: { q: 'Why did the captain need a human helper?', a: ['The button needs a finger, not a paw', 'He was lonely', 'Humans are stronger'], right: 'The button needs a finger, not a paw' } },
+      { art: '🔧🌑',
+        text: "Wheel out! The repair manual says: 'MOON GRAVITY IS WEAK — objects float away if you let go. ALWAYS clip your tools to your belt.' The wrench, the wheel, and your sandwich all wiggle hopefully.",
+        choices: [
+          { t: 'Clip everything to your belt', ok: true },
+          { t: "Set the wrench down 'just for a second'", oops: 'It floats off like a lazy balloon. You hop after it — boing, boing.' },
+          { t: "Let the sandwich go, it's just a sandwich", oops: 'It orbits your helmet. Very distracting. Also: lunch.' },
+        ] },
+      { art: '🐁👽',
+        text: "While you work, a tiny green moon-mouse pops from a hole and squeaks. Captain Whiskers freezes. The mission report warned you: 'The captain chases mice. EVERY time. Hold his harness when mice appear.'",
+        choices: [
+          { t: "Hold the captain's harness tight", ok: true },
+          { t: 'Let him say hi to the mouse', oops: 'ZOOM! A cat-shaped dust cloud. You spend ages coaxing him out of a crater.' },
+          { t: 'Chase the mouse yourself', oops: "It vanishes into a hole one inch wide. The captain looks at you like YOU'RE the silly one." },
+        ],
+        chest: { q: 'What does the captain do when he sees mice?', a: ['Chases them, every time', 'Hides in the ship', 'Falls asleep'], right: 'Chases them, every time' } },
+      { art: '🛞🛠️',
+        text: "Time to bolt on the wheel. The manual's last page says: 'Remember: LEFTY-NO, RIGHTY-YES. In other words, turn the bolts RIGHT to tighten them.'",
+        choices: [
+          { t: 'Turn the bolts to the right', ok: true },
+          { t: 'Turn the bolts to the left', oops: 'The old bolt drops right off and floats past your nose. RIGHTY-yes!' },
+          { t: 'Skip the bolts — gravity is weak anyway', oops: 'A wheel that floats off mid-drive is a BAD surprise. Bolts, please.' },
+        ] },
+      { art: '🐟🌑',
+        text: "Wheel fixed! Captain Whiskers opens the tuna, purring like a rocket engine. 'One can for me,' he says, eyeing the second can, '...and one for the moon-mouse. She guarded my ship while I slept. Fair is fair.'",
+        choices: [
+          { t: "Leave the second can by the mouse's hole", ok: true },
+          { t: 'Keep the extra can for the ride home', oops: "The captain's whiskers droop. 'Fair is fair,' he repeats." },
+          { t: 'Eat it yourself', oops: 'You have a perfectly good sandwich. Orbiting your head.' },
+        ],
+        chest: { q: 'Why does the moon-mouse get tuna too?', a: ['She guarded the ship while he slept', 'Mice love fish the most', 'The captain dislikes tuna'], right: 'She guarded the ship while he slept' } },
+      { art: '🚀🌍',
+        text: "Both ships lift off as Earth rises over the moon hills, blue as a marble. Your flight computer beeps: 'ROUTE HOME: same rule as before — follow the BLINKING satellites.'",
+        choices: [
+          { t: 'Steer along the blinking satellites', ok: true },
+          { t: 'Follow the steady lights this time', oops: 'Loop-de-loop around the moon. The captain yowls politely.' },
+          { t: 'Ask the captain to drive', oops: "Paws. Buttons. You remember why you're here." },
+        ],
+        chest: { q: 'What happened FIRST on the moon?', a: ['I landed by the paw-shaped crater', 'I fixed the wheel', 'The moon-mouse appeared'], right: 'I landed by the paw-shaped crater' } },
+      { art: '🌍🐱🎉',
+        text: "Splashdown! Crowds cheer, cameras flash, and Captain Whiskers gets a medal shaped like a fish. He drops it around YOUR neck instead. 'Heroes share,' he purrs. THE END.",
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+  {
+    emoji: '🌋', title: 'The Grumbly Volcano', sub: 'Help the mountain stop grumbling!',
+    scenes: [
+      { art: '🌋🏘️',
+        text: "The village volcano has grumbled for a week: GRRRMBLE. The old ranger unrolls a map: 'She's not erupting — she's UNCOMFORTABLE. Something is stuck in her steam vent, up past the warm springs. Take my listening cup.'",
+        choices: [
+          { t: 'Take the listening cup and head for the warm springs', ok: true },
+          { t: 'Pour a lake into the volcano', oops: "You'd need about four thousand lakes. Also she'd be VERY offended." },
+          { t: 'Hide under your bed', oops: 'The bed grumbles too. Everything grumbles. Might as well help!' },
+        ],
+        chest: { q: 'What is wrong with the volcano?', a: ['Something is stuck in her steam vent', 'She is erupting', 'She is hungry'], right: 'Something is stuck in her steam vent' } },
+      { art: '🦎♨️',
+        text: "At the warm springs, a salamander floats on his back. 'Path tip! The DARK rocks soaked up steam all morning — hot-hot-HOT. The pale rocks stay cool. Step wisely.'",
+        choices: [
+          { t: 'Step only on the pale rocks', ok: true },
+          { t: 'Step on the dark rocks', oops: 'YOWCH! You do the hot-foot dance. The salamander applauds politely.' },
+          { t: 'Wade through the spring water', oops: 'Your boots fill with warm water. Squish. Squish. Squish.' },
+        ] },
+      { art: '🐦🎶',
+        text: "A little ash-bird lands on your shoulder. 'The volcano only lets CALM visitors up her trail. She measures calm by your breathing: slow breaths, slow feet.' The trail ahead is steep.",
+        choices: [
+          { t: 'Climb slowly, taking deep slow breaths', ok: true },
+          { t: 'Race up before she notices', oops: 'The trail shakes like a giggling belly. You slide back to the start.' },
+          { t: 'Hold your breath entirely', oops: 'You turn pink, then plop down dizzy. SLOW breaths, not NO breaths.' },
+        ],
+        chest: { q: "The bird says to stay 'calm.' What does calm mean?", a: ['Quiet and relaxed', 'Fast and excited', 'Hot and sweaty'], right: 'Quiet and relaxed' } },
+      { art: '👂🗻',
+        text: "You press the ranger's listening cup to the mountainside. Under the grumble you hear a tiny, squeaky echo: 'HELP! HELLO? Hello-ello-llo...' It's coming from ABOVE, up near the smoke.",
+        choices: [
+          { t: 'Climb toward the smoke', ok: true },
+          { t: 'Dig into the mountainside right here', oops: 'You find a very surprised earthworm. The voice came from ABOVE.' },
+          { t: "Shout 'HELLO' into the cup", oops: 'Your own echo scares you. The cup is for LISTENING.' },
+        ] },
+      { art: '🐲💨',
+        text: "At the vent, the mystery is solved: a baby cloud-dragon is wedged in the steam hole like a cork! 'I sat down to warm my tummy,' she coughs, 'and got STUCK. And don't pull my arms — pulling makes me puff up BIGGER. That's how cloud-dragons work.'",
+        choices: [
+          { t: 'Push her gently from below instead of pulling', ok: true },
+          { t: 'Pull her arms hard', oops: 'FWOOMP — she puffs up twice as big, twice as stuck. She TOLD you how cloud-dragons work!' },
+          { t: 'Tickle her loose', oops: 'She giggle-puffs even rounder. Adorable. Unhelpful.' },
+        ],
+        chest: { q: "What happens when you pull a cloud-dragon's arms?", a: ['She puffs up bigger', 'She turns to rain', 'She falls asleep'], right: 'She puffs up bigger' } },
+      { art: '💨🎈',
+        text: "She pops loose — POP! — and the vent whooshes happy steam. But the whoosh blows the little dragon tumbling down the mountainside like a runaway balloon! She snags on the old pine tree by the cliff.",
+        choices: [
+          { t: 'Hurry down to the old pine tree', ok: true },
+          { t: 'Wait for the wind to free her', oops: 'The wind is on lunch break. She dangles, sniffling.' },
+          { t: 'Throw rocks to knock her loose', oops: 'Rocks?! At a BABY dragon?! She puffs up indignantly. You apologize a lot.' },
+        ],
+        chest: { q: 'Why did the dragon go tumbling?', a: ["The vent's steam whooshed her away", 'She jumped for fun', 'A bird carried her off'], right: "The vent's steam whooshed her away" } },
+      { art: '🌲🐲',
+        text: 'You climb the pine, branch by branch. The lowest branches are thick as your leg; near the top they are thin as pencils. The dragon dangles from a pencil-thin one, sniffling.',
+        choices: [
+          { t: 'Stop on a thick branch and reach up with a stick', ok: true },
+          { t: 'Climb onto the pencil-thin branches', oops: 'CRACK-crack-crack say the twigs, in a warning voice. You retreat to the thick branch.' },
+          { t: 'Shake the tree', oops: "She bounces like a paddle ball. 'Whee—STOP!'" },
+        ] },
+      { art: '🐲💗',
+        text: "Safe! The baby dragon sneezes a tiny cloud shaped like a heart. 'Mama says steam-sneezes mean I need FLUFFING,' she yawns. 'Warm hands. Gentle pats. Like a pillow.'",
+        choices: [
+          { t: 'Fluff her gently, like a pillow', ok: true },
+          { t: 'Wring her out like a towel', oops: 'She squeaks like a dog toy! FLUFF, not wring! You apologize again.' },
+          { t: 'Fan her with your hat', oops: "She drifts off your knee like dandelion fluff. You catch her ankle. Gentle PATS." },
+        ],
+        chest: { q: 'How do you fluff a cloud-dragon?', a: ['Warm hands and gentle pats', 'Wring her like a towel', 'Fan her with a hat'], right: 'Warm hands and gentle pats' } },
+      { art: '🌋😊',
+        text: "Down at the springs, the volcano's grumble has become a deep, cozy HUMMM — like a cat by a fireplace. The ash-bird chirps: 'She says THANK YOU. And also: the little one owes her a visit — through the FRONT door next time.'",
+        choices: [
+          { t: 'Promise the dragon will visit the front door', ok: true },
+          { t: 'Ask the volcano for treasure', oops: "The volcano hums a note that clearly means 'don't push it, kiddo.'" },
+          { t: 'Take all the credit yourself', oops: 'The ash-bird coughs. The salamander raises an eyebrow. Teamwork, friend.' },
+        ],
+        chest: { q: 'What happened FIRST on the mountain?', a: ['I crossed the springs on pale rocks', 'I fluffed the dragon', 'I heard the echo in the cup'], right: 'I crossed the springs on pale rocks' } },
+      { art: '🌋🐲🎉',
+        text: 'The baby dragon rides home on your shoulder, light as a marshmallow. Behind you, the volcano puffs one perfect smoke ring into the sunset. The whole village sleeps quietly that night. THE END.',
+        choices: [ { t: 'Take a bow! 🎉', ok: true } ] },
+    ],
+  },
+];
+
+const MAX_HEARTS = 5;
+
+/* ==================================================================
+   Helpers
+   ================================================================== */
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const shuffle = arr => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+// all UI pacing goes through here; tests set window.TEST_FAST to run
+// the continuation synchronously so a script can click through a quest
+const later = (fn, ms) => window.TEST_FAST ? fn() : setTimeout(fn, ms);
+
+/* ==================================================================
+   State
+   ================================================================== */
+const state = {
+  questIdx: null,
+  sceneIdx: 0,
+  hearts: MAX_HEARTS,
+  gems: 0,
+  order: [],        // this scene's shuffled choice order
+  tried: new Set(), // wrong choices already tried this scene
+  busy: false,
+  earnedMins: 0,
+  rewardId: null, rewardEnd: 0,
+};
+const quest = () => QUESTS[state.questIdx];
+const scene = () => quest().scenes[state.sceneIdx];
+
+/* ==================================================================
+   Screens
+   ================================================================== */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+  $(id).classList.add('show');
+}
+
+/* ==================================================================
+   Menu
+   ================================================================== */
+QUESTS.forEach((q, i) => {
+  const b = document.createElement('button');
+  b.className = 'choice';
+  b.innerHTML = `<span class="emoji">${q.emoji}</span>${q.title}` +
+    `<span class="sub">${q.sub} · ${q.scenes.length} scenes</span>`;
+  b.addEventListener('click', () => {
+    Sound.unlock(); Sound.click();
+    document.querySelectorAll('#questRow .choice').forEach(c => c.classList.remove('sel'));
+    b.classList.add('sel');
+    state.questIdx = i;
+    $('startBtn').disabled = false;
+  });
+  $('questRow').appendChild(b);
+});
+
+$('startBtn').addEventListener('click', () => {
+  Sound.unlock(); Sound.click();
+  startQuest();
+});
+
+function renderMute() {
+  $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
+  $('muteBtn').classList.toggle('muted', Sound.muted);
+}
+$('muteBtn').addEventListener('click', () => {
+  Sound.muted = !Sound.muted;
+  localStorage.setItem('storyquest_muted', Sound.muted ? '1' : '0');
+  renderMute();
+});
+renderMute();
+
+/* ==================================================================
+   Quest flow
+   ================================================================== */
+function startQuest() {
+  clearRewardTimer();
+  state.sceneIdx = 0;
+  state.hearts = MAX_HEARTS;
+  state.gems = 0;
+  state.busy = false;
+  showScreen('game');
+  renderScene(true);
+}
+
+function renderStats() {
+  const pips = $('heartPips');
+  pips.innerHTML = '';
+  for (let i = 0; i < MAX_HEARTS; i++) {
+    const p = document.createElement('span');
+    p.className = 'pip heart' + (i < state.hearts ? '' : ' empty');
+    pips.appendChild(p);
+  }
+  $('gemStat').textContent = '💎 ' + state.gems;
+  $('sceneStat').textContent = `📖 ${state.sceneIdx + 1} / ${quest().scenes.length}`;
+}
+
+function renderScene(fresh) {
+  const sc = scene();
+  if (fresh) {
+    state.order = shuffle(sc.choices);
+    state.tried = new Set();
+  }
+  state.busy = false;
+  renderStats();
+  $('art').textContent = sc.art;
+  // restart the art pop-in
+  $('art').style.animation = 'none';
+  void $('art').offsetWidth;
+  $('art').style.animation = '';
+
+  const panel = $('storyPanel');
+  panel.innerHTML = '';
+
+  const txt = document.createElement('div');
+  txt.className = 'story-text';
+  txt.textContent = sc.text;
+  panel.appendChild(txt);
+
+  const box = document.createElement('div');
+  box.className = 'choices';
+  state.order.forEach(choice => {
+    const c = document.createElement('button');
+    c.className = 'choice-card' + (state.tried.has(choice) ? ' tried' : '');
+    c.textContent = choice.t;
+    c.addEventListener('click', () => pickChoice(c, choice));
+    box.appendChild(c);
+  });
+  panel.appendChild(box);
+}
+
+function pickChoice(el, choice) {
+  if (state.busy) return;
+  state.busy = true;
+
+  if (choice.ok) {
+    Sound.right();
+    el.classList.add('right');
+    later(() => {
+      const sc = scene();
+      if (sc.chest) renderChest(sc.chest);
+      else nextScene();
+    }, 700);
+  } else {
+    Sound.wrong();
+    el.classList.add('wrongPick');
+    state.tried.add(choice);
+    state.hearts--;
+    renderStats();
+    later(() => {
+      if (state.hearts <= 0) return questFailed();
+      renderOops(choice.oops);
+    }, 500);
+  }
+}
+
+// a wrong choice: show the consequence, then let them re-read and retry
+function renderOops(text) {
+  const panel = $('storyPanel');
+  panel.innerHTML = '';
+
+  const box = document.createElement('div');
+  box.className = 'oops-box';
+  const txt = document.createElement('div');
+  txt.className = 'story-text oops-text';
+  txt.textContent = text;
+  box.appendChild(txt);
+  panel.appendChild(box);
+
+  const back = document.createElement('button');
+  back.className = 'choice-card';
+  back.textContent = '📖 Read the story again';
+  back.addEventListener('click', () => { Sound.page(); renderScene(false); });
+  panel.appendChild(back);
+  state.busy = false;
+}
+
+/* ==================================================================
+   Treasure chests — bonus comprehension questions. A right answer
+   earns a gem and heals one heart; a wrong one just locks the chest
+   (never punished — the chests are pure reward).
+   ================================================================== */
+function renderChest(chest) {
+  state.busy = false;
+  $('art').textContent = '🧰✨';
+
+  const panel = $('storyPanel');
+  panel.innerHTML = '';
+
+  const banner = document.createElement('div');
+  banner.className = 'chest-banner';
+  banner.textContent = '✨ A treasure chest! Answer to open it ✨';
+  panel.appendChild(banner);
+
+  const q = document.createElement('div');
+  q.className = 'story-text chest-q';
+  q.textContent = chest.q;
+  panel.appendChild(q);
+
+  const box = document.createElement('div');
+  box.className = 'choices';
+  const rewardLine = document.createElement('div');
+  rewardLine.className = 'chest-reward';
+
+  shuffle(chest.a).forEach(ans => {
+    const c = document.createElement('button');
+    c.className = 'choice-card';
+    c.textContent = ans;
+    c.addEventListener('click', () => {
+      if (state.busy) return;
+      state.busy = true;
+      [...box.children].forEach(b => { b.style.pointerEvents = 'none'; });
+      if (ans === chest.right) {
+        Sound.chest();
+        c.classList.add('right');
+        state.gems++;
+        const healed = state.hearts < MAX_HEARTS;
+        if (healed) state.hearts++;
+        renderStats();
+        rewardLine.textContent = healed ? '+1 💎  +1 ❤️' : '+1 💎';
+      } else {
+        Sound.wrong();
+        c.classList.add('wrongPick', 'tried');
+        [...box.children].find(b => b.textContent === chest.right).classList.add('right');
+        rewardLine.textContent = 'The chest stays locked... next time!';
+      }
+      later(nextScene, 1400);
+    });
+    box.appendChild(c);
+  });
+  panel.appendChild(box);
+  panel.appendChild(rewardLine);
+}
+
+function nextScene() {
+  state.sceneIdx++;
+  if (state.sceneIdx >= quest().scenes.length) return questComplete();
+  Sound.page();
+  renderScene(true);
+}
+
+/* ==================================================================
+   Win / lose + the iPad-time reward timer
+   ================================================================== */
+function questComplete() {
+  Sound.victory();
+  const total = quest().scenes.filter(s => s.chest).length;
+  $('winText').textContent =
+    `You finished ${quest().title} with ${state.gems} of ${total} gems!`;
+  state.earnedMins = rand(5, 10);
+  $('earnedMins').textContent = state.earnedMins;
+  $('countdown').textContent = '';
+  $('countdown').classList.remove('ringing');
+  $('timerBtn').style.display = '';
+  $('stopAlarmBtn').style.display = 'none';
+  showScreen('win');
+}
+
+function questFailed() {
+  Sound.gameover();
+  showScreen('lose');
+}
+
+function startRewardTimer() {
+  clearRewardTimer();
+  // track a wall-clock end time so a delayed tick can't drift the total
+  state.rewardEnd = Date.now() + state.earnedMins * 60 * 1000;
+  $('timerBtn').style.display = 'none';
+  const tick = () => {
+    const ms = state.rewardEnd - Date.now();
+    if (ms <= 0) { ringTimer(); return; }
+    const s = Math.ceil(ms / 1000);
+    $('countdown').textContent =
+      Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+  tick();
+  state.rewardId = setInterval(tick, 250);
+}
+
+function ringTimer() {
+  clearRewardTimer();
+  $('countdown').textContent = "TIME'S UP!";
+  $('countdown').classList.add('ringing');
+  $('stopAlarmBtn').style.display = '';
+  Sound.startAlarm();
+}
+
+function clearRewardTimer() {
+  if (state.rewardId) { clearInterval(state.rewardId); state.rewardId = null; }
+  Sound.stopAlarm();
+}
+
+$('timerBtn').addEventListener('click', () => { Sound.click(); startRewardTimer(); });
+$('stopAlarmBtn').addEventListener('click', () => {
+  Sound.stopAlarm();
+  $('stopAlarmBtn').style.display = 'none';
+});
+$('winAgainBtn').addEventListener('click', () => { Sound.click(); clearRewardTimer(); showScreen('menu'); });
+$('retryBtn').addEventListener('click', () => { Sound.click(); startQuest(); });
+$('loseMenuBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+</script>
+</body>
+</html>
