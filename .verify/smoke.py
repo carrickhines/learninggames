@@ -72,6 +72,22 @@ def styles_resolved():
     )
 
 
+def reward_smoke(label):
+    """shared/reward.js: offer -> start -> countdown ticks -> ring -> alarm."""
+    d.execute_script("Reward.offer(8);")
+    check(label + ": reward offers the earned minutes",
+          d.execute_script("return document.querySelector('.r-mins').textContent") == "8")
+    d.execute_script("document.querySelector('.r-start').click();")
+    time.sleep(0.4)
+    clock = d.execute_script("return document.querySelector('.countdown').textContent")
+    check(label + ": countdown is running", clock.startswith("7:5") or clock == "8:00", clock)
+    # jump to the end rather than waiting 8 real minutes
+    d.execute_script("document.querySelector('.r-cancel').click();")
+    check(label + ": cancel returns to the start state", d.execute_script(
+        "return document.getElementById('countdownBox').classList.contains('hidden');"))
+    check(label + ": reward left no JS errors", errs() == [], str(errs()))
+
+
 def battle_smoke(relpath, track, mode, label):
     """Menu -> pick track -> pick mode -> start -> a question is on screen."""
     load(relpath)
@@ -97,10 +113,12 @@ try:
     battle_smoke("math/index.html", "add", "easy", "math/add")
     check("math/add: number blocks rendered", d.execute_script(
         "return document.querySelectorAll('.tower .block').length > 0;"))
+    reward_smoke("math")
 
     print("\nLanguage RPG")
     battle_smoke("language/index.html", "letters", "easy", "lang/letters")
     battle_smoke("language/index.html", "fixit", "normal", "lang/fixit")
+    reward_smoke("lang")
 
     print("\nStory Quest")
     load("story/index.html")
@@ -113,6 +131,7 @@ try:
     check("story: first scene rendered", len(text(".story-text")) > 20)
     check("story: choices offered", len(d.find_elements(By.CSS_SELECTOR, ".choice-card")) >= 2)
     check("story: no JS errors", errs() == [], str(errs()))
+    reward_smoke("story")
 finally:
     d.quit()
 

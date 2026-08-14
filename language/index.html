@@ -8,206 +8,24 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Language RPG">
 <title>LanguageRPG</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/ui.css">
+<link rel="stylesheet" href="../shared/battle.css">
 <style>
-  /* Shared visual system with Math RPG: same tokens, frame, and components */
-  :root {
-    --sky-top: #241544;
-    --sky-mid: #3a1f5c;
-    --sky-low: #5b2a63;
-    --horizon: #ff6fa5;       /* warm dusk glow at the arena floor */
-    --panel: rgba(15, 8, 30, 0.42);
-    --accent: #ffd23f;
-    --accent-2: #d99312;      /* deeper gold for the button "lip" */
-    --good: #5ce8a0;          /* you / hero / correct */
-    --bad: #ff5e7e;           /* foe / danger */
-    --ink: #1b1230;           /* dark text on gold buttons */
-    --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-    --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
-  }
+  /* Language RPG only. The frame, buttons, pips, arena, and timer bar come
+     from the shared stylesheets above. */
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-  html, body {
-    margin: 0;
-    height: 100%;
-    font-family: var(--body);
-    color: #fff;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-
-  body {
-    background:
-      radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #app {
-    width: min(900px, 96vw);
-    height: min(720px, 96vh);
-    position: relative;
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-    overflow: hidden;
-    /* twilight quest arena: starfield + warm horizon glow over a violet sky */
-    background:
-      radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
-      radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
-      radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
-      radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
-      radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
-      radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
-      radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
-      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
-  }
-
-  .sound-toggle {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    width: 46px;
-    height: 46px;
-    padding: 0;                /* override the base button padding so the icon centers */
-    border-radius: 50%;
-    background: var(--panel);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.14);
-    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
-    line-height: 1;
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    transition: transform .08s, filter .15s;
-  }
-  .sound-toggle:active { transform: translateY(3px); }
-  .sound-toggle.muted { opacity: 0.55; }
-
-  .screen {
-    position: absolute;
-    inset: 0;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 24px;
-    animation: fadeIn 0.4s ease;
-  }
-  .screen.show { display: flex; }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-  h1 {
-    font-family: var(--display);
-    font-size: clamp(44px, 8.5vw, 76px);
-    margin: 0 0 6px;
-    color: var(--accent);
-    text-shadow:
-      0 3px 0 var(--accent-2),
-      0 5px 0 #9a6a0c,
-      0 10px 22px rgba(0,0,0,.55);
-    letter-spacing: 1px;
-    line-height: 1;
-  }
-  .subtitle {
-    font-size: 19px;
-    color: rgba(255,255,255,.78);
-    margin-bottom: 22px;
-    max-width: 50ch;
-    text-wrap: balance;
-  }
-  .group-label {
-    font-family: var(--display);
-    font-size: 16px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin: 10px 0 8px;
-    color: var(--accent);
-    opacity: .92;
-  }
-
-  /* the menu can outgrow the frame with both hero rows: center when it
-     fits, scroll when it doesn't (margin:auto does both) */
-  #menu { justify-content: flex-start; overflow-y: auto; scrollbar-width: none; }
-  #menu::-webkit-scrollbar { display: none; }
-  .menu-inner {
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-  }
-  .group-label::before, .group-label::after {
-    content: "";
-    display: inline-block;
-    width: 26px;
-    height: 2px;
-    margin: 0 12px;
-    vertical-align: middle;
-    background: linear-gradient(90deg, transparent, var(--accent));
-    opacity: .55;
-  }
-  .group-label::after { transform: scaleX(-1); }
-
-  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-
-  button {
-    font-family: var(--display);
-    cursor: pointer;
-    border: none;
-    border-radius: 16px;
-    font-size: 22px;
-    font-weight: bold;
-    padding: 16px 28px;
-    color: var(--ink);
-    background: linear-gradient(180deg, #ffe27a, var(--accent));
-    box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
-    transition: transform .08s, box-shadow .08s, filter .15s;
-    user-select: none;
-    touch-action: manipulation;
-  }
-  button:hover { filter: brightness(1.06); }
-  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
-
-  #startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
-  #startBtn:disabled {
-    filter: grayscale(.6) brightness(.85);
-    cursor: default;
-    box-shadow: 0 5px 0 #777, 0 9px 18px rgba(0,0,0,.3);
-    transform: none;
-  }
-
-  button.choice {
-    background: var(--panel);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.12);
-    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    font-size: 18px;
-    padding: 13px 14px;
-    min-width: 150px;
-  }
-  button.choice .emoji { font-size: 30px; display: block; margin-bottom: 4px; }
-  button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
-  button.choice.sel {
-    background: linear-gradient(180deg, #ffe27a, var(--accent));
-    color: var(--ink);
-    border-color: transparent;
-    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
-  }
-  button.choice.sel .sub { opacity: .85; }
-
-  /* ---------- Battle screen ---------- */
+  /* This game stacks a lot of answer UI under the arena (letter blocks,
+     sentence tokens, spelling slots), so the fight scene runs smaller than
+     Math RPG's. These override the shared battle sizes. */
+  .arena { min-height: 110px; }
+  .arena::before, .arena::after { bottom: 10%; width: 200px; height: 44px; }
+  .sprite { font-size: clamp(56px, 10vw, 96px); }
+  .sprite.foe { font-size: calc(clamp(56px, 10vw, 96px) * var(--foe-scale, 1)); }
+  .slash { font-size: 80px; }
+  .float-text { font-size: 38px; }
+  .problem-panel { gap: 8px; }
+  .timer-track .bar { transition: width 0.1s linear; }
   #game {
     justify-content: flex-start;
     padding: 12px 16px;
@@ -216,249 +34,6 @@
   }
   #game::-webkit-scrollbar { display: none; }
 
-  .topbar {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 8px;
-    padding-right: 66px;   /* clear the top-right mute button */
-    flex-shrink: 0;
-  }
-
-  .fighter-info { flex: 1; max-width: 320px; }
-  .fighter-info .name {
-    font-family: var(--display);
-    font-size: 18px;
-    margin-bottom: 6px;
-    text-align: left;
-    text-shadow: 0 2px 4px rgba(0,0,0,.5);
-  }
-  .fighter-info.foe .name { text-align: right; }
-
-  /* HP as countable pips: hearts for the hero, orbs for the foe — true to the
-     small integer HP values and doubles as counting practice. */
-  .pips { display: flex; gap: 7px; min-height: 26px; }
-  .pips.foe { justify-content: flex-end; }
-  .pip {
-    width: 25px;
-    height: 25px;
-    transition: opacity .3s ease, transform .3s ease;
-  }
-  .pip.heart {
-    background: var(--good);
-    -webkit-mask: var(--heart) center / contain no-repeat;
-    mask: var(--heart) center / contain no-repeat;
-    filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
-  }
-  .pip.orb {
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #ff9bb2, var(--bad) 65%);
-    box-shadow: 0 0 6px rgba(255,94,126,.6), inset 0 -3px 4px rgba(0,0,0,.3);
-  }
-  .pip.empty {
-    background: rgba(255,255,255,.16);
-    box-shadow: none;
-    filter: none;
-    transform: scale(.82);
-  }
-  .pip.orb.empty { background: rgba(255,255,255,.14); }
-
-  .arena {
-    position: relative;
-    width: 100%;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 6%;
-    min-height: 110px;
-  }
-  /* glowing stage discs under each fighter */
-  .arena::before, .arena::after {
-    content: "";
-    position: absolute;
-    bottom: 10%;
-    width: 200px;
-    height: 44px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(255,210,63,.22), rgba(255,210,63,0) 70%);
-    filter: blur(3px);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .arena::before { left: 2%; }
-  .arena::after { right: 2%; background: radial-gradient(ellipse at center, rgba(255,94,126,.22), rgba(255,94,126,0) 70%); }
-
-  .sprite {
-    z-index: 1;
-    font-size: clamp(56px, 10vw, 96px);
-    filter: drop-shadow(0 12px 10px rgba(0,0,0,.45));
-    transition: transform .15s;
-    position: relative;
-  }
-  .sprite.player { animation: idlePlayer 2.4s ease-in-out infinite; }
-  .sprite.foe {
-    animation: idleFoe 2.8s ease-in-out infinite;
-    transform: scaleX(-1);
-    /* per-foe scale evens out emoji glyphs that fill their em-box differently,
-       set via --foe-scale in JS */
-    font-size: calc(clamp(56px, 10vw, 96px) * var(--foe-scale, 1));
-  }
-
-  @keyframes idlePlayer { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-  @keyframes idleFoe { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-12px); } }
-
-  /* attack lunges */
-  .sprite.player.attack { animation: lungeRight .45s ease; }
-  .sprite.foe.attack { animation: lungeLeft .45s ease; }
-  @keyframes lungeRight {
-    0% { transform: translateX(0); }
-    35% { transform: translateX(180px) rotate(-12deg); }
-    55% { transform: translateX(180px) rotate(-12deg); }
-    100% { transform: translateX(0); }
-  }
-  @keyframes lungeLeft {
-    0% { transform: scaleX(-1) translateX(0); }
-    35% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
-    55% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
-    100% { transform: scaleX(-1) translateX(0); }
-  }
-
-  /* getting hit */
-  .sprite.hurt { animation: shake .4s ease; }
-  @keyframes shake {
-    0%,100% { transform: translateX(0); }
-    20% { transform: translateX(-12px) rotate(6deg); }
-    40% { transform: translateX(12px) rotate(-6deg); }
-    60% { transform: translateX(-8px) rotate(4deg); }
-    80% { transform: translateX(8px) rotate(-4deg); }
-  }
-  .sprite.foe.hurt { animation: shakeFoe .4s ease; }
-  @keyframes shakeFoe {
-    0%,100% { transform: scaleX(-1) translateX(0); }
-    20% { transform: scaleX(-1) translateX(-12px) rotate(6deg); }
-    40% { transform: scaleX(-1) translateX(12px) rotate(-6deg); }
-    60% { transform: scaleX(-1) translateX(-8px) rotate(4deg); }
-    80% { transform: scaleX(-1) translateX(8px) rotate(-4deg); }
-  }
-
-  .sprite.flash { filter: drop-shadow(0 12px 10px rgba(0,0,0,.45)) brightness(3) saturate(0); }
-  .sprite.super { filter: drop-shadow(0 0 16px var(--accent)) drop-shadow(0 12px 10px rgba(0,0,0,.45)); }
-
-  .sprite.foe.ko { animation: koSpin .8s ease forwards; }
-  @keyframes koSpin { to { transform: scaleX(-1) rotate(360deg) scale(0); opacity: 0; } }
-
-  /* slash effect */
-  .slash {
-    position: absolute;
-    font-size: 80px;
-    pointer-events: none;
-    opacity: 0;
-    z-index: 5;
-  }
-  .slash.go { animation: slashFx .5s ease; }
-  @keyframes slashFx {
-    0% { opacity: 0; transform: scale(.3) rotate(-40deg); }
-    30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
-    100% { opacity: 0; transform: scale(1.6) rotate(30deg); }
-  }
-
-  /* floating damage / status text */
-  .float-text {
-    position: absolute;
-    font-size: 38px;
-    font-weight: bold;
-    pointer-events: none;
-    z-index: 6;
-    text-shadow: 0 2px 6px rgba(0,0,0,.6);
-    animation: floatUp 1s ease forwards;
-  }
-  @keyframes floatUp {
-    0% { opacity: 0; transform: translateY(0) scale(.6); }
-    20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
-    100% { opacity: 0; transform: translateY(-90px) scale(1); }
-  }
-
-  #flashOverlay {
-    position: absolute;
-    inset: 0;
-    background: #fff;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 8;
-  }
-  #flashOverlay.hit { animation: screenFlash .25s ease; }
-  @keyframes screenFlash { 0% { opacity: .5; } 100% { opacity: 0; } }
-
-  /* ---------- Problem panel ---------- */
-  .problem-panel {
-    width: 100%;
-    background: var(--panel);
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 22px;
-    padding: 14px 20px 16px;
-    box-shadow: 0 -2px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.4);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    flex-shrink: 0;            /* never let the panel get squeezed into itself */
-  }
-
-  .timer-row { display: flex; align-items: center; gap: 10px; }
-  .timer-track {
-    position: relative;
-    flex: 1;
-    height: 14px;
-    border-radius: 8px;
-    background: rgba(0,0,0,.3);
-    overflow: hidden;
-  }
-  .timer-track .bar {
-    height: 100%;
-    width: 100%;
-    background: var(--good);
-    border-radius: 8px;
-    transition: width 0.1s linear;
-  }
-  .timer-track .bar.super { background: linear-gradient(90deg, #ffd23f, #ff9500); }
-  .timer-track .bar.warn { background: var(--accent); }
-  .timer-track .bar.danger { background: var(--bad); }
-  .fast-marker {
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 3px;
-    margin-left: -1px;
-    background: #fff;
-    box-shadow: 0 0 4px rgba(0,0,0,.9);
-  }
-  /* little banner flag marking the end of the double-hit zone */
-  .fast-marker::before {
-    content: "";
-    position: absolute;
-    top: -6px; left: -3px;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 7px solid #fff;
-  }
-  .super-label {
-    flex: 0 0 auto;
-    min-width: 96px;
-    white-space: nowrap;
-    text-align: right;
-    font-size: 13px;
-    font-weight: bold;
-    color: var(--accent);
-    visibility: hidden;
-  }
-  .super-label.show { visibility: visible; animation: superPulse 0.6s ease-in-out infinite; }
-  @keyframes superPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
-
-  /* the question: prompt line + big content (emoji, word, or spelling slots) */
   .q-box {
     align-self: center;
     text-align: center;
@@ -626,65 +201,6 @@
 
   #feedback { min-height: 1.5em; font-size: 17px; text-align: center; color: rgba(255,255,255,.85); }
 
-  /* ---------- Win / lose ---------- */
-  .end-emoji {
-    font-size: 120px;
-    margin-bottom: 10px;
-    animation: endPop .5s ease;
-    filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
-  }
-  @keyframes endPop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
-
-  .reward {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    margin: 6px 0 20px;
-  }
-  .reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
-  .reward-line b { color: var(--accent); font-size: 28px; }
-  .reward-hint {
-    font-size: 14px;
-    color: rgba(255,255,255,.6);
-    max-width: 42ch;
-    text-wrap: balance;
-  }
-  #countdown {
-    font-family: var(--display);
-    font-size: clamp(48px, 12vw, 80px);
-    font-weight: bold;
-    color: var(--accent);
-    text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
-    line-height: 1;
-    letter-spacing: 2px;
-  }
-  #countdown:empty { display: none; }
-  #countdown.ringing { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
-  @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
-
-  .ghost-btn {
-    background: rgba(255,255,255,.12);
-    color: #fff;
-    box-shadow: 0 5px 0 rgba(0,0,0,.35);
-    font-size: 18px;
-    padding: 12px 22px;
-  }
-  .ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
-
-  /* ---------- Quality floor ---------- */
-  button:focus-visible {
-    outline: 3px solid #fff;
-    outline-offset: 3px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: .001ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: .001ms !important;
-    }
-  }
 </style>
 </head>
 <body>
@@ -693,8 +209,8 @@
   <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
 
   <!-- ================= MENU ================= -->
-  <section class="screen show" id="menu">
-    <div class="menu-inner">
+  <section class="screen show scrolls" id="menu">
+    <div class="screen-inner">
     <h1>Language RPG</h1>
     <div class="subtitle">Read, spell, and beat the monsters!</div>
 
@@ -823,14 +339,8 @@
     <h1>Victory!</h1>
     <div class="subtitle">You beat every monster!</div>
 
-    <div class="reward">
-      <div class="reward-line">🎮 You earned <b id="earnedMins">7</b> minutes of iPad game time!</div>
-      <div id="countdown"></div>
-      <button id="timerBtn">⏱️ Start the timer</button>
-      <button id="stopAlarmBtn" class="ghost-btn" style="display:none">🔕 Stop alarm</button>
-      <div class="reward-hint">Keep this screen open so the alarm can ring — or
-        ask Siri to set a timer!</div>
-    </div>
+    <!-- shared/reward.js renders and drives this panel. -->
+    <div id="reward" class="reward"></div>
 
     <button id="winAgainBtn" class="ghost-btn">Play Again</button>
   </section>
@@ -849,55 +359,10 @@
      a 404 here is harmless — the game falls back to speechSynthesis. -->
 <script src="voice.js"></script>
 
+<script src="../shared/sound.js"></script>
+<script src="../shared/reward.js"></script>
 <script>
 'use strict';
-
-/* ==================================================================
-   Sound — all SFX synthesized with Web Audio. No files to host.
-   ================================================================== */
-const Sound = {
-  ctx: null, muted: localStorage.getItem('langrpg_muted') === '1',
-  alarmTimer: null,
-
-  unlock() {  // call on first user gesture (autoplay rules)
-    if (!this.ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) this.ctx = new AC();
-    }
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-  },
-
-  // one tone: frequency, duration, type, volume, start-delay
-  tone(freq, dur, type = 'square', vol = 0.15, delay = 0) {
-    if (this.muted || !this.ctx) return;
-    const t = this.ctx.currentTime + delay;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = type; osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(vol, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(gain).connect(this.ctx.destination);
-    osc.start(t); osc.stop(t + dur);
-  },
-
-  click()    { this.tone(600, .06, 'square', .08); },
-  tap()      { this.tone(880, .08, 'triangle', .12); },
-  hit()      { this.tone(220, .12, 'sawtooth', .2); this.tone(440, .1, 'square', .15, .06); },
-  superHit() { [660, 880, 1100, 1320].forEach((f, i) => this.tone(f, .12, 'square', .18, i * .07)); },
-  hurt()     { this.tone(160, .25, 'sawtooth', .2); this.tone(110, .3, 'sawtooth', .15, .1); },
-  wrong()    { this.tone(300, .18, 'triangle', .12); this.tone(240, .25, 'triangle', .12, .18); },
-  ko()       { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, .14, 'triangle', .16, i * .09)); },
-  victory()  { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, .2, 'triangle', .16, i * .14)); },
-  gameover() { [392, 330, 262, 196].forEach((f, i) => this.tone(f, .3, 'triangle', .14, i * .25)); },
-
-  startAlarm() {
-    this.stopAlarm();
-    const beep = () => { this.tone(880, .25, 'square', .22); this.tone(660, .25, 'square', .22, .3); };
-    beep();
-    this.alarmTimer = setInterval(beep, 800);
-  },
-  stopAlarm() { if (this.alarmTimer) { clearInterval(this.alarmTimer); this.alarmTimer = null; } }
-};
 
 /* ==================================================================
    Speech — fallback voice via the browser's built-in speechSynthesis.
@@ -1738,8 +1203,9 @@ const state = {
   timerId: null, timeLeft: 0, inFastZone: false,
   draw: null,              // deck function for current track
   earnedMins: 0,
-  rewardId: null, rewardEnd: 0,
 };
+
+Reward.mount($('reward'));
 
 /* ==================================================================
    Screens
@@ -1785,8 +1251,7 @@ function renderMute() {
   $('muteBtn').classList.toggle('muted', Sound.muted);
 }
 $('muteBtn').addEventListener('click', () => {
-  Sound.muted = !Sound.muted;
-  localStorage.setItem('langrpg_muted', Sound.muted ? '1' : '0');
+  Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
   renderMute();
   if (Sound.muted) Voice.stop();
 });
@@ -1796,7 +1261,7 @@ renderMute();
    Game flow
    ================================================================== */
 function startGame() {
-  clearRewardTimer();
+  Reward.clear();
   state.foeIdx = 0;
   state.playerHp = PLAYER_HP;
   state.draw = makeDeck(
@@ -2488,11 +1953,7 @@ function winGame() {
   Sound.victory();
   Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
   state.earnedMins = rand(5, 10);
-  $('earnedMins').textContent = state.earnedMins;
-  $('countdown').textContent = '';
-  $('countdown').classList.remove('ringing');
-  $('timerBtn').style.display = '';
-  $('stopAlarmBtn').style.display = 'none';
+  Reward.offer(state.earnedMins);
   showScreen('win');
 }
 
@@ -2503,41 +1964,7 @@ function gameOver() {
   showScreen('lose');
 }
 
-function startRewardTimer() {
-  clearRewardTimer();
-  // track a wall-clock end time so a delayed tick can't drift the total
-  state.rewardEnd = Date.now() + state.earnedMins * 60 * 1000;
-  $('timerBtn').style.display = 'none';
-  const tick = () => {
-    const ms = state.rewardEnd - Date.now();
-    if (ms <= 0) { ringTimer(); return; }
-    const s = Math.ceil(ms / 1000);
-    $('countdown').textContent =
-      Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-  };
-  tick();
-  state.rewardId = setInterval(tick, 250);
-}
-
-function ringTimer() {
-  clearRewardTimer();
-  $('countdown').textContent = "TIME'S UP!";
-  $('countdown').classList.add('ringing');
-  $('stopAlarmBtn').style.display = '';
-  Sound.startAlarm();
-}
-
-function clearRewardTimer() {
-  if (state.rewardId) { clearInterval(state.rewardId); state.rewardId = null; }
-  Sound.stopAlarm();
-}
-
-$('timerBtn').addEventListener('click', () => { Sound.click(); startRewardTimer(); });
-$('stopAlarmBtn').addEventListener('click', () => {
-  Sound.stopAlarm();
-  $('stopAlarmBtn').style.display = 'none';
-});
-$('winAgainBtn').addEventListener('click', () => { Sound.click(); clearRewardTimer(); showScreen('menu'); });
+$('winAgainBtn').addEventListener('click', () => { Sound.click(); Reward.clear(); showScreen('menu'); });
 $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 
 $('sayBtn').addEventListener('click', () => {

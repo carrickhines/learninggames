@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Headless screenshots of Math RPG's screens, driven through the real game.
+"""Headless screenshots of every screen in the site, driven through the real UI.
 
 Usage:
     .verify/venv/bin/python .verify/shots.py [width height]
@@ -17,7 +17,6 @@ from selenium.webdriver.common.by import By
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "shots")
-PAGE = "file://" + os.path.join(ROOT, "index.html")
 
 W = int(sys.argv[1]) if len(sys.argv) > 1 else 960
 H = int(sys.argv[2]) if len(sys.argv) > 2 else 820
@@ -44,10 +43,6 @@ def fit_viewport(w, h):
         d.set_window_size(sz["width"] + (w - iw), sz["height"] + (h - ih))
 
 
-d.get(PAGE)
-fit_viewport(W, H)
-
-
 def shot(name):
     path = os.path.join(OUT, name + ".png")
     d.save_screenshot(path)
@@ -58,22 +53,50 @@ def click(sel):
     d.find_element(By.CSS_SELECTOR, sel).click()
 
 
-def load():
-    d.get(PAGE)
+def load(relpath):
+    d.get("file://" + os.path.join(ROOT, relpath))
+    fit_viewport(W, H)
     time.sleep(0.7)  # let the fadeIn settle
 
 
-try:
-    # 1. Menu
-    load()
-    shot("menu")
+def battle(relpath, track, mode, name, settle=1.0):
+    load(relpath)
+    click('[data-track="%s"]' % track)
+    click('[data-mode="%s"]' % mode)
+    click("#startBtn")
+    time.sleep(settle)
+    shot(name)
 
-    # 2. Multiplication battle (no blocks)
-    click('[data-track="mul"]')
-    click('[data-mode="normal"]')
-    click('#startBtn')
-    time.sleep(1.0)  # battle fade + first problem
-    shot("battle-mul")
+
+def reward_states(prefix):
+    """The shared reward panel in each of its three states."""
+    d.execute_script("Reward.offer(8);")
+    time.sleep(0.3)
+    shot(prefix + "-reward")
+    d.execute_script("document.querySelector('.r-start').click();")
+    time.sleep(0.4)
+    shot(prefix + "-countdown")
+    d.execute_script("""
+        document.getElementById('countdownBox').classList.add('ringing');
+        document.querySelector('.countdown').textContent = '0:00';
+        document.querySelector('.countdown-label').textContent = "\\u23f0 TIME'S UP!";
+        document.querySelector('.r-cancel').textContent = '\\ud83d\\udd15 Stop alarm';
+    """)
+    time.sleep(0.3)
+    shot(prefix + "-ringing")
+
+
+try:
+    # ---------- Hub ----------
+    if os.path.exists(os.path.join(ROOT, "index.html")):
+        load("index.html")
+        shot("hub")
+
+    # ---------- Math RPG ----------
+    load("math/index.html")
+    shot("math-menu")
+
+    battle("math/index.html", "mul", "normal", "math-battle-mul")
 
     # the dragon is the largest foe — check the boss against the layout
     d.execute_script("""
@@ -84,99 +107,64 @@ try:
         for(var i=0;i<5;i++){var o=document.createElement('span');o.className='pip orb';p.appendChild(o);}
     """)
     time.sleep(0.3)
-    shot("battle-dragon")
+    shot("math-battle-dragon")
 
-    # 3. Division battle (no blocks, same layout as multiplication)
-    load()
-    click('[data-track="div"]')
-    click('[data-mode="normal"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-div")
+    battle("math/index.html", "div", "normal", "math-battle-div")
+    battle("math/index.html", "next", "easy", "math-battle-next")
+    battle("math/index.html", "alg", "normal", "math-battle-alg")
+    battle("math/index.html", "count", "easy", "math-battle-count")
 
-    # 4. Addition battle (number blocks visible), then push the towers together
-    load()
-    click('[data-track="add"]')
-    click('[data-mode="easy"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-add")
-    click('#pushBtn')
-    time.sleep(1.6)  # block count-up animation
-    shot("battle-add-merged")
+    # addition: number blocks, then pushed together and counted
+    battle("math/index.html", "add", "easy", "math-battle-add")
+    click("#pushBtn")
+    time.sleep(1.6)
+    shot("math-battle-add-merged")
 
-    # 5. Subtraction battle: one tower with the top blocks marked to remove,
-    #    then take them away and count the remainder.
-    load()
-    click('[data-track="sub"]')
-    click('[data-mode="easy"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-sub")
-    click('#pushBtn')
-    time.sleep(2.0)  # take-away + count-up animation
-    shot("battle-sub-taken")
+    # subtraction: blocks marked to remove, then taken away
+    battle("math/index.html", "sub", "easy", "math-battle-sub")
+    click("#pushBtn")
+    time.sleep(2.0)
+    shot("math-battle-sub-taken")
 
-    # 6. Next Number battle (counting, no blocks): a number and "→ ?"
-    load()
-    click('[data-track="next"]')
-    click('[data-mode="easy"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-next")
-
-    # 7. Count On battle (add 1-3, push-together blocks like addition)
-    load()
-    click('[data-track="count"]')
-    click('[data-mode="easy"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-count")
-
-    # 8. Algebra battle (solve for x, no blocks). Capture a few problems so the
-    #    suite shows one-step and two-step forms across runs.
-    load()
-    click('[data-track="alg"]')
-    click('[data-mode="normal"]')
-    click('#startBtn')
-    time.sleep(1.0)
-    shot("battle-alg")
-
-    # 4. Victory / Game-over screens. These need many turns to reach naturally,
-    #    so just reveal the static end screen to verify its layout.
+    # end screens
     d.execute_script("""
-        document.getElementById('battle').classList.add('hidden');
-        document.getElementById('menu').classList.add('hidden');
-        var e=document.getElementById('endScreen'); e.classList.remove('hidden');
+        document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
+        document.getElementById('endScreen').classList.add('show');
         document.getElementById('endEmoji').textContent='🏆';
         document.getElementById('endTitle').textContent='Victory!';
         document.getElementById('endText').textContent="You defeated every monster. You're a math hero!";
-        // reveal the win reward (earned iPad time + Start timer button)
-        document.getElementById('reward').classList.remove('hidden');
-        document.getElementById('rewardMins').textContent='8';
-        document.getElementById('rewardMinsHint').textContent='8';
     """)
-    time.sleep(1.2)  # let the end screen fade in fully
-    shot("end-win")
+    time.sleep(1.2)
+    reward_states("math-win")
 
-    # the countdown, mid-run and at "time's up" (alarm state)
+    # ---------- Language RPG ----------
+    load("language/index.html")
+    shot("lang-menu")
+    battle("language/index.html", "letters", "easy", "lang-battle-letters")
+    battle("language/index.html", "builder", "easy", "lang-battle-builder")
+    battle("language/index.html", "fixit", "normal", "lang-battle-fixit")
+    battle("language/index.html", "forge", "normal", "lang-battle-forge")
+    battle("language/index.html", "rhyme", "easy", "lang-battle-rhyme")
     d.execute_script("""
-        document.getElementById('rewardStart').classList.add('hidden');
-        var cb=document.getElementById('countdownBox'); cb.classList.remove('hidden');
-        document.getElementById('countdown').textContent='7:42';
-        document.getElementById('countdownLabel').textContent='iPad time left';
-        document.getElementById('cancelTimerBtn').textContent='Cancel';
+        document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
+        document.getElementById('win').classList.add('show');
     """)
-    time.sleep(0.4)
-    shot("end-countdown")
+    time.sleep(1.0)
+    reward_states("lang-win")
 
+    # ---------- Story Quest ----------
+    load("story/index.html")
+    shot("story-menu")
+    d.find_elements(By.CSS_SELECTOR, "#questRow .choice")[0].click()
+    click("#startBtn")
+    time.sleep(1.0)
+    shot("story-scene")
     d.execute_script("""
-        var cb=document.getElementById('countdownBox'); cb.classList.add('ringing');
-        document.getElementById('countdown').textContent='0:00';
-        document.getElementById('countdownLabel').textContent="⏰ TIME'S UP!";
-        document.getElementById('cancelTimerBtn').textContent='🔕 Stop alarm';
+        document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('show');});
+        document.getElementById('win').classList.add('show');
+        document.getElementById('winText').textContent='You finished The Troll Bridge with 5 of 6 gems!';
     """)
-    time.sleep(0.4)
-    shot("end-ringing")
+    time.sleep(1.0)
+    reward_states("story-win")
 finally:
     d.quit()

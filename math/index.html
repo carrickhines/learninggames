@@ -8,424 +8,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Math RPG">
 <title>Math RPG</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/ui.css">
+<link rel="stylesheet" href="../shared/battle.css">
 <style>
-  :root {
-    --sky-top: #241544;
-    --sky-mid: #3a1f5c;
-    --sky-low: #5b2a63;
-    --horizon: #ff6fa5;       /* warm dusk glow at the arena floor */
-    --panel: rgba(15, 8, 30, 0.42);
-    --accent: #ffd23f;
-    --accent-2: #d99312;      /* deeper gold for the button "lip" */
-    --good: #5ce8a0;          /* you / hero */
-    --bad: #ff5e7e;           /* foe / danger */
-    --ink: #1b1230;           /* dark text on gold buttons */
-    --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-    --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
-  }
-
-  * { box-sizing: border-box; }
-
-  html, body {
-    margin: 0;
-    height: 100%;
-    font-family: var(--body);
-    color: #fff;
-    overflow: hidden;
-  }
-
-  body {
-    background:
-      radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #app {
-    width: min(900px, 96vw);
-    height: min(720px, 96vh);
-    position: relative;
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-    overflow: hidden;
-    /* twilight quest arena: starfield + warm horizon glow over a violet sky */
-    background:
-      radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
-      radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
-      radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
-      radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
-      radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
-      radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
-      radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
-      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
-  }
-
-  .sound-toggle {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    width: 46px;
-    height: 46px;
-    padding: 0;                /* override the base button padding so the icon centers */
-    border-radius: 50%;
-    background: var(--panel);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.14);
-    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
-    line-height: 1;
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    transition: transform .08s, filter .15s;
-  }
-  .sound-toggle:active { transform: translateY(3px); }
-  .sound-toggle.muted { opacity: 0.55; }
-
-  .screen {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 24px;
-    animation: fadeIn 0.4s ease;
-  }
-  .screen.hidden { display: none; }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-  h1 {
-    font-family: var(--display);
-    font-size: clamp(44px, 8.5vw, 76px);
-    margin: 0 0 6px;
-    color: var(--accent);
-    text-shadow:
-      0 3px 0 var(--accent-2),
-      0 5px 0 #9a6a0c,
-      0 10px 22px rgba(0,0,0,.55);
-    letter-spacing: 1px;
-    line-height: 1;
-  }
-  .subtitle {
-    font-size: 19px;
-    color: rgba(255,255,255,.78);
-    margin-bottom: 30px;
-    max-width: 50ch;       /* wide enough to keep these on one line on tablet/desktop */
-    text-wrap: balance;    /* if it must wrap on a narrow phone, keep the lines even */
-  }
-  .group-label {
-    font-family: var(--display);
-    font-size: 16px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin: 14px 0 10px;
-    color: var(--accent);
-    opacity: .92;
-  }
-  .group-label::before, .group-label::after {
-    content: "";
-    display: inline-block;
-    width: 26px;
-    height: 2px;
-    margin: 0 12px;
-    vertical-align: middle;
-    background: linear-gradient(90deg, transparent, var(--accent));
-    opacity: .55;
-  }
-  .group-label::after { transform: scaleX(-1); }
-
-  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-
-  button {
-    font-family: var(--display);
-    cursor: pointer;
-    border: none;
-    border-radius: 16px;
-    font-size: 22px;
-    font-weight: bold;
-    padding: 16px 28px;
-    color: var(--ink);
-    background: linear-gradient(180deg, #ffe27a, var(--accent));
-    box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
-    transition: transform .08s, box-shadow .08s, filter .15s;
-    user-select: none;
-  }
-  button:hover { filter: brightness(1.06); }
-  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
-
-  #startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
-
-  button.choice {
-    background: var(--panel);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.12);
-    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    /* compact so the seven tracks wrap to a couple of tidy rows within 720px */
-    font-size: 18px;
-    padding: 13px 14px;
-    min-width: 150px;
-  }
-  button.choice .emoji { font-size: 30px; display: block; margin-bottom: 4px; }
-  button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
-  button.choice.selected {
-    background: linear-gradient(180deg, #ffe27a, var(--accent));
-    color: var(--ink);
-    border-color: transparent;
-    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
-  }
-  button.choice.selected .sub { opacity: .85; }
-
+  /* Math RPG only. The frame, buttons, pips, arena, and timer bar come from
+     the shared stylesheets above. */
   /* ---------- Battle screen ---------- */
   #battle { justify-content: flex-start; padding: 12px 16px; }
-
-  .topbar {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 8px;
-    padding-right: 66px;   /* clear the top-right mute button (~58px wide) */
-  }
-
-  .fighter-info { flex: 1; max-width: 320px; }
-  .fighter-info .name {
-    font-family: var(--display);
-    font-size: 18px;
-    margin-bottom: 6px;
-    text-align: left;
-    text-shadow: 0 2px 4px rgba(0,0,0,.5);
-  }
-  .fighter-info.foe .name { text-align: right; }
-
-  /* HP as countable pips: hearts for the hero, orbs for the foe — true to the
-     small integer HP values and doubles as counting practice. */
-  .pips { display: flex; gap: 7px; min-height: 26px; }
-  .pips.foe { justify-content: flex-end; }
-  .pip {
-    width: 25px;
-    height: 25px;
-    transition: opacity .3s ease, transform .3s ease;
-  }
-  .pip.heart {
-    background: var(--good);
-    -webkit-mask: var(--heart) center / contain no-repeat;
-    mask: var(--heart) center / contain no-repeat;
-    filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
-  }
-  .pip.orb {
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #ff9bb2, var(--bad) 65%);
-    box-shadow: 0 0 6px rgba(255,94,126,.6), inset 0 -3px 4px rgba(0,0,0,.3);
-  }
-  .pip.empty {
-    background: rgba(255,255,255,.16);
-    box-shadow: none;
-    filter: none;
-    transform: scale(.82);
-  }
-  .pip.orb.empty { background: rgba(255,255,255,.14); }
-
-  .arena {
-    position: relative;
-    width: 100%;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 6%;
-    min-height: 170px;
-  }
-  /* glowing stage discs under each fighter */
-  .arena::before, .arena::after {
-    content: "";
-    position: absolute;
-    bottom: 16%;
-    width: 230px;
-    height: 50px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(255,210,63,.22), rgba(255,210,63,0) 70%);
-    filter: blur(3px);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .arena::before { left: 2%; }
-  .arena::after { right: 2%; background: radial-gradient(ellipse at center, rgba(255,94,126,.22), rgba(255,94,126,0) 70%); }
-  .sprite { z-index: 1; }
   #battle.with-blocks .arena::before, #battle.with-blocks .arena::after { display: none; }
-
-  .sprite {
-    font-size: clamp(64px, 13vw, 124px);
-    filter: drop-shadow(0 12px 10px rgba(0,0,0,.45));
-    transition: transform .15s;
-    position: relative;
-  }
-  .sprite.player { animation: idlePlayer 2.4s ease-in-out infinite; }
-  .sprite.foe {
-    animation: idleFoe 2.8s ease-in-out infinite;
-    transform: scaleX(-1);
-    /* per-foe scale evens out emoji glyphs that fill their em-box differently
-       (a solid circle vs a sprawling dragon), set via --foe-scale in JS */
-    font-size: calc(clamp(64px, 13vw, 124px) * var(--foe-scale, 1));
-  }
-
-  @keyframes idlePlayer { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-  @keyframes idleFoe { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-12px); } }
-
-  /* attack lunges */
-  .sprite.player.attack { animation: lungeRight .45s ease; }
-  .sprite.foe.attack { animation: lungeLeft .45s ease; }
-  @keyframes lungeRight {
-    0% { transform: translateX(0); }
-    35% { transform: translateX(180px) rotate(-12deg); }
-    55% { transform: translateX(180px) rotate(-12deg); }
-    100% { transform: translateX(0); }
-  }
-  @keyframes lungeLeft {
-    0% { transform: scaleX(-1) translateX(0); }
-    35% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
-    55% { transform: scaleX(-1) translateX(180px) rotate(-12deg); }
-    100% { transform: scaleX(-1) translateX(0); }
-  }
-
-  /* getting hit */
-  .sprite.hurt { animation: shake .4s ease; }
-  @keyframes shake {
-    0%,100% { transform: translateX(0); }
-    20% { transform: translateX(-12px) rotate(6deg); }
-    40% { transform: translateX(12px) rotate(-6deg); }
-    60% { transform: translateX(-8px) rotate(4deg); }
-    80% { transform: translateX(8px) rotate(-4deg); }
-  }
-  .sprite.foe.hurt { animation: shakeFoe .4s ease; }
-  @keyframes shakeFoe {
-    0%,100% { transform: scaleX(-1) translateX(0); }
-    20% { transform: scaleX(-1) translateX(-12px) rotate(6deg); }
-    40% { transform: scaleX(-1) translateX(12px) rotate(-6deg); }
-    60% { transform: scaleX(-1) translateX(-8px) rotate(4deg); }
-    80% { transform: scaleX(-1) translateX(8px) rotate(-4deg); }
-  }
-
-  .sprite.flash { filter: drop-shadow(0 12px 10px rgba(0,0,0,.45)) brightness(3) saturate(0); }
-
-  /* slash effect */
-  .slash {
-    position: absolute;
-    font-size: 90px;
-    pointer-events: none;
-    opacity: 0;
-    z-index: 5;
-  }
-  .slash.go { animation: slashFx .5s ease; }
-  @keyframes slashFx {
-    0% { opacity: 0; transform: scale(.3) rotate(-40deg); }
-    30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
-    100% { opacity: 0; transform: scale(1.6) rotate(30deg); }
-  }
-
-  /* floating damage / status text */
-  .float-text {
-    position: absolute;
-    font-size: 42px;
-    font-weight: bold;
-    pointer-events: none;
-    z-index: 6;
-    text-shadow: 0 2px 6px rgba(0,0,0,.6);
-    animation: floatUp 1s ease forwards;
-  }
-  @keyframes floatUp {
-    0% { opacity: 0; transform: translateY(0) scale(.6); }
-    20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
-    100% { opacity: 0; transform: translateY(-90px) scale(1); }
-  }
-
-  #flashOverlay {
-    position: absolute;
-    inset: 0;
-    background: #fff;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 8;
-  }
-  #flashOverlay.hit { animation: screenFlash .25s ease; }
-  @keyframes screenFlash { 0% { opacity: .5; } 100% { opacity: 0; } }
-
-  /* ---------- Problem panel ---------- */
-  .problem-panel {
-    width: 100%;
-    background: var(--panel);
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 22px;
-    padding: 14px 20px 16px;
-    box-shadow: 0 -2px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.4);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    flex-shrink: 0;            /* never let the panel get squeezed into itself */
-  }
-
-  .timer-row { display: flex; align-items: center; gap: 10px; }
-  .timer-track {
-    position: relative;
-    flex: 1;
-    height: 14px;
-    border-radius: 8px;
-    background: rgba(0,0,0,.3);
-    overflow: hidden;
-  }
-  .timer-track .bar {
-    height: 100%;
-    width: 100%;
-    background: var(--good);
-    border-radius: 8px;
-    transition: width 0.05s linear;
-  }
-  .timer-track .bar.super { background: linear-gradient(90deg, #ffd23f, #ff9500); }
-  .timer-track .bar.warn { background: var(--accent); }
-  .timer-track .bar.danger { background: var(--bad); }
-  .fast-marker {
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 3px;
-    margin-left: -1px;
-    background: #fff;
-    box-shadow: 0 0 4px rgba(0,0,0,.9);
-  }
-  /* little banner flag marking the end of the double-hit zone */
-  .fast-marker::before {
-    content: "";
-    position: absolute;
-    top: -6px; left: -3px;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 7px solid #fff;
-  }
-  .super-label {
-    flex: 0 0 auto;
-    width: 96px;
-    text-align: right;
-    font-size: 13px;
-    font-weight: bold;
-    color: var(--accent);
-    visibility: hidden;
-  }
-  .super-label.show { visibility: visible; animation: superPulse 0.6s ease-in-out infinite; }
-  @keyframes superPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
-  .sprite.super { filter: drop-shadow(0 0 16px var(--accent)) drop-shadow(0 12px 10px rgba(0,0,0,.45)); }
 
   .question {
     font-family: var(--display);
@@ -578,83 +169,6 @@
   /* addition mode has the blocks above, so trim the pad only slightly */
   #battle.with-blocks .keypad { gap: 9px; margin-top: 6px; }
   #battle.with-blocks .key { font-size: 28px; padding: 12px 0; }
-
-  .end-emoji {
-    font-size: 120px;
-    margin-bottom: 10px;
-    animation: pop .5s ease;
-    filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
-  }
-  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
-
-  .hint { font-size: 16px; color: rgba(255,255,255,.62); margin-top: 8px; }
-
-  /* ---------- Win reward: iPad-time countdown ---------- */
-  .reward {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    margin: 8px 0 22px;
-  }
-  .reward.hidden, #countdownBox.hidden, #rewardStart.hidden { display: none; }
-  #rewardStart { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-  .reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
-  .reward-line b { color: var(--accent); font-size: 28px; }
-  .reward-hint {
-    font-size: 14px;
-    color: rgba(255,255,255,.6);
-    max-width: 42ch;
-    text-wrap: balance;
-  }
-
-  #countdownBox { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .countdown {
-    font-family: var(--display);
-    font-size: clamp(56px, 14vw, 92px);
-    font-weight: bold;
-    color: var(--accent);
-    text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
-    line-height: 1;
-    letter-spacing: 2px;
-  }
-  .countdown-label {
-    font-size: 16px;
-    letter-spacing: 1px;
-    color: rgba(255,255,255,.72);
-    margin-bottom: 10px;
-  }
-  .ghost-btn {
-    background: rgba(255,255,255,.12);
-    color: #fff;
-    box-shadow: 0 5px 0 rgba(0,0,0,.35);
-    font-size: 18px;
-    padding: 12px 22px;
-  }
-  .ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
-
-  /* time's up: flash the countdown red to grab attention within the app */
-  #countdownBox.ringing .countdown { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
-  #countdownBox.ringing .countdown-label { color: var(--bad); font-weight: bold; }
-  @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
-
-  /* ---------- Quality floor ---------- */
-  button:focus-visible,
-  .key:focus-visible,
-  .sound-toggle:focus-visible,
-  .tower:focus-visible,
-  #answer:focus-visible {
-    outline: 3px solid #fff;
-    outline-offset: 3px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: .001ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: .001ms !important;
-    }
-  }
 </style>
 </head>
 <body>
@@ -663,7 +177,8 @@
   <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
 
   <!-- MENU -->
-  <section id="menu" class="screen">
+  <section id="menu" class="screen show scrolls">
+    <div class="screen-inner">
     <h1>Math RPG</h1>
     <div class="subtitle">Defeat the monster with your math powers!</div>
 
@@ -718,10 +233,11 @@
     <div style="margin-top:22px">
       <button id="startBtn">Start Battle!</button>
     </div>
+    </div>
   </section>
 
   <!-- BATTLE -->
-  <section id="battle" class="screen hidden">
+  <section id="battle" class="screen">
     <div class="topbar">
       <div class="fighter-info player">
         <div class="name">🦸 You</div>
@@ -785,151 +301,25 @@
   </section>
 
   <!-- GAME OVER / WIN -->
-  <section id="endScreen" class="screen hidden">
+  <section id="endScreen" class="screen">
     <div class="end-emoji" id="endEmoji">🏆</div>
     <h1 id="endTitle">Victory!</h1>
     <div class="subtitle" id="endText">You defeated the monster!</div>
 
-    <!-- Win-only reward: earned iPad game time + an in-app countdown timer.
-         (The timer only runs while this screen stays open and in front — iOS
-         freezes background tabs — hence the "ask Siri" nudge.) -->
-    <div id="reward" class="reward hidden">
-      <div class="reward-line">🎮 You earned <b id="rewardMins">7</b> minutes of iPad game time!</div>
-
-      <div id="rewardStart">
-        <button id="startTimerBtn">⏱️ Start the timer</button>
-        <div class="reward-hint">Keep this screen open so the alarm can ring — or
-          ask Siri to set a timer for <span id="rewardMinsHint">7</span> minutes.</div>
-      </div>
-
-      <div id="countdownBox" class="hidden">
-        <div class="countdown" id="countdown">7:00</div>
-        <div class="countdown-label" id="countdownLabel">iPad time left</div>
-        <button id="cancelTimerBtn" class="ghost-btn">Cancel</button>
-      </div>
-    </div>
+    <!-- Win-only reward. shared/reward.js renders and drives this panel. -->
+    <div id="reward" class="reward hidden"></div>
 
     <button id="playAgainBtn">Play Again</button>
   </section>
 
 </div>
 
+<script src="../shared/sound.js"></script>
+<script src="../shared/reward.js"></script>
 <script>
 (() => {
   "use strict";
 
-  // ---------- Sound (synthesized, no audio files) ----------
-  const Sound = (() => {
-    let ctx = null;
-    let muted = (localStorage.getItem("mathrpg_muted") === "1");
-    let alarmTimer = null;
-
-    function ensure() {
-      if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) ctx = new AC();
-      }
-      if (ctx && ctx.state === "suspended") ctx.resume();
-      return ctx;
-    }
-
-    // A single tone with a quick attack/decay envelope, optional pitch slide.
-    function tone(freq, dur, opts = {}) {
-      const c = ensure();
-      if (!c || muted) return;
-      const { type = "square", vol = 0.2, delay = 0, slideTo = null } = opts;
-      const t0 = c.currentTime + delay;
-      const osc = c.createOscillator();
-      const g = c.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, t0);
-      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(g).connect(c.destination);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.03);
-    }
-
-    // Decaying white noise burst (impacts, poofs).
-    function noise(dur, opts = {}) {
-      const c = ensure();
-      if (!c || muted) return;
-      const { vol = 0.2, delay = 0 } = opts;
-      const n = Math.floor(c.sampleRate * dur);
-      const buf = c.createBuffer(1, n, c.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
-      const src = c.createBufferSource();
-      src.buffer = buf;
-      const g = c.createGain();
-      g.gain.value = vol;
-      src.connect(g).connect(c.destination);
-      src.start(c.currentTime + delay);
-    }
-
-    return {
-      isMuted: () => muted,
-      toggle() {
-        muted = !muted;
-        localStorage.setItem("mathrpg_muted", muted ? "1" : "0");
-        if (!muted) tone(660, 0.08, { type: "triangle", vol: 0.15 });
-        return muted;
-      },
-      // call once from a user gesture so the audio context is unlocked
-      unlock() { ensure(); },
-
-      click() { tone(660, 0.06, { type: "triangle", vol: 0.12 }); },
-      hit() {
-        tone(190, 0.12, { type: "square", vol: 0.25, slideTo: 90 });
-        noise(0.12, { vol: 0.14 });
-      },
-      super() {
-        tone(523, 0.08, { type: "square", vol: 0.2 });
-        tone(784, 0.08, { type: "square", vol: 0.2, delay: 0.08 });
-        tone(1047, 0.14, { type: "square", vol: 0.22, delay: 0.16 });
-        noise(0.16, { vol: 0.16, delay: 0.16 });
-      },
-      hurt() { tone(150, 0.25, { type: "sawtooth", vol: 0.22, slideTo: 70 }); },
-      wrong() {
-        tone(330, 0.12, { type: "sine", vol: 0.18 });
-        tone(247, 0.18, { type: "sine", vol: 0.18, delay: 0.12 });
-      },
-      ko() {
-        noise(0.25, { vol: 0.2 });
-        tone(420, 0.22, { type: "triangle", vol: 0.18, slideTo: 120 });
-      },
-      win() {
-        [523, 659, 784, 1047].forEach((f, i) =>
-          tone(f, 0.16, { type: "triangle", vol: 0.2, delay: i * 0.14 }));
-      },
-      lose() {
-        [392, 330, 262, 196].forEach((f, i) =>
-          tone(f, 0.24, { type: "triangle", vol: 0.2, delay: i * 0.2 }));
-      },
-      blockTap() { tone(600, 0.08, { type: "triangle", vol: 0.14 }); },
-      count(i) { tone(440 + i * 45, 0.07, { type: "triangle", vol: 0.16 }); },
-      push() { noise(0.3, { vol: 0.12 }); tone(220, 0.3, { type: "sine", vol: 0.12, slideTo: 440 }); },
-
-      // Looping "time's up" alarm: a classic two-tone beep that repeats until
-      // stopAlarm() is called. Respects the mute toggle like every other sound.
-      // (Only rings while the page is in the foreground — iOS suspends audio in
-      // backgrounded tabs.)
-      startAlarm() {
-        this.stopAlarm();
-        const ring = () => {
-          tone(880, 0.18, { type: "square", vol: 0.3 });
-          tone(660, 0.20, { type: "square", vol: 0.3, delay: 0.22 });
-        };
-        ring();
-        alarmTimer = setInterval(ring, 750);
-      },
-      stopAlarm() {
-        if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
-      },
-    };
-  })();
 
   // ---------- Config ----------
   // total = full time bar; fast = answer within this for a SUPER double hit;
@@ -979,8 +369,6 @@
     timerStart: 0,
     busy: false,
     earnedMins: 0,
-    countdownId: null,
-    countdownEnd: 0,
   };
 
   // ---------- Element refs ----------
@@ -1000,11 +388,10 @@
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
     endEmoji: $("endEmoji"), endTitle: $("endTitle"), endText: $("endText"),
     playAgainBtn: $("playAgainBtn"), muteBtn: $("muteBtn"),
-    reward: $("reward"), rewardMins: $("rewardMins"), rewardMinsHint: $("rewardMinsHint"),
-    rewardStart: $("rewardStart"), countdownBox: $("countdownBox"),
-    countdown: $("countdown"), countdownLabel: $("countdownLabel"),
-    startTimerBtn: $("startTimerBtn"), cancelTimerBtn: $("cancelTimerBtn"),
+    reward: $("reward"),
   };
+
+  Reward.mount(el.reward);
 
   // reflect saved mute preference on the toggle
   function renderMute() {
@@ -1018,8 +405,8 @@
     row.addEventListener("click", (e) => {
       const btn = e.target.closest("button.choice");
       if (!btn) return;
-      [...row.children].forEach((c) => c.classList.remove("selected"));
-      btn.classList.add("selected");
+      [...row.children].forEach((c) => c.classList.remove("sel"));
+      btn.classList.add("sel");
       state[key] = btn.dataset[key];
       Sound.click();
     });
@@ -1027,8 +414,8 @@
   wireChoices(el.trackRow, "track");
   wireChoices(el.modeRow, "mode");
   // defaults
-  el.trackRow.querySelector('[data-track="add"]').classList.add("selected");
-  el.modeRow.querySelector('[data-mode="normal"]').classList.add("selected");
+  el.trackRow.querySelector('[data-track="add"]').classList.add("sel");
+  el.modeRow.querySelector('[data-mode="normal"]').classList.add("sel");
 
   // ---------- Problem generation ----------
   function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -1489,15 +876,15 @@
   }
 
   // ---------- Screen transitions ----------
-  function show(screen) {
-    [el.menu, el.battle, el.end].forEach((s) => s.classList.add("hidden"));
-    screen.classList.remove("hidden");
+  function showScreen(id) {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("show"));
+    document.getElementById(id).classList.add("show");
   }
 
   function startGame() {
     Sound.unlock();
     Sound.click();
-    clearRewardTimer();
+    Reward.clear();
     state.playerHp = PLAYER_MAX_HP;
     state.foeIndex = 0;
     state.busy = false;
@@ -1506,83 +893,30 @@
     setupFoe();
     renderHp();
     el.battle.classList.toggle("with-blocks", state.track === "add" || state.track === "sub" || state.track === "count");
-    show(el.battle);
+    showScreen("battle");
     newProblem();
   }
 
   function win() {
     stopTimer();
-    clearRewardTimer();
     el.endEmoji.textContent = "🏆";
     el.endTitle.textContent = "Victory!";
     el.endText.textContent = "You defeated every monster. You're a math hero!";
     // earned iPad game time: a fun, variable 5–10 minute reward
     state.earnedMins = rand(5, 10);
-    el.rewardMins.textContent = state.earnedMins;
-    el.rewardMinsHint.textContent = state.earnedMins;
-    el.reward.classList.remove("hidden");
-    el.rewardStart.classList.remove("hidden");
-    el.countdownBox.classList.add("hidden");
+    Reward.offer(state.earnedMins);
     Sound.win();
-    show(el.end);
+    showScreen("endScreen");
   }
 
   function gameOver() {
     stopTimer();
-    clearRewardTimer();
-    el.reward.classList.add("hidden");   // no reward time for a loss
+    Reward.hide();                       // no reward time for a loss
     el.endEmoji.textContent = "💀";
     el.endTitle.textContent = "Game Over";
     el.endText.textContent = "The monster got you! Want to try again?";
     Sound.lose();
-    show(el.end);
-  }
-
-  // ---------- iPad game-time countdown (win reward) ----------
-  function fmtClock(totalSec) {
-    const m = Math.floor(totalSec / 60), s = totalSec % 60;
-    return m + ":" + String(s).padStart(2, "0");
-  }
-
-  function clearRewardTimer() {
-    if (state.countdownId) { clearInterval(state.countdownId); state.countdownId = null; }
-    Sound.stopAlarm();
-    el.countdownBox.classList.remove("ringing");
-  }
-
-  function startRewardTimer() {
-    Sound.unlock();
-    Sound.click();
-    el.rewardStart.classList.add("hidden");
-    el.countdownBox.classList.remove("hidden", "ringing");
-    el.cancelTimerBtn.textContent = "Cancel";
-    el.countdownLabel.textContent = "iPad time left";
-    el.countdown.textContent = fmtClock(state.earnedMins * 60);
-    // track against wall-clock end time so a delayed tick can't drift the total
-    state.countdownEnd = Date.now() + state.earnedMins * 60 * 1000;
-    const tick = () => {
-      const left = Math.max(0, Math.round((state.countdownEnd - Date.now()) / 1000));
-      el.countdown.textContent = fmtClock(left);
-      if (left <= 0) ringTimer();
-    };
-    state.countdownId = setInterval(tick, 250);
-  }
-
-  function ringTimer() {
-    if (state.countdownId) { clearInterval(state.countdownId); state.countdownId = null; }
-    el.countdown.textContent = "0:00";
-    el.countdownLabel.textContent = "⏰ TIME'S UP!";
-    el.countdownBox.classList.add("ringing");
-    el.cancelTimerBtn.textContent = "🔕 Stop alarm";
-    Sound.startAlarm();
-  }
-
-  // Cancel (mid-countdown) or silence the alarm, then reset to the start state.
-  function dismissRewardTimer() {
-    Sound.click();
-    clearRewardTimer();
-    el.countdownBox.classList.add("hidden");
-    el.rewardStart.classList.remove("hidden");
+    showScreen("endScreen");
   }
 
   // ---------- Answer entry (on-screen pad + physical keyboard) ----------
@@ -1602,9 +936,7 @@
 
   // ---------- Events ----------
   el.startBtn.addEventListener("click", startGame);
-  el.playAgainBtn.addEventListener("click", () => { Sound.click(); clearRewardTimer(); show(el.menu); });
-  el.startTimerBtn.addEventListener("click", startRewardTimer);
-  el.cancelTimerBtn.addEventListener("click", dismissRewardTimer);
+  el.playAgainBtn.addEventListener("click", () => { Sound.click(); Reward.clear(); showScreen("menu"); });
   el.attackBtn.addEventListener("click", playerAttack);
   el.keypad.addEventListener("click", (e) => {
     const b = e.target.closest("button.key");
@@ -1613,7 +945,7 @@
   el.backBtn.addEventListener("click", () => pressKey("back"));
   // Physical keyboards (laptops) keep working during a battle.
   document.addEventListener("keydown", (e) => {
-    if (el.battle.classList.contains("hidden")) return;
+    if (!el.battle.classList.contains("show")) return;
     if (e.key === "Enter") { e.preventDefault(); playerAttack(); }
     else if (e.key === "Backspace") { e.preventDefault(); pressKey("back"); }
     else if (/^\d$/.test(e.key)) { e.preventDefault(); pressKey(e.key); }
@@ -1625,7 +957,7 @@
   attachDrag(el.towerA);
   attachDrag(el.towerB);
 
-  show(el.menu);
+  showScreen("menu");
 })();
 </script>
 </body>

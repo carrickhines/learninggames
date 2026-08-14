@@ -1,0 +1,25 @@
+/* ==========================================================================
+   Design tokens — the one source of truth for the family's look.
+
+   Every game and the hub load this first. These values were already identical
+   in all three games before the merge; they live here now so a palette change
+   is one edit instead of four.
+   ========================================================================== */
+
+:root {
+  --sky-top: #241544;
+  --sky-mid: #3a1f5c;
+  --sky-low: #5b2a63;
+  --horizon: #ff6fa5;       /* warm dusk glow at the arena floor */
+  --panel: rgba(15, 8, 30, 0.42);
+  --accent: #ffd23f;
+  --accent-2: #d99312;      /* deeper gold for the button "lip" */
+  --good: #5ce8a0;          /* you / hero / correct */
+  --bad: #ff5e7e;           /* foe / danger */
+  --ink: #1b1230;           /* dark text on gold buttons */
+  --gold: #ffcf4d;          /* the currency, distinct from --accent chrome */
+  --xp: #7dd3fc;            /* the XP bar */
+  --display: "Arial Rounded MT Bold", "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+}

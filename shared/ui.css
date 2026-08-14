@@ -1,0 +1,317 @@
+/* ==========================================================================
+   Shared chrome — the parts every page wears: the app frame, screens,
+   headings, buttons, HP pips, the end-screen reward panel.
+
+   Loaded by the hub and all three games. Game-specific CSS stays inline in
+   each game's index.html and may override anything here.
+
+   Screen convention: `.screen` is hidden by default, `.screen.show` is
+   visible. Navigate with `showScreen(id)`.
+   ========================================================================== */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--body);
+  color: #fff;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1d1336 0%, #0d0820 70%, #07040f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  width: min(900px, 96vw);
+  height: min(720px, 96vh);
+  position: relative;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  /* twilight quest arena: starfield + warm horizon glow over a violet sky */
+  background:
+    radial-gradient(2px 2px at 15% 18%, rgba(255,255,255,.75), transparent 60%),
+    radial-gradient(2px 2px at 72% 14%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1.5px 1.5px at 40% 28%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 86% 33%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(2px 2px at 28% 10%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 58% 22%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(125% 75% at 50% 120%, var(--horizon) 0%, rgba(255,111,165,0) 55%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-low) 100%);
+}
+
+/* ---------- Screens ---------- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  animation: fadeIn 0.4s ease;
+}
+.screen.show { display: flex; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* A screen whose content can outgrow the frame: centered when it fits,
+   scrolling when it doesn't (margin:auto on the inner wrapper does both). */
+.scrolls { justify-content: flex-start; overflow-y: auto; scrollbar-width: none; }
+.scrolls::-webkit-scrollbar { display: none; }
+.screen-inner {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* ---------- Type ---------- */
+
+h1 {
+  font-family: var(--display);
+  font-size: clamp(44px, 8.5vw, 76px);
+  margin: 0 0 6px;
+  color: var(--accent);
+  text-shadow:
+    0 3px 0 var(--accent-2),
+    0 5px 0 #9a6a0c,
+    0 10px 22px rgba(0,0,0,.55);
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.subtitle {
+  font-size: 19px;
+  color: rgba(255,255,255,.78);
+  margin-bottom: 24px;
+  max-width: 50ch;       /* wide enough to keep these on one line on tablet/desktop */
+  text-wrap: balance;    /* if it must wrap on a narrow phone, keep the lines even */
+}
+.group-label {
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin: 12px 0 9px;
+  color: var(--accent);
+  opacity: .92;
+}
+.group-label::before, .group-label::after {
+  content: "";
+  display: inline-block;
+  width: 26px;
+  height: 2px;
+  margin: 0 12px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, transparent, var(--accent));
+  opacity: .55;
+}
+.group-label::after { transform: scaleX(-1); }
+
+.hint { font-size: 16px; color: rgba(255,255,255,.62); margin-top: 8px; }
+
+/* ---------- Buttons ---------- */
+
+.btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+button {
+  font-family: var(--display);
+  cursor: pointer;
+  border: none;
+  border-radius: 16px;
+  font-size: 22px;
+  font-weight: bold;
+  padding: 16px 28px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #ffe27a, var(--accent));
+  box-shadow: 0 5px 0 var(--accent-2), 0 9px 18px rgba(0,0,0,.35);
+  transition: transform .08s, box-shadow .08s, filter .15s;
+  user-select: none;
+  touch-action: manipulation;
+}
+button:hover { filter: brightness(1.06); }
+button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-2), 0 4px 10px rgba(0,0,0,.3); }
+
+#startBtn { font-size: 26px; padding: 18px 40px; letter-spacing: .5px; }
+#startBtn:disabled,
+button:disabled {
+  filter: grayscale(.6) brightness(.85);
+  cursor: default;
+  box-shadow: 0 5px 0 #777, 0 9px 18px rgba(0,0,0,.3);
+  transform: none;
+}
+
+/* The glassy card used for every pick-one-of-these choice: tracks, modes,
+   quests, profiles, shop items. `.sel` marks the current selection. */
+button.choice {
+  background: var(--panel);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 9px 18px rgba(0,0,0,.28);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  /* compact so a dozen tracks wrap into a few tidy rows within 720px */
+  font-size: 18px;
+  padding: 13px 16px;
+  min-width: 158px;
+}
+button.choice .emoji { font-size: 30px; display: block; margin-bottom: 4px; }
+button.choice .sub { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; display: block; margin-top: 3px; }
+button.choice.sel {
+  background: linear-gradient(180deg, #ffe27a, var(--accent));
+  color: var(--ink);
+  border-color: transparent;
+  box-shadow: 0 5px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.35), 0 9px 18px rgba(0,0,0,.32);
+}
+button.choice.sel .sub { opacity: .85; }
+
+.ghost-btn {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  box-shadow: 0 5px 0 rgba(0,0,0,.35);
+  font-size: 18px;
+  padding: 12px 22px;
+}
+.ghost-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+.sound-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  width: 46px;
+  height: 46px;
+  padding: 0;                /* override the base button padding so the icon centers */
+  border-radius: 50%;
+  background: var(--panel);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.3);
+  line-height: 1;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: transform .08s, filter .15s;
+}
+.sound-toggle:active { transform: translateY(3px); }
+.sound-toggle.muted { opacity: 0.55; }
+
+/* ---------- Top bar + HP pips ---------- */
+
+.topbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+  padding-right: 66px;   /* clear the top-right mute button (~58px wide) */
+  flex-shrink: 0;
+}
+
+/* HP as countable pips: hearts for the hero, orbs for the foe — true to the
+   small integer HP values and doubles as counting practice. */
+.pips { display: flex; gap: 7px; min-height: 26px; }
+.pips.foe { justify-content: flex-end; }
+.pip {
+  width: 25px;
+  height: 25px;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.pip.heart {
+  background: var(--good);
+  -webkit-mask: var(--heart) center / contain no-repeat;
+  mask: var(--heart) center / contain no-repeat;
+  filter: drop-shadow(0 0 5px rgba(92,232,160,.6)) drop-shadow(0 2px 2px rgba(0,0,0,.4));
+}
+.pip.empty {
+  background: rgba(255,255,255,.16);
+  box-shadow: none;
+  filter: none;
+  transform: scale(.82);
+}
+
+/* ---------- End screens ---------- */
+
+.end-emoji {
+  font-size: 120px;
+  margin-bottom: 10px;
+  animation: endPop .5s ease;
+  filter: drop-shadow(0 0 24px rgba(255,210,63,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45));
+}
+@keyframes endPop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+/* ---------- iPad-time countdown (shared/reward.js drives this) ---------- */
+
+.reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 22px;
+}
+.reward.hidden, #countdownBox.hidden, #rewardStart.hidden { display: none; }
+#rewardStart { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.reward-line { font-size: 22px; font-weight: bold; color: var(--good); }
+.reward-line b { color: var(--accent); font-size: 28px; }
+.reward-hint {
+  font-size: 14px;
+  color: rgba(255,255,255,.6);
+  max-width: 42ch;
+  text-wrap: balance;
+}
+
+#countdownBox { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.countdown {
+  font-family: var(--display);
+  font-size: clamp(56px, 14vw, 92px);
+  font-weight: bold;
+  color: var(--accent);
+  text-shadow: 0 3px 0 var(--accent-2), 0 8px 18px rgba(0,0,0,.5);
+  line-height: 1;
+  letter-spacing: 2px;
+}
+.countdown-label {
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,.72);
+  margin-bottom: 10px;
+}
+/* time's up: flash the countdown red to grab attention within the app */
+#countdownBox.ringing .countdown { color: var(--bad); animation: ringPulse .6s ease-in-out infinite; }
+#countdownBox.ringing .countdown-label { color: var(--bad); font-weight: bold; }
+@keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.14); opacity: .55; } }
+
+/* ---------- Quality floor ---------- */
+
+button:focus-visible,
+.key:focus-visible,
+.sound-toggle:focus-visible,
+.tower:focus-visible,
+#answer:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
