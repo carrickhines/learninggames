@@ -442,6 +442,7 @@
     timerStart: 0,
     busy: false,
     node: null,          // the map stop being played, if any
+    mapReturn: null,     // set on winning one, so the end screen sends you back
     shield: 0,           // one free hit, if a pet is equipped
     goldAtStart: 0,      // so the win screen can show what this run paid
   };
@@ -1253,7 +1254,11 @@
     Sound.click();
     Save.setContext("math");     // the world's gold multiplier applies here
     Log.startSession({ game: "math", track: state.track, mode: state.mode });
-    FOES = Save.foesFor("math");
+    state.mapReturn = null;
+    // a boss stop is one named monster with a lot of hearts, not the lineup
+    FOES = (state.node && state.node.boss && state.node.foe)
+      ? [state.node.foe]
+      : Save.foesFor("math");
     GEAR = Save.loadout();
     renderPet();
     state.playerHp = GEAR.maxHp;
@@ -1268,7 +1273,9 @@
     el.battle.classList.toggle("with-blocks", BLOCK_TRACKS.indexOf(state.track) !== -1);
     el.nodeBar.classList.toggle("hidden", !state.node);
     if (state.node) {
-      el.nodeBar.textContent = `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
+      el.nodeBar.textContent = state.node.boss
+        ? `⚔️ BOSS — ${state.node.foe.name}`
+        : `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
     }
     showScreen("battle");
     newProblem();
@@ -1287,6 +1294,9 @@
       ? "Stop " + (node.i + 1) + " beaten! The path goes on."
       : "You defeated every monster. You're a math hero!";
     showEarnings();
+    // a beaten map stop pays out on the map, where the walk and the chest are
+    state.mapReturn = node && node.advanced ? node : null;
+    el.playAgainBtn.textContent = state.mapReturn ? "🗺️ Back to the map" : "Play Again";
     Sound.win();
     Log.endSession({ won: true, gold: earnedThisRun() });
     showScreen("endScreen");
@@ -1343,6 +1353,7 @@
   });
   el.playAgainBtn.addEventListener("click", () => {
     Sound.click();
+    if (state.mapReturn) return Hud.backToMap(state.mapReturn);
     // back to the menu is free play again
     state.node = null;
     Save.clearNode();

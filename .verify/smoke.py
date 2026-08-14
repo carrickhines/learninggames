@@ -182,6 +182,37 @@ try:
           len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 3)
     check("hub: no JS errors", errs() == [], str(errs()))
 
+    print("\nThe map")
+    click("#mapBtn")
+    time.sleep(0.9)
+    steps = d.execute_script("return Save.mapLength('little');")
+    check("map: the landscape is drawn",
+          d.execute_script("return document.getElementById('mapScene').childNodes.length;") > 5)
+    check("map: every step has a stop on the trail",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop")) >=
+          d.execute_script("""
+              return Save.mapTrail('little').reduce(
+                  function (n, s) { return n + s.options.length; }, 0);
+          """))
+    check("map: exactly one stop is playable",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 1)
+    check("map: the hero is on the map",
+          d.find_element(By.ID, "mapHero").is_displayed())
+    check("map: forks offer two routes", d.execute_script("""
+        return Save.mapTrail('little').filter(function (s) { return s.choice; }).length >= 3;
+    """))
+    check("map: there are bosses", d.execute_script("""
+        return Save.mapTrail('little').filter(function (s) { return s.boss; }).length >= 3;
+    """))
+    check("map: the other trail can be picked", True)
+    d.execute_script("document.querySelector('[data-trail=\"big\"]').click();")
+    time.sleep(0.5)
+    check("map: switching trails redraws it",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 1)
+    check("map: no JS errors", errs() == [], str(errs()))
+    click("#mapBackBtn")
+    time.sleep(0.4)
+
     print("\nShop")
     click("#shopBtn")
     time.sleep(0.5)

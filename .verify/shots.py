@@ -182,23 +182,52 @@ try:
     # the map, a few stops in
     load("index.html")
     d.execute_script("""
-        Save.update(function (p) { p.progress.map = { little: 7, big: 3 }; });
+        Save.update(function (p) {
+            p.progress.map = { little: 4, big: 3 };
+            p.progress.mapPicks = { little: { 2: 1 }, big: { 2: 0 } };
+        });
         document.getElementById('mapBtn').click();
     """)
-    time.sleep(0.7)
+    time.sleep(1.2)
     d.execute_script(NO_ANIM)
     shot("hub-map")
+    # further along, at a boss and into the next region
+    d.execute_script("""
+        Save.update(function (p) { p.progress.map.little = 5; });
+        openMap(null);
+        document.getElementById('mapScroll').scrollTop = 380;
+    """)
+    time.sleep(0.6)
+    shot("hub-map-boss")
     d.execute_script("document.querySelector('[data-trail=\"big\"]').click();")
-    time.sleep(0.5)
+    time.sleep(0.6)
     shot("hub-map-big")
+    # the chest
+    d.execute_script("""
+        showChest({ boss: true, gold: 250,
+                    card: { id: 'm-dragon', how: 'new', foil: true }, token: false });
+    """)
+    time.sleep(0.5)
+    shot("hub-map-chest")
 
-    # a game playing a map stop
+    # a game playing a map stop, and a boss stop
     load("index.html")
-    d.execute_script("Save.startNode('little', 7);")
+    d.execute_script("Save.update(function (p) { p.progress.map.little = 1; });"
+                     "Save.startNode('little', 1);")
     load("story/index.html")
     time.sleep(1.0)
     d.execute_script(NO_ANIM)
     shot("story-map-stop")
+
+    load("index.html")
+    d.execute_script("Save.update(function (p) { p.progress.map.little = 5; });"
+                     "Save.startNode('little', 5);")
+    load("math/index.html")
+    time.sleep(1.2)
+    d.execute_script(NO_ANIM)
+    shot("math-boss")
+    load("index.html")
+    d.execute_script("Save.clearNode();")
 
     # the collection, part-caught
     load("index.html")

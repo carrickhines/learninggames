@@ -12,7 +12,7 @@ speed — a couple of minutes for all three.
 
 Exit code 0 only if every run reaches its win screen.
 """
-import os, sys, time
+import os, re, sys, time
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -338,19 +338,22 @@ try:
     load("index.html")
     d.execute_script("document.getElementById('mapBtn').click();")
     time.sleep(0.6)
+    total = d.execute_script("""
+        return Save.mapTrail('little').reduce(
+            function (n, s) { return n + s.options.length; }, 0);
+    """)
     check("map: the trail is drawn",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode")) ==
-          d.execute_script("return Save.MAP.little.length;"))
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop")) == total,
+          "%d stops" % total)
     check("map: exactly one stop is playable",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next")) == 1)
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 1)
     check("map: the rest are locked",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.locked")) ==
-          d.execute_script("return Save.MAP.little.length;") - 1)
-    check("map: the hero is standing on the next stop",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next .you")) == 1)
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.locked")) == total - 1)
+    check("map: the hero is on the map",
+          d.find_element(By.ID, "mapHero").is_displayed())
 
     # a locked stop refuses, and arms nothing
-    d.execute_script("document.querySelectorAll('.mapnode.locked')[3].click();")
+    d.execute_script("document.querySelectorAll('.mapstop.locked')[3].click();")
     time.sleep(0.3)
     check("map: a locked stop refuses", "Beat the stop before" in text("#mapFlash"),
           text("#mapFlash"))
@@ -359,7 +362,7 @@ try:
 
     # play the first stop for real
     first = d.execute_script("return Save.MAP.little[0];")
-    d.execute_script("document.querySelector('.mapnode.next').click();")
+    d.execute_script("document.querySelector('.mapstop.next').click();")
     time.sleep(1.6)
     check("map: tapping a stop opens its game",
           first["g"] in d.current_url, d.current_url)
@@ -391,17 +394,91 @@ try:
     check("map: nothing is left armed",
           d.execute_script("return Save.activeNode();") is None)
 
-    load("index.html")
-    d.execute_script("document.getElementById('mapBtn').click();")
-    time.sleep(0.6)
+    # the win screen should offer the map, not "play again"
+    check("map: the win screen sends you back to the map",
+          "map" in text("#playAgainBtn").lower(), text("#playAgainBtn"))
+    click("#playAgainBtn")
+    time.sleep(2.8)                       # the hero walks, then the chest opens
+
+    check("map: beating a stop lands back on the map", showing("map"))
+    check("map: the chest opened", d.execute_script(
+        "return !document.getElementById('chestBox').classList.contains('hidden');"))
+    # The gold is banked when the stop completes; the map reveals it. So check
+    # the revealed amount is the configured one and the hero actually has it.
+    shown = int(re.search(r"(\d+)", text("#chestLoot")).group(1))
+    expect = d.execute_script("return Math.round(Save.ECONOMY.chestGold * Save.goldRate());")
+    check("map: the chest paid the configured amount", shown == expect,
+          "showed %d, expected %d" % (shown, expect))
+    check("map: the hero actually has that gold", gold() >= shown,
+          "%d gold vs a %d chest" % (gold(), shown))
+    check("map: the chest says what was in it",
+          "gold" in text("#chestLoot"), text("#chestLoot"))
+    d.execute_script("document.getElementById('chestOk').click();")
+    time.sleep(0.4)
+
     check("map: the beaten stop now shows as done",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.done")) == 1)
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.done")) >= 1)
     check("map: the next stop opened up",
-          len(d.find_elements(By.CSS_SELECTOR, ".mapnode.next")) == 1)
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 1)
     check("map: the other trail is untouched",
           d.execute_script("return Save.mapAt('big');") == 0)
+    check("map: the walk is not offered twice",
+          d.execute_script("return Save.me().progress.mapWalk;") is None)
 
-    # free play must be unaffected by the map
+    # a fork: both routes are open, and taking one closes the other
+    fork = d.execute_script("""
+        var t = Save.mapTrail('little');
+        for (var i = 0; i < t.length; i++) if (t[i].choice) return i;
+        return null;
+    """)
+    check("map: the trail has a fork", fork is not None)
+    d.execute_script(
+        "var at = arguments[0];"
+        "Save.update(function (p) { p.progress.map.little = at; });", fork)
+    d.execute_script("openMap(null);")
+    time.sleep(0.6)
+    check("map: both routes of a fork are offered",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.next")) == 2)
+    check("map: the fork is signposted",
+          len(d.find_elements(By.CSS_SELECTOR, ".forksign")) == 1)
+    d.execute_script("Save.startNode('little', arguments[0], 1); Save.completeNode();", fork)
+    d.execute_script("openMap(null);")
+    time.sleep(0.5)
+    check("map: the route taken reads as done",
+          d.execute_script("return Save.nodeState('little', arguments[0], 1);", fork) == "done")
+    check("map: the road not taken is faded",
+          len(d.find_elements(By.CSS_SELECTOR, ".mapstop.untaken")) == 1)
+
+    # a boss stop fights one big monster, not the usual lineup
+    boss = d.execute_script("""
+        var t = Save.mapTrail('little');
+        for (var i = 0; i < t.length; i++) if (t[i].boss && !t[i].options[0].needs) return i;
+        return null;
+    """)
+    check("map: the trail has a boss", boss is not None)
+    d.execute_script("""
+        var at = arguments[0];
+        Save.update(function (p) { p.progress.map.little = at; });
+        Save.startNode('little', at);
+    """, boss)
+    bossNode = d.execute_script("return Save.activeNode();")
+    load(bossNode["g"] + "/index.html")
+    time.sleep(0.6)
+    check("map: a boss stop fights a single monster",
+          d.execute_script("return TEST.FOES.length;") == 1)
+    check("map: the boss is the named one",
+          d.execute_script("return TEST.FOES[0].name;") == bossNode["foe"]["name"],
+          d.execute_script("return TEST.FOES[0].name;"))
+    check("map: the boss has more hearts than a common monster",
+          d.execute_script("return TEST.FOES[0].hp;") >= 8)
+    check("map: the boss shows its own pips",
+          len(d.find_elements(By.CSS_SELECTOR, "#foeHp .pip, #foePips .pip")) ==
+          bossNode["foe"]["hp"])
+
+    # Free play must be unaffected by the map. Going through the hub is what
+    # disarms a stop, so do that — the boss above was armed and never played.
+    load("index.html")
+    d.execute_script("Save.clearNode();")
     load("math/index.html")
     check("map: free play shows the menu, not a stop", showing("menu"))
     check("map: free play has no stop banner", d.execute_script(

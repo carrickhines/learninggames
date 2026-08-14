@@ -1028,6 +1028,7 @@ const state = {
   goldAtStart: 0,     // so the win screen can show what this quest paid
   shownAt: 0,         // when the current scene went up
   node: null,         // the map stop being played, if any
+  mapReturn: null,    // set on winning one, so the win screen sends you back
   mode: 'quest',      // 'quest' | 'order' | 'finish'
   round: 0,           // little-hero games run rounds, not scenes
   item: null,         // the current round's set or story
@@ -1293,6 +1294,7 @@ function pickFinish(el, choice) {
 
 function miniComplete() {
   const node = state.node ? Save.completeNode() : null;
+  offerMapReturn(node);
   const card = state.mode === 'order' ? MINI_CARDS.order : MINI_CARDS.finish;
   const drop = Save.awardCard(card.id, true);   // a finished game always pays
   Save.recordRunWon('story');
@@ -1496,6 +1498,7 @@ function nextScene() {
    ================================================================== */
 function questComplete() {
   const node = state.node ? Save.completeNode() : null;
+  offerMapReturn(node);
   Save.recordQuestDone(state.questIdx);
   Save.recordRunWon('story');
   const bonus = Save.awardEvent('questDone');
@@ -1515,6 +1518,13 @@ function questComplete() {
 
 // What this quest put in the purse. Gold is the reward now — iPad time is
 // bought with it back at the hub.
+/* A beaten map stop pays out on the map, where the walk and the chest are. */
+function offerMapReturn(node) {
+  state.mapReturn = node && node.advanced ? node : null;
+  $('winAgainBtn').textContent =
+    state.mapReturn ? '🗺️ Back to the map' : 'Back to quests';
+}
+
 function earnedThisRun() {
   return Math.max(0, (Save.me() || { gold: 0 }).gold - state.goldAtStart);
 }
@@ -1536,6 +1546,7 @@ function questFailed() {
 
 $('winAgainBtn').addEventListener('click', () => {
   Sound.click();
+  if (state.mapReturn) return Hud.backToMap(state.mapReturn);
   state.node = null;        // back to the menu is free play again
   Save.clearNode();
   showScreen('menu');

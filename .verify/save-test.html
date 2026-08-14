@@ -496,18 +496,115 @@ try {
   ok('buying the world opens it', Save.nodeState(gateTrail, gate) === 'next');
   ok('now it can be started', Save.startNode(gateTrail, gate) === true);
 
-  /* every stop must point at a real game, track and mode */
+  /* every option of every step must point at a real game, track and mode */
   ['little', 'big'].forEach(function (tr) {
-    var bad = Save.MAP[tr].filter(function (n) {
+    var all = [];
+    Save.mapTrail(tr).forEach(function (step) {
+      step.options.forEach(function (n) { all.push(n); });
+    });
+    var bad = all.filter(function (n) {
       if (['math', 'language', 'story'].indexOf(n.g) === -1) return true;
       if (n.g === 'story') return n.quest === undefined && !n.mini;
       return !n.t || !n.m;
     });
     ok(tr + ' trail: every stop names a real game and track', bad.length === 0,
-       JSON.stringify(bad.slice(0, 2)));
-    var noLabel = Save.MAP[tr].filter(function (n) { return !n.label; });
-    ok(tr + ' trail: every stop has a label', noLabel.length === 0);
+       JSON.stringify(bad.slice(0, 1)));
+    ok(tr + ' trail: every stop has a label',
+       all.every(function (n) { return !!n.label; }));
+    ok(tr + ' trail: every option of a fork explains its route',
+       Save.mapTrail(tr).every(function (step) {
+         return !step.choice || step.options.every(function (n) { return !!n.route; });
+       }));
+    ok(tr + ' trail: story stops are never bosses',
+       all.every(function (n) { return !(n.boss && n.g === 'story'); }));
+    ok(tr + ' trail: every boss names the monster it fights',
+       all.every(function (n) { return !n.boss || (n.foe && n.foe.hp && n.foe.emoji); }));
+    ok(tr + ' trail: it has forks to choose between',
+       Save.mapTrail(tr).filter(function (s2) { return s2.choice; }).length >= 3);
+    ok(tr + ' trail: it has bosses',
+       Save.mapTrail(tr).filter(function (s2) { return s2.boss; }).length >= 3);
+    ok(tr + ' trail: every step belongs to a region',
+       Save.mapTrail(tr).every(function (s2) { return !!s2.region; }));
   });
+  ok('the regions cover the whole trail',
+     Save.REGIONS.reduce(function (n, r) { return n + r.steps; }, 0) >=
+     Math.max(Save.mapLength('little'), Save.mapLength('big')));
+
+  /* ---------- forks ---------- */
+  fresh();
+  var forkAt = null;
+  Save.mapTrail('little').forEach(function (st) {
+    if (forkAt === null && st.choice) forkAt = st.i;
+  });
+  ok('the little trail has a fork', forkAt !== null);
+
+  Save.update(function (p) { p.progress.map.little = forkAt; });
+  ok('both routes of a fork are playable',
+     Save.nodeState('little', forkAt, 0) === 'next' &&
+     Save.nodeState('little', forkAt, 1) === 'next');
+
+  ok('taking the second route works', Save.startNode('little', forkAt, 1) === true);
+  ok('the armed stop remembers which route', Save.activeNode().o === 1);
+  var forkRes = Save.completeNode();
+  ok('either route advances the trail', forkRes.advanced === true);
+  ok('the route taken is remembered', Save.mapPick('little', forkAt) === 1);
+  ok('the route taken reads as done',
+     Save.nodeState('little', forkAt, 1) === 'done');
+  ok('the road not taken reads as untaken',
+     Save.nodeState('little', forkAt, 0) === 'untaken');
+  ok('the trail rejoins after a fork',
+     Save.nodeState('little', forkAt + 1, 0) === 'next');
+
+  /* ---------- the hero's walk ---------- */
+  ok('completing a stop remembers where to walk the hero from',
+     Save.mapWalkFrom('little') === forkAt);
+  ok('the walk is only offered once', Save.mapWalkFrom('little') === null);
+
+  /* ---------- loot ---------- */
+  fresh();
+  var goldWas = Save.me().gold;
+  Save.startNode('little', 0);
+  var res2 = Save.completeNode();
+  ok('a beaten stop leaves a chest', !!res2.loot);
+  ok('the chest holds gold', res2.loot.gold > 0);
+  ok('the gold is actually banked', Save.me().gold === goldWas + res2.loot.gold);
+  ok('an ordinary chest is not a boss chest', res2.loot.boss === false);
+
+  /* a boss chest is bigger and always holds a card */
+  fresh();
+  var bossAt = null;
+  Save.mapTrail('little').forEach(function (st) {
+    if (bossAt === null && st.boss) bossAt = st.i;
+  });
+  ok('the little trail has a boss', bossAt !== null);
+  Save.update(function (p) { p.progress.map.little = bossAt; });
+  Save.award(100000, 0);
+  ['world-cave', 'world-sky', 'world-reef', 'world-ember'].forEach(function (w) { Save.buy(w); });
+  Save.startNode('little', bossAt);
+  var bossNode = Save.activeNode();
+  ok('a boss stop names its monster', !!bossNode.foe && !!bossNode.foe.name);
+  ok('a boss monster has more hearts than a common one',
+     bossNode.foe.hp >= 8, String(bossNode.foe.hp));
+  var bossRes = Save.completeNode();
+  ok('a boss chest is marked as one', bossRes.loot.boss === true);
+  ok('a boss chest pays more than an ordinary one',
+     bossRes.loot.gold > Save.ECONOMY.chestGold);
+  ok('a boss chest always holds a card', !!bossRes.loot.card);
+  ok('the card from a chest is really held',
+     Save.held(bossRes.loot.card.id) > 0);
+
+  /* over many chests, ordinary ones pay cards only sometimes */
+  fresh();
+  var withCard = 0, N2 = 300;
+  for (var i = 0; i < N2; i++) {
+    Save.update(function (p) { p.progress.map.little = 0; p.cards = {}; });
+    Save.startNode('little', 0);
+    if (Save.completeNode().loot.card) withCard++;
+  }
+  var rate = withCard / N2;
+  ok('an ordinary chest holds a card sometimes, not always',
+     Math.abs(rate - Save.ECONOMY.chestCardChance) < 0.09,
+     'got ' + rate.toFixed(2) + ', want ' + Save.ECONOMY.chestCardChance);
 
   /* ---------- progress bookkeeping ---------- */
   fresh();

@@ -1241,6 +1241,7 @@ const state = {
   goldAtStart: 0,          // so the win screen can show what this run paid
   askedAt: 0,              // when the current question went up
   node: null,              // the map stop being played, if any
+  mapReturn: null,         // set on winning one, so the win screen sends you back
 };
 
 // The hero chip, and the gate: no hero picked means back to the hub.
@@ -1331,7 +1332,11 @@ function startGame() {
   state.foeIdx = 0;
   Save.setContext('language');   // the world's gold multiplier applies here
   Log.startSession({ game: 'language', track: state.track, mode: state.mode });
-  FOES = Save.foesFor('language');
+  state.mapReturn = null;
+  // a boss stop is one named monster with a lot of hearts, not the lineup
+  FOES = (state.node && state.node.boss && state.node.foe)
+    ? [state.node.foe]
+    : Save.foesFor('language');
   GEAR = Save.loadout();
   renderPet();
   state.playerHp = GEAR.maxHp;
@@ -1340,7 +1345,9 @@ function startGame() {
   state.draw = makeDeck(track(state.track).pool());
   $('nodeBar').classList.toggle('hidden', !state.node);
   if (state.node) {
-    $('nodeBar').textContent = `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
+    $('nodeBar').textContent = state.node.boss
+      ? `⚔️ BOSS — ${state.node.foe.name}`
+      : `🗺️ Stop ${state.node.i + 1} — ${state.node.label}`;
   }
   showScreen('game');
   spawnFoe();
@@ -2105,6 +2112,9 @@ function winGame() {
     $('win').querySelector('.subtitle').textContent =
       'Stop ' + (node.i + 1) + ' beaten! The path goes on.';
   }
+  // a beaten map stop pays out on the map, where the walk and the chest are
+  state.mapReturn = node && node.advanced ? node : null;
+  $('winAgainBtn').textContent = state.mapReturn ? '🗺️ Back to the map' : 'Play Again';
   Save.recordRunWon('language');
   const bonus = Save.awardEvent('runWon');
   Sound.victory();
@@ -2140,6 +2150,7 @@ function gameOver() {
 
 $('winAgainBtn').addEventListener('click', () => {
   Sound.click();
+  if (state.mapReturn) return Hud.backToMap(state.mapReturn);
   state.node = null;        // back to the menu is free play again
   Save.clearNode();
   showScreen('menu');

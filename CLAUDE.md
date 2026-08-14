@@ -48,26 +48,51 @@ no build step and the games still open straight from `file://`.
 
 ## The map
 
-The hub's map is the visible route through everything: a winding trail of
-stops, each naming a concrete challenge, opening the next when beaten.
+A landscape the hero walks, not a menu. The trail climbs through five regions,
+each with its own sky, hills and scenery, and the hero token slides along the
+path when a stop is beaten — that walk is the moment the screen exists for.
 
 **Two trails, deliberately.** The five-year-old and the eight-year-old play
-genuinely different content, so a single linear path would strand the younger
-one at the first Algebra stop. `MAP.little` and `MAP.big` are 24 stops each,
-with independent progress per profile.
+genuinely different content, so a single path would strand the younger one at
+the first Algebra stop. `MAP.little` and `MAP.big` are ~22 steps each, with
+independent progress per profile.
+
+**A step is one stop or a choice of two.** A fork always rejoins, so no route
+is a dead end and nothing is missable — the branch exists to make the journey
+yours, not to punish a wrong turn. Beating either option advances the step;
+the road not taken is drawn faded. Which route was taken is remembered in
+`progress.mapPicks`.
+
+```
+    ●───●───┬─●─┬───●───◆        ◆ boss
+            └─●─┘
+```
+
+**Bosses** fight one named monster with 8–14 hearts instead of the usual
+lineup (`boss: true` plus a `foe`), get a bigger red node, and always drop a
+card. Story stops are never bosses — there's nothing to fight.
+
+**Every stop pays a chest**, revealed on the map when the hero arrives rather
+than on a win screen. That's deliberate: the reward lands where the progress
+is visible, which is the reason to walk back and look. Boss chests pay more
+and always hold a card, so they're also the most reliable way to finish a set.
+The game stashes the loot in `sessionStorage` and the hub's `resumeFromMap()`
+picks it up.
 
 Tapping a stop calls `Save.startNode()`, opens that game, and the game locks
 itself to the stop's track and mode (skipping its menu). Winning calls
-`Save.completeNode()`, which walks the trail forward once — replaying a beaten
-stop is fine and doesn't double-advance. Some stops carry `needs: '<world>'`
-and stay shut until that world is bought.
+`Save.completeNode()`, which advances once — replaying a beaten stop doesn't
+double-advance — records the route, remembers where to walk the hero from, and
+rolls the chest. Some stops carry `needs: '<world>'` and stay shut until that
+world is bought.
 
 **Free play is not gated by the map.** Starting from a game's own menu clears
 any armed stop. A kid who wants to drill times tables today just can.
 
-Stop positions are not stored — the hub lays them out as a serpentine, so
-adding a stop is a one-line change to the `MAP` data with nothing to
-re-position.
+**Geometry is computed, never stored.** Each step gets a point on a sine that
+oscillates across the board while climbing, so the trail winds itself; a fork
+puts its options either side and the path splits and rejoins around them.
+Adding a stop is a one-line change to `MAP` with nothing to re-position.
 
 ## The hero, and why everything persists
 

@@ -156,7 +156,20 @@ var Hud = (function () {
     if (result.leveledTo) levelUp(result.leveledTo);
   }
 
+  /* Beating a map stop: stash what it paid and send the player back to the
+     map, where the hero walks on and the chest opens. The reward lands where
+     the progress is visible instead of on a win screen nobody looks at. */
+  function backToMap(result) {
+    try {
+      sessionStorage.setItem('lg_loot', JSON.stringify({
+        trail: result.trail, chest: result.loot
+      }));
+    } catch (e) { /* no session storage: the gold is banked either way */ }
+    location.href = opts.home;
+  }
+
   return {
+    backToMap: backToMap,
     mount: mount,
     render: render,
     gained: gained,

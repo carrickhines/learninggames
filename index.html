@@ -189,99 +189,196 @@
   .shop-item.setlocked .price { color: var(--accent); }
 
   /* ---------- The map ----------
-     A serpentine of stops. Every other row runs right-to-left and the
-     connectors are drawn between nodes, so the route reads as a winding path
-     rather than a list. */
+     A landscape, not a list. The scene is one SVG (sky bands per region, the
+     trail drawn through them); the stops and the hero are DOM on top, so they
+     can be tapped and transitioned. */
   .trail-pick { min-width: 168px; }
   .trail-pick .emoji { font-size: 30px; }
 
-  #mapBoard { max-width: 720px; margin: 14px auto 0; }
-  .maprow {
-    display: flex;
-    justify-content: center;
-    align-items: stretch;
-    gap: 0;
-    /* hug the nodes so the turn connector can be positioned against the row's
-       own edge rather than the board's */
-    width: fit-content;
-    margin-left: auto;
-    margin-right: auto;
-    position: relative;
+  #mapScroll {
+    width: 100%;
+    max-width: 700px;
+    height: min(52vh, 420px);
+    margin: 12px auto 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: inset 0 2px 20px rgba(0,0,0,.5);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .maprow.flip { flex-direction: row-reverse; }
+  #mapScroll::-webkit-scrollbar { display: none; }
 
-  .mapnode {
-    position: relative;
-    width: 122px;
-    padding: 10px 6px 8px;
-    margin: 0;
-    border-radius: 18px;
-    background: var(--panel);
-    border: 1px solid rgba(255,255,255,.12);
-    box-shadow: 0 4px 0 rgba(0,0,0,.3);
+  #mapBoard { position: relative; width: 700px; }
+  #mapScene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #mapProps, #mapNodes { position: absolute; inset: 0; }
+
+  .mapprop {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    opacity: .5;
+    filter: drop-shadow(0 3px 3px rgba(0,0,0,.4));
+    pointer-events: none;
+  }
+
+  /* ---- a stop on the trail ---- */
+  .mapstop {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 116px;
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
     color: #fff;
     font-family: var(--body);
-    font-size: 11.5px;
-    line-height: 1.2;
-  }
-  /* the path between stops */
-  .mapnode + .mapnode::before {
-    content: "";
-    position: absolute;
-    top: 34px;
-    left: -14px;
-    width: 14px;
-    height: 5px;
-    background: rgba(255,255,255,.18);
-  }
-  .maprow.flip .mapnode + .mapnode::before { left: auto; right: -14px; }
-  /* The drop between rows, at the end where the path actually turns: the
-     right for a left-to-right row, the left for a flipped one. */
-  .maprow + .maprow { margin-top: 18px; }
-  .maprow:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    bottom: -18px;
-    width: 5px;
-    height: 18px;
-    background: rgba(255,255,255,.18);
-    right: 58px;
-  }
-  .maprow.flip:not(:last-child)::after { right: auto; left: 58px; }
-
-  .mapnode .num {
-    display: block;
-    font-family: var(--display);
     font-size: 11px;
-    opacity: .5;
+    line-height: 1.15;
   }
-  .mapnode .face { display: block; font-size: 30px; line-height: 1.1; }
-  .mapnode .lbl { display: block; margin-top: 2px; }
-  .mapnode .you {
-    position: absolute;
-    top: -14px; right: -6px;
-    font-size: 26px;
-    filter: drop-shadow(0 3px 4px rgba(0,0,0,.5));
+  .mapstop .ring {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: rgba(12,6,24,.6);
+    border: 3px solid rgba(255,255,255,.35);
+    box-shadow: 0 5px 0 rgba(0,0,0,.45), 0 8px 16px rgba(0,0,0,.4);
+    transition: transform .12s;
+  }
+  .mapstop .face { font-size: 26px; line-height: 1; }
+  .mapstop .tag {
+    display: block;
+    margin-top: 5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.7);
+  }
+  .mapstop:active .ring { transform: translateY(3px); }
+
+  .mapstop.done .ring { border-color: rgba(255,210,63,.75); background: rgba(60,40,10,.6); }
+  .mapstop.done .tag { opacity: .75; }
+
+  /* the one to play: it should be obvious across the room */
+  .mapstop.next .ring {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, rgba(255,226,122,.35), rgba(255,210,63,.18));
+    box-shadow: 0 5px 0 var(--accent-2), 0 0 0 5px rgba(255,210,63,.25), 0 0 26px rgba(255,210,63,.5);
+    animation: stopPulse 1.8s ease-in-out infinite;
+  }
+  .mapstop.next .tag { font-weight: bold; color: #fff2c4; }
+  @keyframes stopPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.09); }
   }
 
-  .mapnode.done { border-color: rgba(255,210,63,.45); }
-  .mapnode.done .face { filter: drop-shadow(0 0 8px rgba(255,210,63,.6)); }
-  .mapnode.done .lbl { opacity: .7; }
-  /* the one to play next */
-  .mapnode.next {
-    background: linear-gradient(180deg, rgba(255,226,122,.22), rgba(255,210,63,.10));
-    border-color: var(--accent);
-    box-shadow: 0 4px 0 var(--accent-2), 0 0 0 3px rgba(255,210,63,.25);
-    font-weight: bold;
+  .mapstop.locked { opacity: .45; }
+  .mapstop.locked .face { filter: grayscale(1); }
+  /* the fork you didn't take */
+  .mapstop.untaken { opacity: .3; }
+  .mapstop.untaken .ring { border-style: dashed; }
+  /* open on the path, but the world it sits in isn't bought */
+  .mapstop.needs .ring { border-color: rgba(255,210,63,.5); }
+  .mapstop.needs .face::after { content: "🔒"; font-size: 14px; position: absolute; margin: 14px 0 0 -10px; }
+
+  /* a boss stop is bigger and reads as danger */
+  .mapstop.boss .ring {
+    width: 74px;
+    height: 74px;
+    border-color: var(--bad);
+    background: radial-gradient(circle at 40% 30%, rgba(255,120,150,.4), rgba(60,10,25,.75));
+    box-shadow: 0 6px 0 #8d2340, 0 0 24px rgba(255,94,126,.5);
   }
-  .mapnode.locked { opacity: .4; }
-  .mapnode.locked .face { filter: grayscale(1); }
-  /* unlocked by the path, but you don't own the world it's in */
-  .mapnode.needs { opacity: .75; border-color: rgba(255,210,63,.35); }
-  .mapnode.needs .face::after { content: " 🔒"; font-size: 15px; }
-  .mapnode.boss { width: 138px; }
-  .mapnode.boss .face { font-size: 38px; }
-  .mapnode.boss .num::after { content: " ⚔"; color: var(--bad); }
+  .mapstop.boss .face { font-size: 36px; }
+  .mapstop.boss .tag { color: #ffc9d4; font-weight: bold; }
+  .mapstop.boss.next .ring {
+    border-color: var(--accent);
+    box-shadow: 0 6px 0 var(--accent-2), 0 0 0 5px rgba(255,94,126,.3), 0 0 30px rgba(255,210,63,.55);
+  }
+
+  /* the signpost at a fork */
+  .forksign {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--display);
+    font-size: 13px;
+    color: var(--ink);
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    padding: 4px 12px;
+    border-radius: 999px;
+    box-shadow: 0 3px 0 var(--accent-2);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* ---- the hero, walking ---- */
+  #mapHero {
+    position: absolute;
+    transform: translate(-50%, -132%);
+    font-size: 38px;
+    z-index: 4;
+    pointer-events: none;
+    filter: drop-shadow(0 6px 6px rgba(0,0,0,.55));
+  }
+  #mapHero::before {
+    content: "";
+    position: absolute;
+    inset: -14px -10px -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,240,190,.55), rgba(255,240,190,0) 70%);
+    z-index: -1;
+  }
+  #mapHero.walking { animation: heroHop .38s ease-in-out infinite; }
+  @keyframes heroHop {
+    0%, 100% { transform: translate(-50%, -132%); }
+    50% { transform: translate(-50%, -152%); }
+  }
+
+  /* ---- the chest ---- */
+  .chest-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8,4,16,.6);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  .chest-overlay.hidden { display: none; }
+  .chest-card {
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    color: var(--ink);
+    font-family: var(--display);
+    text-align: center;
+    padding: 22px 34px;
+    border-radius: 24px;
+    box-shadow: 0 10px 0 var(--accent-2), 0 22px 44px rgba(0,0,0,.55);
+    animation: chestPop .45s ease;
+    max-width: 86%;
+  }
+  @keyframes chestPop {
+    0% { transform: scale(.5) rotate(-6deg); opacity: 0; }
+    70% { transform: scale(1.08) rotate(2deg); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .chest-lid { font-size: 64px; line-height: 1; animation: chestShake .6s ease 3; }
+  @keyframes chestShake {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-9deg); }
+    75% { transform: rotate(9deg); }
+  }
+  .chest-title { font-size: 26px; margin: 2px 0 8px; }
+  .loot-row { font-size: 18px; margin: 4px 0; font-family: var(--body); }
+  .loot-row b { font-family: var(--display); }
+  .loot-row.foil {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    border-radius: 8px;
+  }
+  #chestOk { margin-top: 12px; font-size: 19px; padding: 11px 26px;
+             background: rgba(27,18,48,.9); color: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.4); }
 
   /* the banner a game shows when it's playing a map stop */
   .nodebar {
@@ -558,7 +655,14 @@
         </button>
       </div>
 
-      <div id="mapBoard"></div>
+      <div id="mapScroll">
+        <div id="mapBoard">
+          <svg id="mapScene" preserveAspectRatio="none"></svg>
+          <div id="mapProps"></div>
+          <div id="mapNodes"></div>
+          <div id="mapHero">🦸</div>
+        </div>
+      </div>
 
       <div class="flash" id="mapFlash"></div>
 
@@ -567,6 +671,16 @@
       </div>
     </div>
   </section>
+
+  <!-- The chest a beaten stop leaves behind, opened on the map. -->
+  <div id="chestBox" class="chest-overlay hidden">
+    <div class="chest-card">
+      <div class="chest-lid" id="chestLid">🎁</div>
+      <div class="chest-title" id="chestTitle">A chest!</div>
+      <div class="chest-loot" id="chestLoot"></div>
+      <button id="chestOk">Take it</button>
+    </div>
+  </div>
 
   <!-- ================= PROGRESS REPORT (for grown-ups) ================= -->
   <section class="screen scrolls" id="parent">
@@ -1001,71 +1115,287 @@ $('shopBtn').addEventListener('click', () => {
 $('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 
 /* ---------- The map ----------
-   The nodes lay out as a serpentine: rows of five, every other row running
-   right-to-left, so the path visibly winds rather than reading as a list.
-   Positions aren't stored — inserting a node is a one-line data change. */
-const PER_ROW = 5;
+   A landscape the hero walks, not a list. The path winds up through five
+   regions; the hero token slides along it when a stop is beaten, which is the
+   moment the whole screen exists for.
+
+   Geometry is computed, never stored. Each step gets a point on a sine that
+   oscillates across the board while climbing steadily, so the trail winds
+   itself and adding a stop needs no re-positioning. A choice step puts its two
+   options either side of the centre line, and the path forks and rejoins
+   around them. */
+const STEP_H = 138;        // vertical distance between steps
+const BOARD_W = 700;       // the board's own coordinate width
+const SWING = 130;         // how far the path swings from the centre
+const FORK = 128;          // how far a choice's options sit either side
+const EDGE = 76;           // keep stops clear of the board's edges
+
 let mapTrail = 'little';
 
-function renderMap() {
+/* Where a step's node sits. `o` is which option of a choice. */
+function stepPoint(step, o) {
+  const y = 70 + step.i * STEP_H;
+  let x = BOARD_W / 2 + Math.sin(step.i * 0.9) * SWING;
+  if (step.choice) x += (o === 0 ? -FORK : FORK);
+  // never let a stop hang off the board
+  return { x: Math.max(EDGE, Math.min(BOARD_W - EDGE, x)), y };
+}
+
+/* The point the path passes through between steps — the centre line, so forks
+   leave and rejoin somewhere sensible. */
+function joinPoint(i) {
+  return { x: BOARD_W / 2 + Math.sin(i * 0.9) * SWING, y: 70 + i * STEP_H };
+}
+
+function renderMap(walkFrom) {
   const me = Save.me();
   if (!me) return;
 
-  $('littleAt').textContent = `${Save.mapAt('little')} of ${Save.MAP.little.length}`;
-  $('bigAt').textContent = `${Save.mapAt('big')} of ${Save.MAP.big.length}`;
+  $('littleAt').textContent = `${Save.mapAt('little')} of ${Save.mapLength('little')}`;
+  $('bigAt').textContent = `${Save.mapAt('big')} of ${Save.mapLength('big')}`;
   document.querySelectorAll('.trail-pick').forEach(b =>
     b.classList.toggle('sel', b.dataset.trail === mapTrail));
 
-  const nodes = Save.mapTrail(mapTrail);
+  const steps = Save.mapTrail(mapTrail);
   const at = Save.mapAt(mapTrail);
-  const board = $('mapBoard');
-  board.innerHTML = '';
+  const height = 70 + steps.length * STEP_H + 90;
 
-  for (let r = 0; r * PER_ROW < nodes.length; r++) {
-    const row = document.createElement('div');
-    row.className = 'maprow' + (r % 2 ? ' flip' : '');
-    nodes.slice(r * PER_ROW, r * PER_ROW + PER_ROW).forEach(n => {
-      row.appendChild(mapNode(n, Save.nodeState(mapTrail, n.i), at));
+  $('mapBoard').style.height = height + 'px';
+  drawScene(steps, height);
+  drawNodes(steps, at);
+  placeHero(steps, at, walkFrom);
+
+  const doneAll = at >= steps.length;
+  $('mapSub').textContent = doneAll
+    ? 'Every stop beaten. The whole trail is yours.'
+    : `${Save.regionOf(at).emoji} ${Save.regionOf(at).name} — ${steps[at].options[0].label}`;
+}
+
+/* ---------- The landscape ---------- */
+function drawScene(steps, height) {
+  const svg = $('mapScene');
+  svg.setAttribute('viewBox', `0 0 ${BOARD_W} ${height}`);
+
+  const defs = [];
+  const parts = [];
+
+  // Each region is a band: its own sky, three layers of hills receding into
+  // it, and a name board where it begins. Climbing the trail should feel like
+  // arriving somewhere new.
+  let y = 0;
+  Save.REGIONS.forEach((r, ri) => {
+    const h = r.steps * STEP_H + (ri === 0 ? 70 : 0);
+    const bottom = (ri === Save.REGIONS.length - 1) ? height : y + h;
+
+    defs.push(
+      `<linearGradient id="sky${ri}" x1="0" y1="0" x2="0" y2="1">` +
+      `<stop offset="0" stop-color="${r.sky[0]}"/>` +
+      `<stop offset="1" stop-color="${r.sky[1]}"/></linearGradient>`);
+    parts.push(`<rect x="0" y="${y}" width="${BOARD_W}" height="${bottom - y}" fill="url(#sky${ri})"/>`);
+
+    /* Three hill layers along the foot of the band, the furthest highest and
+       palest. They sit in the bottom slice so most of the band stays sky —
+       filling it turns the whole map one flat colour. */
+    const HILLS = 190;
+    r.hills.forEach((c, li) => {
+      const top = bottom - HILLS + li * 46;
+      parts.push(`<path d="${hills(top, bottom + 2, 22 + li * 10, ri + li)}"
+        fill="${c}" opacity="${0.6 + li * 0.15}"/>`);
     });
-    board.appendChild(row);
+
+    // a soft horizon line where the band starts, and its name
+    if (ri > 0) {
+      parts.push(`<rect x="0" y="${y - 2}" width="${BOARD_W}" height="4" fill="rgba(255,255,255,.10)"/>`);
+    }
+    parts.push(
+      `<text x="${BOARD_W / 2}" y="${y + 34}" text-anchor="middle" ` +
+      `font-family="Arial Rounded MT Bold, Trebuchet MS, sans-serif" font-size="19" ` +
+      `fill="rgba(255,255,255,.55)" letter-spacing="3">${r.emoji}  ${r.name.toUpperCase()}</text>`);
+
+    y = bottom;
+  });
+
+  // the trail: a dark bed with a dotted light path on top
+  const d = trailPath(steps);
+  parts.push(`<path d="${d}" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="26"
+    stroke-linecap="round" stroke-linejoin="round"/>`);
+  parts.push(`<path d="${d}" fill="none" stroke="rgba(255,236,200,.65)" stroke-width="13"
+    stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 20"/>`);
+
+  svg.innerHTML = `<defs>${defs.join('')}</defs>` + parts.join('');
+  drawProps(steps, height);
+}
+
+/* A rolling hill silhouette across the board, seeded so each layer differs. */
+function hills(top, base, amp, seed) {
+  const pts = [];
+  for (let i = 0; i <= 6; i++) {
+    const x = (BOARD_W / 6) * i;
+    const wob = Math.sin(i * 1.7 + seed * 2.3) * amp;
+    pts.push([x, top + wob]);
+  }
+  let d = `M 0 ${base} L ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const mx = (px + cx) / 2;
+    d += ` C ${mx} ${py}, ${mx} ${cy}, ${cx} ${cy}`;
+  }
+  d += ` L ${BOARD_W} ${base} Z`;
+  return d;
+}
+
+/* One path string covering the spine and every fork. */
+function trailPath(steps) {
+  const seg = [];
+  for (let i = 0; i < steps.length - 1; i++) {
+    const step = steps[i], next = steps[i + 1];
+    const from = step.choice ? [stepPoint(step, 0), stepPoint(step, 1)] : [stepPoint(step, 0)];
+    const to = next.choice ? [stepPoint(next, 0), stepPoint(next, 1)] : [stepPoint(next, 0)];
+    from.forEach(a => to.forEach(b => {
+      const my = (a.y + b.y) / 2;
+      seg.push(`M ${a.x} ${a.y} C ${a.x} ${my}, ${b.x} ${my}, ${b.x} ${b.y}`);
+    }));
+  }
+  return seg.join(' ');
+}
+
+/* Scenery, scattered clear of the path so nothing sits under a node. */
+function drawProps(steps, height) {
+  const box = $('mapProps');
+  box.innerHTML = '';
+  steps.forEach(step => {
+    const r = step.region;
+    const p = stepPoint(step, 0);
+    // two props per step, on whichever side has room
+    for (let k = 0; k < 2; k++) {
+      const left = (p.x < BOARD_W / 2) ? BOARD_W - 90 - k * 60 : 40 + k * 60;
+      const d = document.createElement('div');
+      d.className = 'mapprop';
+      d.textContent = r.props[(step.i * 2 + k) % r.props.length];
+      d.style.left = left + 'px';
+      d.style.top = (p.y - 40 + ((step.i + k) % 3) * 34) + 'px';
+      d.style.fontSize = (20 + ((step.i + k) % 3) * 8) + 'px';
+      box.appendChild(d);
+    }
+  });
+}
+
+/* ---------- The stops ---------- */
+function drawNodes(steps, at) {
+  const box = $('mapNodes');
+  box.innerHTML = '';
+
+  steps.forEach(step => {
+    // a fork gets a little signpost so the choice is legible before you tap
+    if (step.choice && step.i === at) {
+      const sign = document.createElement('div');
+      sign.className = 'forksign';
+      sign.textContent = 'Which way?';
+      const jp = joinPoint(step.i);
+      sign.style.left = jp.x + 'px';
+      sign.style.top = (jp.y - 52) + 'px';
+      box.appendChild(sign);
+    }
+
+    step.options.forEach((node, o) => {
+      const state = Save.nodeState(mapTrail, step.i, o);
+      const p = stepPoint(step, o);
+      const b = document.createElement('button');
+      b.className = 'mapstop ' + state + (node.boss ? ' boss' : '');
+      b.style.left = p.x + 'px';
+      b.style.top = p.y + 'px';
+      b.innerHTML =
+        `<span class="ring"><span class="face">${state === 'done' ? '⭐' : node.emoji}</span></span>` +
+        `<span class="tag"></span>`;
+      b.querySelector('.tag').textContent =
+        step.choice && state === 'next' ? (node.route || node.label) : node.label;
+      b.title = node.label + (node.needs ? ` — needs ${Save.world(node.needs).name}` : '');
+      b.addEventListener('click', () => tapStop(node, state));
+      box.appendChild(b);
+    });
+  });
+}
+
+/* ---------- The hero ---------- */
+function placeHero(steps, at, walkFrom) {
+  const hero = $('mapHero');
+  hero.textContent = Save.me().avatar;
+
+  const spot = (i) => {
+    if (i >= steps.length) {                      // finished: stand past the end
+      const last = stepPoint(steps[steps.length - 1], Save.mapPick(mapTrail, steps.length - 1) || 0);
+      return { x: last.x, y: last.y + 80 };
+    }
+    const step = steps[i];
+    const pick = Save.mapPick(mapTrail, i);
+    return stepPoint(step, pick == null ? 0 : pick);
+  };
+
+  const to = spot(at);
+
+  if (walkFrom == null || walkFrom >= at) {
+    hero.style.transition = 'none';
+    hero.style.left = to.x + 'px';
+    hero.style.top = to.y + 'px';
+    scrollTo(to.y);
+    return;
   }
 
-  $('mapSub').textContent = at >= nodes.length
-    ? 'Every stop beaten. The whole trail is yours.'
-    : `Stop ${at + 1}: ${nodes[at].label}`;
+  // Walk. Start where the hero was, then move — this is the payoff for
+  // beating a stop, so it gets a beat of its own before it happens.
+  const from = spot(walkFrom);
+  hero.style.transition = 'none';
+  hero.style.left = from.x + 'px';
+  hero.style.top = from.y + 'px';
+  hero.classList.add('walking');
+  scrollTo(from.y);
+
+  setTimeout(() => {
+    hero.style.transition = 'left 1.1s ease-in-out, top 1.1s ease-in-out';
+    hero.style.left = to.x + 'px';
+    hero.style.top = to.y + 'px';
+    scrollTo(to.y, true);
+    Sound.page();
+    setTimeout(() => hero.classList.remove('walking'), 1200);
+  }, 450);
 }
 
-function mapNode(n, state, at) {
-  const b = document.createElement('button');
-  b.className = 'mapnode ' + state + (n.boss ? ' boss' : '');
-  b.innerHTML =
-    `<span class="num">${n.i + 1}</span>` +
-    `<span class="face">${state === 'done' ? '⭐' : n.emoji}</span>` +
-    `<span class="lbl"></span>` +
-    (n.i === at ? `<span class="you">${Save.me().avatar}</span>` : '');
-  b.querySelector('.lbl').textContent = n.label;
-  b.title = n.label + (n.needs ? ` — needs ${Save.world(n.needs).name}` : '');
-  b.addEventListener('click', () => tapNode(n, state));
-  return b;
+function scrollTo(y, smooth) {
+  const sc = $('mapScroll');
+  // bias upward a little so the stop's label sits clear of the bottom edge
+  const target = Math.max(0, y - sc.clientHeight / 2 + 40);
+  if (smooth) sc.scrollTo({ top: target, behavior: 'smooth' });
+  else sc.scrollTop = target;
 }
 
-function tapNode(n, state) {
+/* ---------- Tapping a stop ---------- */
+function tapStop(node, state) {
   Sound.unlock();
   if (state === 'locked') {
     Sound.denied();
     mapFlash('Beat the stop before it first!', true);
     return;
   }
+  if (state === 'untaken') {
+    Sound.denied();
+    mapFlash('You took the other road past here.', true);
+    return;
+  }
   if (state === 'needs') {
     Sound.denied();
-    const w = Save.world(n.needs);
+    const w = Save.world(node.needs);
     mapFlash(`${w.emoji} Buy the ${w.name} in the shop to reach this one.`, true);
     return;
   }
+  if (state === 'done') {
+    Sound.denied();
+    mapFlash('Already beaten — the path goes on ahead.', true);
+    return;
+  }
   Sound.click();
-  // replaying a beaten stop is fine — it just doesn't move you on twice
-  Save.startNode(n.trail, n.i);
-  location.href = n.g + '/index.html';
+  Save.startNode(node.trail, node.i, node.o);
+  location.href = node.g + '/index.html';
 }
 
 function mapFlash(msg, bad) {
@@ -1074,30 +1404,83 @@ function mapFlash(msg, bad) {
   f.classList.toggle('bad', !!bad);
 }
 
+/* ---------- The chest a beaten stop leaves ---------- */
+function showChest(loot) {
+  if (!loot) return;
+  $('chestBox').classList.remove('hidden');
+  $('chestLid').textContent = loot.boss ? '🏆' : '🎁';
+  $('chestTitle').textContent = loot.boss ? 'Boss chest!' : 'A chest!';
+
+  const rows = [`<div class="loot-row">🪙 <b>${loot.gold}</b> gold</div>`];
+  if (loot.card) {
+    const c = Save.card(loot.card.id);
+    rows.push(
+      `<div class="loot-row${loot.card.foil ? ' foil' : ''}">${c.emoji} ` +
+      `<b>${loot.card.how === 'new' ? 'New card' : 'Another'}</b> — ${c.name}` +
+      `${loot.card.foil ? ' ✨' : ''}</div>`);
+  }
+  if (loot.token) rows.push('<div class="loot-row">🎟️ <b>An iPad Time Token!</b></div>');
+  $('chestLoot').innerHTML = rows.join('');
+
+  Sound.buy();
+  if (loot.card) setTimeout(() => Sound.cardGet(), 400);
+}
+
+$('chestOk').addEventListener('click', () => {
+  Sound.click();
+  $('chestBox').classList.add('hidden');
+  renderHome();
+});
+
+/* ---------- Getting here ---------- */
+function openMap(walkFrom) {
+  Save.clearNode();          // opening the map is not the same as being on a stop
+  mapFlash('');
+  // show first: a hidden element has no height, so scrolling to the hero
+  // would land at zero
+  showScreen('map');
+  renderMap(walkFrom);
+}
+
 $('mapBtn').addEventListener('click', () => {
   Sound.click();
-  Save.clearNode();          // opening the map is not the same as being on a node
-  mapFlash('');
   // start on whichever trail this hero has actually been walking
   if (Save.mapAt('big') > Save.mapAt('little')) mapTrail = 'big';
-  renderMap();
-  showScreen('map');
+  openMap(null);
 });
 $('mapBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 document.querySelectorAll('.trail-pick').forEach(b => {
   b.addEventListener('click', () => {
     Sound.click();
     mapTrail = b.dataset.trail;
-    mapFlash('');
-    renderMap();
+    openMap(null);
   });
 });
 
-/* Tapping a game card is free play, so it must not leave a node armed. */
+/* Tapping a game card is free play, so it must not leave a stop armed. */
 document.querySelectorAll('.game-card').forEach(a => {
   a.addEventListener('click', () => Save.clearNode());
 });
 
+/* Coming back from a beaten stop: walk the hero, then open the chest.
+   The game stashes the loot rather than showing it, so the reward lands on
+   the map where the progress is visible. */
+function resumeFromMap() {
+  let loot = null;
+  try {
+    const raw = sessionStorage.getItem('lg_loot');
+    if (raw) { loot = JSON.parse(raw); sessionStorage.removeItem('lg_loot'); }
+  } catch (e) { /* no session storage: skip the reveal, the gold is already banked */ }
+
+  const trail = loot && loot.trail;
+  if (trail) mapTrail = trail;
+  const from = Save.mapWalkFrom(mapTrail);
+  if (from == null && !loot) return false;
+
+  openMap(from);
+  if (loot && loot.chest) setTimeout(() => showChest(loot.chest), from == null ? 400 : 1800);
+  return true;
+}
 
 /* ---------- Monster cards ---------- */
 function renderCards() {
@@ -1437,8 +1820,15 @@ $('deleteBtn').addEventListener('click', () => {
 
 /* ---------- Boot ---------- */
 Save.load();
-if (Save.me()) goHome();
-else { renderHeroList(); showScreen('who'); }
+if (!Save.me()) {
+  renderHeroList();
+  showScreen('who');
+} else if (!resumeFromMap()) {
+  // not arriving from a beaten map stop: the usual home screen
+  goHome();
+} else {
+  renderHome();
+}
 </script>
 </body>
 </html>

@@ -54,6 +54,14 @@ var Save = (function () {
     foilWorth: 3,
     wildCardCost: 12,        // spare cards traded for one you're missing
 
+    /* ---- Map chests ----
+       Every map stop pays a chest when the hero arrives back. It's the reason
+       to walk the map rather than replay from a menu, and a boss chest is the
+       most reliable way to finish a card set. */
+    chestGold: 60,
+    bossGold: 250,
+    chestCardChance: 0.35,    // an ordinary chest; a boss chest always holds one
+
     baseXpToLevel: 100,   // XP for level 1 -> 2
     xpStepPerLevel: 50    // each level costs this much more than the last
   };
@@ -263,113 +271,240 @@ var Save = (function () {
   ];
 
   /* ---------- The map -----------------------------------------------------
-     A visible route through everything, so playing feels like going
-     somewhere rather than picking from a list.
+     A journey across a landscape, not a menu. The hero walks a path that
+     climbs through five regions; each stop is a real challenge, and beating
+     one moves the hero on to the next.
 
      Two trails, not one. The five-year-old and the eight-year-old play
-     genuinely different content, so a single linear path would strand the
-     younger one at the first Algebra node. Each trail has its own progress on
-     each profile; a kid taps whichever one is theirs.
+     genuinely different content, so a single path would strand the younger
+     one at the first Algebra stop. Each has its own progress per profile.
 
-     A node names a game, a track and a mode. Tapping it starts exactly that,
-     and winning advances the trail. `boss` marks a harder step and gets a
-     bigger node; `needs` requires a world to have been bought, which is how
-     the map and the shop pull on each other without either blocking the
-     other. Free play is always still there — the map is a route, not a gate.
+     A step is either one stop or a CHOICE of two. A choice always rejoins
+     afterwards, so no route is a dead end and nothing is missable — the
+     branch is there to make the journey yours, not to punish a wrong turn.
+     Beating either option advances the step.
 
-     Nodes are positioned by the renderer, not stored here: they lay out as a
-     serpentine, so inserting one is a one-line change with nothing to
-     re-position. */
+         ●───●───┬─●─┬───●───◆        ◆ boss
+                 └─●─┘
+
+     `boss` fights one named tougher monster instead of the usual lineup and
+     always drops loot. `needs` requires a world to have been bought, which is
+     how the map and the shop pull on each other. `loot` sets the size of the
+     chest the stop pays.
+
+     Positions are computed by the hub, not stored — the path winds itself, so
+     inserting a stop is a one-line change here with nothing to re-place. */
 
   var MAP = {
     little: [
       { g: 'math',     t: 'next',      m: 'easy',   label: 'Count to 30' },
       { g: 'story',    mini: 'order',               label: 'Put it in order' },
-      { g: 'math',     t: 'oneless',   m: 'easy',   label: 'One more, one less' },
-      { g: 'language', t: 'letters',   m: 'easy',   label: 'Find the letter' },
+      [ { g: 'math',     t: 'oneless', m: 'easy',   label: 'One more, one less',
+          route: 'The meadow path' },
+        { g: 'language', t: 'letters', m: 'easy',   label: 'Find the letter',
+          route: 'The forest path' } ],
       { g: 'math',     t: 'count',     m: 'easy',   label: 'Count on' },
       { g: 'language', t: 'sounds',    m: 'easy',   label: 'Beginning sounds' },
-      { g: 'math',     t: 'add',       m: 'easy',   label: 'Adding blocks' },
-      { g: 'story',    mini: 'finish',              label: 'What happens next?', boss: true },
+      { g: 'math',     t: 'add',       m: 'easy',   label: 'Adding blocks',
+        boss: true, foe: { id: 'b-meadow', name: 'Bramble King', emoji: '🌳', hp: 8, scale: 1.2 },
+        loot: 'boss' },
 
       { g: 'language', t: 'sight',     m: 'easy',   label: 'Sight words' },
-      { g: 'math',     t: 'pattern',   m: 'easy',   label: 'Patterns' },
-      { g: 'language', t: 'builder',   m: 'easy',   label: 'Build a word' },
+      [ { g: 'math',     t: 'pattern', m: 'easy',   label: 'Patterns',
+          route: 'The painted caves' },
+        { g: 'language', t: 'builder', m: 'easy',   label: 'Build a word',
+          route: 'The whispering caves' } ],
       { g: 'math',     t: 'sub',       m: 'easy',   label: 'Taking away' },
       { g: 'language', t: 'rhyme',     m: 'easy',   label: 'Rhyme time' },
-      { g: 'math',     t: 'skip',      m: 'easy',   label: 'Skip counting' },
-      { g: 'language', t: 'opposites', m: 'easy',   label: 'Opposites' },
-      { g: 'math',     t: 'sort',      m: 'easy',   label: "What doesn't belong", boss: true },
+      { g: 'math',     t: 'skip',      m: 'easy',   label: 'Skip counting',
+        boss: true, foe: { id: 'b-cave', name: 'Crystal Ogre', emoji: '💠', hp: 9, scale: 1.2 },
+        loot: 'boss' },
 
+      { g: 'language', t: 'opposites', m: 'easy',   label: 'Opposites' },
+      [ { g: 'math',     t: 'sort',    m: 'easy',   label: "What doesn't belong",
+          route: 'The cloud stair' },
+        { g: 'story',    mini: 'finish',            label: 'What happens next?',
+          route: 'The storybook stair' } ],
       { g: 'language', t: 'read',      m: 'easy',   label: 'Read it yourself' },
-      { g: 'math',     t: 'add',       m: 'normal', label: 'Adding, faster' },
+      { g: 'math',     t: 'add',       m: 'normal', label: 'Adding, faster',
+        boss: true, foe: { id: 'b-sky', name: 'Thunder Roc', emoji: '🦅', hp: 10, scale: 1.2 },
+        loot: 'boss' },
+
       { g: 'language', t: 'past',      m: 'easy',   label: 'Time machine' },
-      { g: 'math',     t: 'count',     m: 'normal', label: 'Counting on, faster' },
-      { g: 'story',    mini: 'order',               label: 'Order it again' },
+      [ { g: 'math',     t: 'count',   m: 'normal', label: 'Counting on, faster',
+          route: 'The shallow reef' },
+        { g: 'story',    mini: 'order',             label: 'Order it again',
+          route: 'The deep reef' } ],
       { g: 'math',     t: 'sub',       m: 'normal', label: 'Taking away, faster' },
-      { g: 'math',     t: 'skip',      m: 'normal', label: 'Skip counting, faster' },
-      { g: 'math',     t: 'add',       m: 'normal', label: 'The Crystal Cave',
-        boss: true, needs: 'cave' }
+      { g: 'math',     t: 'skip',      m: 'normal', label: 'Skip counting, faster',
+        boss: true, foe: { id: 'b-reef', name: 'Old Barnacle', emoji: '🐚', hp: 11, scale: 1.2 },
+        loot: 'boss' },
+
+      { g: 'language', t: 'sounds',    m: 'normal', label: 'Sounds, faster' },
+      [ { g: 'math',     t: 'next',    m: 'normal', label: 'Counting, faster',
+          route: 'The ash road' },
+        { g: 'language', t: 'sight',   m: 'normal', label: 'Sight words, faster',
+          route: 'The lava road' } ],
+      { g: 'math',     t: 'add',       m: 'normal', label: 'The last climb',
+        boss: true, needs: 'cave',
+        foe: { id: 'b-ember', name: 'Emberling', emoji: '🔥', hp: 12, scale: 1.25 },
+        loot: 'boss' }
     ],
 
     big: [
       { g: 'math',     t: 'mul',       m: 'normal', label: 'Times tables' },
       { g: 'story',    quest: 0,                    label: 'The Troll Bridge' },
-      { g: 'math',     t: 'div',       m: 'normal', label: 'Division' },
-      { g: 'language', t: 'fixit',     m: 'normal', label: 'Fix the mistake' },
+      [ { g: 'math',     t: 'div',     m: 'normal', label: 'Division',
+          route: 'The number road' },
+        { g: 'language', t: 'fixit',   m: 'normal', label: 'Fix the mistake',
+          route: 'The word road' } ],
       { g: 'math',     t: 'rule',      m: 'normal', label: 'Find the rule' },
-      { g: 'story',    quest: 1,                    label: "The Dragon's Library" },
       { g: 'language', t: 'forge',     m: 'normal', label: 'Word forge' },
-      { g: 'math',     t: 'mul',       m: 'expert', label: 'Times tables, fast', boss: true },
+      { g: 'math',     t: 'mul',       m: 'expert', label: 'Times tables, fast',
+        boss: true, foe: { id: 'b-meadow2', name: 'Thorn Warden', emoji: '🌿', hp: 9, scale: 1.2 },
+        loot: 'boss' },
 
-      { g: 'language', t: 'grammar',   m: 'normal', label: 'Grammar hunt' },
-      { g: 'story',    quest: 2,                    label: 'The Ghost Ship' },
-      { g: 'math',     t: 'alg',       m: 'normal', label: 'Solve for x' },
+      { g: 'story',    quest: 1,                    label: "The Dragon's Library" },
+      [ { g: 'language', t: 'grammar', m: 'normal', label: 'Grammar hunt',
+          route: 'The tunnel of names' },
+        { g: 'math',     t: 'alg',     m: 'normal', label: 'Solve for x',
+          route: 'The tunnel of x' } ],
       { g: 'language', t: 'syllable',  m: 'normal', label: 'Syllable smith' },
-      { g: 'story',    quest: 3,                    label: "The Wizard's Maze" },
-      { g: 'language', t: 'twins',     m: 'normal', label: 'Word twins' },
-      { g: 'math',     t: 'rule',      m: 'normal', label: 'Rules, harder' },
-      { g: 'math',     t: 'div',       m: 'expert', label: 'The Crystal Cave',
-        boss: true, needs: 'cave' },
+      { g: 'story',    quest: 2,                    label: 'The Ghost Ship' },
+      { g: 'math',     t: 'div',       m: 'expert', label: 'Division, fast',
+        boss: true, needs: 'cave',
+        foe: { id: 'b-cave2', name: 'Geode Colossus', emoji: '🗿', hp: 10, scale: 1.25 },
+        loot: 'boss' },
 
-      { g: 'language', t: 'marks',     m: 'normal', label: 'Mark it' },
+      { g: 'language', t: 'twins',     m: 'normal', label: 'Word twins' },
+      [ { g: 'story',    quest: 3,                  label: "The Wizard's Maze",
+          route: 'The maze route' },
+        { g: 'language', t: 'marks',   m: 'normal', label: 'Mark it',
+          route: 'The scholar route' } ],
+      { g: 'math',     t: 'rule',      m: 'normal', label: 'Rules, harder' },
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'Algebra, fast',
+        boss: true, needs: 'sky',
+        foe: { id: 'b-sky2', name: 'Storm Sovereign', emoji: '⚡', hp: 11, scale: 1.25 },
+        loot: 'boss' },
+
       { g: 'story',    quest: 4,                    label: 'The Robot Bakery' },
-      { g: 'math',     t: 'alg',       m: 'expert', label: 'Algebra, fast' },
-      { g: 'story',    quest: 5,                    label: "The Yeti's Birthday" },
-      { g: 'language', t: 'fixit',     m: 'expert', label: 'Proofread, fast' },
-      { g: 'story',    quest: 6,                    label: 'The Moon Rescue' },
+      [ { g: 'language', t: 'fixit',   m: 'expert', label: 'Proofread, fast',
+          route: 'The current' },
+        { g: 'story',    quest: 5,                  label: "The Yeti's Birthday",
+          route: 'The trench' } ],
       { g: 'language', t: 'forge',     m: 'expert', label: 'Forge, fast' },
-      { g: 'math',     t: 'alg',       m: 'expert', label: 'The Sky Castle',
-        boss: true, needs: 'sky' }
+      { g: 'math',     t: 'rule',      m: 'expert', label: 'Rules, fast',
+        boss: true, needs: 'reef',
+        foe: { id: 'b-reef2', name: 'Abyss Warden', emoji: '🦑', hp: 12, scale: 1.25 },
+        loot: 'boss' },
+
+      { g: 'story',    quest: 6,                    label: 'The Moon Rescue' },
+      [ { g: 'language', t: 'syllable', m: 'expert', label: 'Syllables, fast',
+          route: 'The obsidian way' },
+        { g: 'language', t: 'twins',   m: 'expert', label: 'Twins, fast',
+          route: 'The cinder way' } ],
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'The summit',
+        boss: true, needs: 'ember',
+        foe: { id: 'b-ember2', name: 'The Ember King', emoji: '👑', hp: 14, scale: 1.3 },
+        loot: 'boss' }
     ]
   };
 
-  /* The little emblem on each node — the game it belongs to. */
+  /* The landscape the trail climbs through. Each region covers a run of steps
+     and gives the hub its colours and scenery. */
+  var REGIONS = [
+    { id: 'meadow', name: 'Sunny Meadow', emoji: '🌳', steps: 6,
+      sky: ['#7b4a86', '#c98a6a'], hills: ['#2f7a4d', '#256b41', '#1c5735'],
+      props: ['🌳', '🌲', '🌼', '🪨', '🦋', '🐝'] },
+    { id: 'cave',   name: 'Crystal Cave', emoji: '💎', steps: 5,
+      sky: ['#241a4d', '#3c2a72'], hills: ['#4a3a80', '#3b2e68', '#2c2350'],
+      props: ['💎', '🪨', '🕸️', '🦇', '💠', '🔮'] },
+    { id: 'sky',    name: 'Sky Castle',   emoji: '🏰', steps: 4,
+      sky: ['#3a63b8', '#8fc4f0'], hills: ['#cfe4ff', '#b3d3f7', '#94bdec'],
+      props: ['☁️', '🕊️', '⭐', '🏰', '🌙', '🎈'] },
+    { id: 'reef',   name: 'Sunken Reef',  emoji: '🌊', steps: 4,
+      sky: ['#0b3a5e', '#1b8fae'], hills: ['#1f8f9c', '#17727f', '#115a66'],
+      props: ['🐠', '🪸', '🐚', '🫧', '🦀', '🐟'] },
+    { id: 'ember',  name: 'Ember Peak',   emoji: '🌋', steps: 4,
+      sky: ['#4a1020', '#c04a1c'], hills: ['#7a2a18', '#5f2013', '#45170e'],
+      props: ['🌋', '🔥', '🪨', '💀', '🗻', '🌑'] }
+  ];
+
+  /* Which region a step belongs to. */
+  function regionOf(stepIndex) {
+    var n = 0;
+    for (var i = 0; i < REGIONS.length; i++) {
+      n += REGIONS[i].steps;
+      if (stepIndex < n) return REGIONS[i];
+    }
+    return REGIONS[REGIONS.length - 1];
+  }
+
   var MAP_EMOJI = { math: '🔢', language: '🔤', story: '📖' };
 
+  /* The trail, normalized: every step becomes { i, options: [...] }, so a
+     plain stop and a choice are handled the same way everywhere. */
   function mapTrail(trail) {
-    return (MAP[trail] || []).map(function (n, i) { 
-      var out = {};
-      for (var k in n) out[k] = n[k];
-      out.i = i;
-      out.trail = trail;
-      out.emoji = MAP_EMOJI[n.g] || '⭐';
-      return out;
+    return (MAP[trail] || []).map(function (step, i) {
+      var region = regionOf(i);
+      var opts = (step instanceof Array ? step : [step]).map(function (n, o) {
+        var out = {};
+        for (var k in n) out[k] = n[k];
+        out.i = i;
+        out.o = o;
+        out.trail = trail;
+        // every option carries its region: the chest's card pool is drawn
+        // from it, and completeNode() looks options up directly
+        out.region = region;
+        out.last = i === (MAP[trail] || []).length - 1;
+        out.emoji = n.boss ? (n.foe && n.foe.emoji) || '⚔️' : (MAP_EMOJI[n.g] || '⭐');
+        return out;
+      });
+      return { i: i, options: opts, choice: opts.length > 1,
+               boss: !!opts[0].boss, region: region };
     });
   }
 
-  /* How far along a trail this hero is: the index of the next node to play. */
+  function mapLength(trail) { return (MAP[trail] || []).length; }
+
+  /* How far along a trail this hero is: the index of the next step to play. */
   function mapAt(trail) {
     var p = me();
-    return (p && p.progress.map && p.progress.map[trail]) || 0;
+    var at = p && p.progress.map && p.progress.map[trail];
+    // coerce: a corrupted save shouldn't be able to crash the whole map
+    at = Math.floor(Number(at));
+    if (!isFinite(at) || at < 0) at = 0;
+    return Math.min(at, mapLength(trail));
   }
 
-  /* A node is playable if it's the next one and any world it needs is owned. */
-  function nodeState(trail, i) {
+  /* Which option was taken at a step already beaten, for drawing the route. */
+  function mapPick(trail, i) {
+    var p = me();
+    var picks = p && p.progress.mapPicks && p.progress.mapPicks[trail];
+    return (picks && picks[i] != null) ? picks[i] : null;
+  }
+
+  /* Where the hero was last drawn, so the map can walk them to where they are
+     now. Returns the step index, and clears itself once used. */
+  function mapWalkFrom(trail) {
+    var p = me();
+    var w = p && p.progress.mapWalk;
+    if (!w || w.trail !== trail) return null;
+    p.progress.mapWalk = null;
+    write();
+    return w.from;
+  }
+
+  function nodeState(trail, i, o) {
     var at = mapAt(trail);
-    if (i < at) return 'done';
+    if (i < at) {
+      // a beaten step: the route taken reads as done, the one not taken faded
+      var pick = mapPick(trail, i);
+      return (pick == null || pick === (o || 0)) ? 'done' : 'untaken';
+    }
     if (i > at) return 'locked';
-    var node = MAP[trail][i];
+    var opts = mapTrail(trail)[i].options;
+    var node = opts[o || 0];
     if (node && node.needs) {
       var p = me();
       if (!p || p.progress.unlockedWorlds.indexOf(node.needs) === -1) return 'needs';
@@ -377,23 +512,23 @@ var Save = (function () {
     return 'next';
   }
 
-  /* Begin a node: the game reads this on load and locks itself to it. */
-  function startNode(trail, i) {
+  /* Begin a stop: the game reads this on load and locks itself to it. */
+  function startNode(trail, i, o) {
     var p = me();
-    if (!p || nodeState(trail, i) !== 'next') return false;
-    p.progress.activeNode = { trail: trail, i: i };
+    o = o || 0;
+    if (!p || nodeState(trail, i, o) !== 'next') return false;
+    p.progress.activeNode = { trail: trail, i: i, o: o };
     write();
     return true;
   }
 
-  /* The node being played, with its spec — or null for free play. */
+  /* The stop being played, with its spec — or null for free play. */
   function activeNode() {
     var p = me();
     var a = p && p.progress.activeNode;
     if (!a || !MAP[a.trail] || !MAP[a.trail][a.i]) return null;
-    var node = mapTrail(a.trail)[a.i];
-    node.last = a.i === MAP[a.trail].length - 1;
-    return node;
+    var step = mapTrail(a.trail)[a.i];
+    return step.options[a.o || 0] || null;
   }
 
   function clearNode() {
@@ -403,22 +538,68 @@ var Save = (function () {
     write();
   }
 
-  /* Won the node that was being played. Advances the trail once — replaying a
-     node you've already beaten is fine, it just doesn't move you twice. */
+  /* Won the stop that was being played. Advances the trail once — replaying a
+     beaten stop is fine, it just doesn't move you twice — records which route
+     was taken, remembers where to walk the hero from, and rolls the loot. */
   function completeNode() {
     var p = me();
     var a = p && p.progress.activeNode;
     if (!a) return null;
     if (!p.progress.map) p.progress.map = { little: 0, big: 0 };
+    if (!p.progress.mapPicks) p.progress.mapPicks = { little: {}, big: {} };
+
+    var node = mapTrail(a.trail)[a.i].options[a.o || 0];
     var advanced = false;
     if (a.i === (p.progress.map[a.trail] || 0)) {
+      p.progress.mapPicks[a.trail][a.i] = a.o || 0;
       p.progress.map[a.trail] = a.i + 1;
+      p.progress.mapWalk = { trail: a.trail, from: a.i };
       advanced = true;
     }
     p.progress.activeNode = null;
     write();
-    return { trail: a.trail, i: a.i, advanced: advanced,
+
+    var loot = advanced ? rollLoot(node) : null;
+    return { trail: a.trail, i: a.i, advanced: advanced, loot: loot,
              done: (p.progress.map[a.trail] >= MAP[a.trail].length) };
+  }
+
+  /* ---------- Loot ---------------------------------------------------------
+     Every stop pays a chest, revealed on the map when the hero arrives — the
+     reason to walk back and look. A boss chest is bigger and always holds a
+     card, which is also the most reliable way to finish a set. */
+
+  function rollLoot(node) {
+    var boss = !!(node && node.boss);
+    var chest = { boss: boss, gold: 0, card: null, token: false };
+
+    chest.gold = boss ? ECONOMY.bossGold : ECONOMY.chestGold;
+    chest.gold = Math.round(chest.gold * goldRate());
+
+    var p = me();
+    if (p) { p.gold += chest.gold; write(); }
+
+    // a boss always leaves a card; an ordinary chest sometimes does
+    var pool = node && node.region ? cardsOfWorld(node.region.id) : [];
+    if (pool.length && (boss || Math.random() < ECONOMY.chestCardChance)) {
+      var pick = pool[Math.floor(Math.random() * pool.length)];
+      var got = awardCard(pick.id, true);
+      if (got) chest.card = { id: pick.id, how: got.how, foil: got.foil };
+    }
+
+    // the very last stop of a trail hands over an iPad token
+    if (node && node.last) {
+      if (p) { p.inventory.tokens++; write(); }
+      chest.token = true;
+    }
+    return chest;
+  }
+
+  /* Every card that can drop in a world, for the chests. */
+  function cardsOfWorld(worldId) {
+    var w = world(worldId);
+    if (!w) return [];
+    return w.foes.math.concat(w.foes.language);
   }
 
   var AVATARS = ['🦸', '🦹', '🧙', '🧝', '🦊', '🐯', '🐸', '🦖', '🐙', '🦄', '🐧', '🤖'];
@@ -443,8 +624,10 @@ var Save = (function () {
       cards: {},                     // card id -> copies held (foils included)
       foils: {},                     // card id -> how many of those are shiny
       progress: {
-        map: { little: 0, big: 0 },  // how far along each map trail
-        activeNode: null,            // the map node being played, if any
+        map: { little: 0, big: 0 },      // how far along each map trail
+        mapPicks: { little: {}, big: {} },// which route was taken at each fork
+        mapWalk: null,                   // where to walk the hero from, once
+        activeNode: null,                // the map stop being played, if any
         world: 'meadow',
         unlockedWorlds: ['meadow'],
         runsWon: {},                 // game id -> wins
@@ -501,6 +684,8 @@ var Save = (function () {
         if (p.progress.koSinceCard === undefined) p.progress.koSinceCard = 0;
         if (!p.foils) p.foils = {};
         if (!p.progress.map) p.progress.map = { little: 0, big: 0 };
+        if (!p.progress.mapPicks) p.progress.mapPicks = { little: {}, big: {} };
+        if (p.progress.mapWalk === undefined) p.progress.mapWalk = null;
         if (p.progress.activeNode === undefined) p.progress.activeNode = null;
       });
     }
@@ -1160,8 +1345,13 @@ var Save = (function () {
     foesFor: foesFor,
 
     MAP: MAP,
+    REGIONS: REGIONS,
     mapTrail: mapTrail,
+    mapLength: mapLength,
     mapAt: mapAt,
+    mapPick: mapPick,
+    mapWalkFrom: mapWalkFrom,
+    regionOf: regionOf,
     nodeState: nodeState,
     startNode: startNode,
     activeNode: activeNode,
