@@ -905,11 +905,14 @@ function showScreen(id) {
 /* ==================================================================
    Menu
    ================================================================== */
+const questsDone = (Save.me() && Save.me().progress.questsDone) || [];
 QUESTS.forEach((q, i) => {
   const b = document.createElement('button');
   b.className = 'choice';
-  b.innerHTML = `<span class="emoji">${q.emoji}</span>${q.title}` +
-    `<span class="sub">${q.sub} · ${q.scenes.length} scenes</span>`;
+  // a finished quest keeps a tick, so it's obvious which are left to play
+  const done = questsDone.indexOf(i) !== -1 ? ' \u2705' : '';
+  b.innerHTML = `<span class="emoji">${q.emoji}</span>${q.title}${done}` +
+    `<span class="sub">${q.sub} \u00b7 ${q.scenes.length} scenes</span>`;
   b.addEventListener('click', () => {
     Sound.unlock(); Sound.click();
     document.querySelectorAll('#questRow .choice').forEach(c => c.classList.remove('sel'));
@@ -1001,6 +1004,8 @@ function pickChoice(el, choice) {
   if (choice.ok) {
     Sound.right();
     el.classList.add('right');
+    Save.recordAnswer(true);
+    Hud.applied(Save.awardEvent('storyChoice'));
     later(() => {
       const sc = scene();
       if (sc.chest) renderChest(sc.chest);
@@ -1009,6 +1014,7 @@ function pickChoice(el, choice) {
   } else {
     Sound.wrong();
     el.classList.add('wrongPick');
+    Save.recordAnswer(false);   // a lost heart is punishment enough
     state.tried.add(choice);
     state.hearts--;
     renderStats();
@@ -1078,6 +1084,7 @@ function renderChest(chest) {
       if (ans === chest.right) {
         Sound.chest();
         c.classList.add('right');
+        Hud.applied(Save.awardEvent('storyChest'));
         state.gems++;
         const healed = state.hearts < MAX_HEARTS;
         if (healed) state.hearts++;
@@ -1108,6 +1115,9 @@ function nextScene() {
    Win / lose + the iPad-time reward timer
    ================================================================== */
 function questComplete() {
+  Save.recordQuestDone(state.questIdx);
+  Save.recordRunWon('story');
+  const bonus = Save.awardEvent('questDone');
   Sound.victory();
   const total = quest().scenes.filter(s => s.chest).length;
   $('winText').textContent =
@@ -1115,6 +1125,7 @@ function questComplete() {
   state.earnedMins = rand(5, 10);
   Reward.offer(state.earnedMins);
   showScreen('win');
+  Hud.applied(bonus);
 }
 
 function questFailed() {
@@ -1123,6 +1134,10 @@ function questFailed() {
 }
 
 $('winAgainBtn').addEventListener('click', () => { Sound.click(); Reward.clear(); showScreen('menu'); });
+// Test seam: .verify/ scripts drive the real game and need to know which
+// choice is the right one. Costs nothing in play.
+window.TEST = { state, scene, quest, QUESTS, startQuest };
+
 $('retryBtn').addEventListener('click', () => { Sound.click(); startQuest(); });
 $('loseMenuBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
 </script>

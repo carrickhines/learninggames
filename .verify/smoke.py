@@ -72,6 +72,26 @@ def styles_resolved():
     )
 
 
+def gold():
+    return d.execute_script("return Save.me() ? Save.me().gold : -1;")
+
+
+def earns_smoke(label, *steps):
+    """Answer one question correctly and check the gold actually moved.
+    Some tracks take two taps (find the mistake, then pick the fix), so this
+    takes one or more steps and pauses between them."""
+    before = gold()
+    for js in steps:
+        d.execute_script(js)
+        time.sleep(0.9)
+    time.sleep(1.0)
+    after = gold()
+    check(label + ": a correct answer pays gold", after > before,
+          "%d -> %d" % (before, after))
+    check(label + ": the chip shows the new total",
+          ("🪙 " + str(after)) in d.find_element(By.CSS_SELECTOR, ".hud").text)
+
+
 def reward_smoke(label):
     """shared/reward.js: offer -> start -> countdown ticks -> ring -> alarm."""
     d.execute_script("Reward.offer(8);")
@@ -118,7 +138,10 @@ try:
     check("hub: a blank save asks who's playing", d.execute_script(
         "return document.getElementById('who').classList.contains('show');"))
     click("#newHeroBtn")
-    d.find_element(By.ID, "nameInput").send_keys("Tester")
+    time.sleep(0.5)                       # the screen fades in and focuses the field
+    name = d.find_element(By.ID, "nameInput")
+    name.clear()
+    name.send_keys("Tester")
     d.find_elements(By.CSS_SELECTOR, ".avatar-opt")[3].click()
     click("#createBtn")
     time.sleep(0.6)
@@ -136,11 +159,36 @@ try:
     battle_smoke("math/index.html", "add", "easy", "math/add")
     check("math/add: number blocks rendered", d.execute_script(
         "return document.querySelectorAll('.tower .block').length > 0;"))
+    # read the answer off the question and type it in
+    earns_smoke("math", """
+        var q = document.getElementById('question').textContent;
+        var p = q.split('+');
+        document.getElementById('answer').value =
+            String(parseInt(p[0], 10) + parseInt(p[1], 10));
+        document.getElementById('attackBtn').click();
+    """)
     reward_smoke("math")
 
     print("\nLanguage RPG")
     battle_smoke("language/index.html", "letters", "easy", "lang/letters")
     battle_smoke("language/index.html", "fixit", "normal", "lang/fixit")
+    # Fix It! takes two taps: find the mistake, then pick the correction
+    earns_smoke(
+        "lang",
+        """
+        var w = TEST.state.question.wrong;
+        var toks = document.querySelectorAll('.word-tok');
+        for (var i = 0; i < toks.length; i++) {
+            if (toks[i].textContent.replace(/[.,!?]$/, '') === w) { toks[i].click(); break; }
+        }
+        """,
+        """
+        var fix = TEST.state.question.fix;
+        var cards = document.querySelectorAll('.wordcard');
+        for (var i = 0; i < cards.length; i++) {
+            if (cards[i].textContent === fix) { cards[i].click(); break; }
+        }
+        """)
     reward_smoke("lang")
 
     print("\nStory Quest")
@@ -154,6 +202,14 @@ try:
     check("story: first scene rendered", len(text(".story-text")) > 20)
     check("story: choices offered", len(d.find_elements(By.CSS_SELECTOR, ".choice-card")) >= 2)
     check("story: no JS errors", errs() == [], str(errs()))
+    # click the one choice the scene marks as right
+    earns_smoke("story", """
+        var ok = TEST.scene().choices.filter(function (c) { return c.ok; })[0];
+        var cards = document.querySelectorAll('.choice-card');
+        for (var i = 0; i < cards.length; i++) {
+            if (cards[i].textContent === ok.t) { cards[i].click(); break; }
+        }
+    """)
     reward_smoke("story")
 finally:
     d.quit()

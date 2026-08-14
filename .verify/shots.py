@@ -53,10 +53,21 @@ def click(sel):
     d.find_element(By.CSS_SELECTOR, sel).click()
 
 
+NO_ANIM = """
+var s = document.createElement('style');
+s.textContent = '*,*::before,*::after{animation:none !important;transition:none !important}';
+document.head.appendChild(s);
+"""
+
+
 def load(relpath):
     d.get("file://" + os.path.join(ROOT, relpath))
     fit_viewport(W, H)
-    time.sleep(0.7)  # let the fadeIn settle
+    # Capture every screen in its settled state. Headless Firefox also stops
+    # advancing the animation clock after a window resize, which would
+    # otherwise freeze fade-ins and pop-ins at their first frame.
+    d.execute_script(NO_ANIM)
+    time.sleep(0.4)
 
 
 def battle(relpath, track, mode, name, settle=1.0):
@@ -65,6 +76,7 @@ def battle(relpath, track, mode, name, settle=1.0):
     click('[data-mode="%s"]' % mode)
     click("#startBtn")
     time.sleep(settle)
+    d.execute_script(NO_ANIM)
     shot(name)
 
 
@@ -131,6 +143,14 @@ try:
     """)
     time.sleep(0.3)
     shot("math-battle-dragon")
+
+    # earning: the gold float off the chip, and the level-up banner
+    d.execute_script("Hud.gained(4);")
+    time.sleep(0.35)
+    shot("math-battle-earning")
+    d.execute_script("Hud.levelUp(5);")
+    time.sleep(0.5)
+    shot("math-battle-levelup")
 
     battle("math/index.html", "div", "normal", "math-battle-div")
     battle("math/index.html", "next", "easy", "math-battle-next")

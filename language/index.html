@@ -1229,6 +1229,7 @@ document.querySelectorAll('#menu .choice[data-track]').forEach(btn => {
     document.querySelectorAll('#menu .choice[data-track]').forEach(b => b.classList.remove('sel'));
     btn.classList.add('sel');
     state.track = btn.dataset.track;
+    Save.remember('language', state.track, null);
     updateStart();
   });
 });
@@ -1238,10 +1239,28 @@ document.querySelectorAll('#menu .choice[data-mode]').forEach(btn => {
     document.querySelectorAll('#menu .choice[data-mode]').forEach(b => b.classList.remove('sel'));
     btn.classList.add('sel');
     state.mode = btn.dataset.mode;
+    Save.remember('language', null, state.mode);
     updateStart();
   });
 });
 function updateStart() { $('startBtn').disabled = !(state.track && state.mode); }
+
+// Start on whatever this hero played last — a kid who always plays one track
+// shouldn't have to re-pick it every time.
+(function restoreChoices() {
+  const me = Save.me();
+  if (!me) return;
+  const pick = (attr, want) => {
+    if (!want) return;
+    const btn = document.querySelector(`#menu .choice[data-${attr}="${want}"]`);
+    if (!btn) return;
+    btn.classList.add('sel');
+    state[attr] = want;
+  };
+  pick('track', me.settings.lastTrack.language);
+  pick('mode', me.settings.modeByGame.language);
+  updateStart();
+})();
 
 $('startBtn').addEventListener('click', () => {
   Sound.unlock(); Sound.click();
@@ -1760,6 +1779,8 @@ function resolveCorrect() {
   stopTimer();
   const dbl = state.inFastZone;
   const q = state.question;
+  Save.recordAnswer(true);
+  Hud.applied(Save.awardEvent(dbl ? 'correctFast' : 'correct'));
   // reinforce by saying the word after a correct answer (dad's voice if recorded)
   const praiseId  = dbl ? 'P_double' : 'P_great';
   const praiseTxt = dbl ? 'Double hit!' : 'Great job!';
@@ -1775,6 +1796,7 @@ function resolveWrong(msg) {
   state.answered = true;
   stopTimer();
   Sound.wrong();
+  Save.recordAnswer(false);   // no gold lost: progress only ever goes up
   const q = state.question;
   const reveal = q.isBuilder ? '' :
     q.revealMsg ? q.revealMsg :
@@ -1874,6 +1896,7 @@ function playerAttack(double) {
         Sound.ko();
         floatText('KO!', '#ffd23f', true);
         $('foeSprite').classList.add('ko');
+        Hud.applied(Save.awardEvent('foeDefeated'));
         setTimeout(nextFoeOrWin, 900);
       } else {
         setTimeout(newQuestion, 600);
@@ -1954,11 +1977,14 @@ function stopTimer() {
    ================================================================== */
 function winGame() {
   stopTimer();
+  Save.recordRunWon('language');
+  const bonus = Save.awardEvent('runWon');
   Sound.victory();
   Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
   state.earnedMins = rand(5, 10);
   Reward.offer(state.earnedMins);
   showScreen('win');
+  Hud.applied(bonus);
 }
 
 function gameOver() {
@@ -1970,6 +1996,10 @@ function gameOver() {
 
 $('winAgainBtn').addEventListener('click', () => { Sound.click(); Reward.clear(); showScreen('menu'); });
 $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+
+// Test seam: .verify/ scripts drive the real game and need to read the
+// current question and run state. Costs nothing in play.
+window.TEST = { state, FOES, MODES, newQuestion };
 
 $('sayBtn').addEventListener('click', () => {
   Sound.unlock();

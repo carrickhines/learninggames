@@ -412,14 +412,25 @@
       [...row.children].forEach((c) => c.classList.remove("sel"));
       btn.classList.add("sel");
       state[key] = btn.dataset[key];
+      Save.remember("math", state.track, state.mode);
       Sound.click();
     });
   }
   wireChoices(el.trackRow, "track");
   wireChoices(el.modeRow, "mode");
-  // defaults
-  el.trackRow.querySelector('[data-track="add"]').classList.add("sel");
-  el.modeRow.querySelector('[data-mode="normal"]').classList.add("sel");
+  // Start on whatever this hero played last, falling back to the defaults —
+  // a kid who always plays one track shouldn't have to re-pick it every time.
+  (function restoreChoices() {
+    const me = Save.me();
+    const pick = (row, key, want, fallback) => {
+      const btn = row.querySelector(`[data-${key}="${want}"]`) ||
+                  row.querySelector(`[data-${key}="${fallback}"]`);
+      btn.classList.add("sel");
+      state[key] = btn.dataset[key];
+    };
+    pick(el.trackRow, "track", me && me.settings.lastTrack.math, "add");
+    pick(el.modeRow, "mode", me && me.settings.modeByGame.math, "normal");
+  })();
 
   // ---------- Problem generation ----------
   function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -795,6 +806,8 @@
       const isSuper = isFastAnswer();
       const dmg = isSuper ? PLAYER_DAMAGE * 2 : PLAYER_DAMAGE;
       el.answer.className = "correct";
+      Save.recordAnswer(true);
+      Hud.applied(Save.awardEvent(isSuper ? "correctFast" : "correct"));
       if (isSuper) el.playerSprite.classList.add("super");
       animateAttack("player", "foe",
         () => {
@@ -816,9 +829,10 @@
         }
       );
     } else {
-      // wrong answer -> foe gets a hit
+      // wrong answer -> foe gets a hit. Costs no gold: progress only goes up.
       el.answer.className = "wrong";
       Sound.wrong();
+      Save.recordAnswer(false);
       wrongOrTimeout();
     }
   }
@@ -828,6 +842,7 @@
     state.busy = true;
     el.answer.className = "wrong";
     Sound.wrong();
+    Save.recordAnswer(false);
     floatText("Too slow!", "#fbbf24", false);
     wrongOrTimeout();
   }
@@ -853,6 +868,7 @@
   function foeDefeated() {
     Sound.ko();
     floatText("KO!", "#ffd23f", true);
+    Hud.applied(Save.awardEvent("foeDefeated"));
     el.foeSprite.style.transition = "transform .6s, opacity .6s";
     el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
     el.foeSprite.style.opacity = "0";
@@ -903,6 +919,8 @@
 
   function win() {
     stopTimer();
+    Save.recordRunWon("math");
+    const bonus = Save.awardEvent("runWon");
     el.endEmoji.textContent = "🏆";
     el.endTitle.textContent = "Victory!";
     el.endText.textContent = "You defeated every monster. You're a math hero!";
@@ -911,6 +929,7 @@
     Reward.offer(state.earnedMins);
     Sound.win();
     showScreen("endScreen");
+    Hud.applied(bonus);
   }
 
   function gameOver() {
@@ -962,6 +981,10 @@
   attachDrag(el.towerB);
 
   showScreen("menu");
+
+  // Test seam: .verify/ scripts drive the real game and need to read the
+  // answer and the run state. Costs nothing in play.
+  window.TEST = { state, FOES, MODES, newProblem, playerAttack };
 })();
 </script>
 </body>
