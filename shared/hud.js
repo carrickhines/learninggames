@@ -99,6 +99,20 @@ var Hud = (function () {
       '<span class="home">🏠</span>';
     el.querySelector('.nm').textContent = me.name;   // never trust a typed name in HTML
     badge();                                         // render() rebuilt the chip
+    measure();
+  }
+
+  /* Publish the chip's real width so the topbar can keep clear of it.
+
+     This used to be a hardcoded 172px in ui.css, which was fine when gold ran
+     to three digits and names were short — and then the economy grew to five
+     figures, the chip grew with it, and it started sitting on top of the
+     hearts. Measuring is the only version that stays true for any name and
+     any amount of gold. */
+  function measure() {
+    if (!el) return;
+    var app = document.getElementById('app');
+    if (app) app.style.setProperty('--hud-w', Math.ceil(el.offsetWidth) + 'px');
   }
 
   /* Float "+N 🪙" off the chip and refresh it. */

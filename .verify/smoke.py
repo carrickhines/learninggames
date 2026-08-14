@@ -447,6 +447,45 @@ try:
             if (cards[i].textContent === ok.t) { cards[i].click(); break; }
         }
     """)
+    print("\nThe topbar has room for everyone")
+    # The hero chip's width depends on the name and the gold in it. It used to
+    # have a hardcoded clearance, which the five-figure economy outgrew — the
+    # chip ended up sitting on the hearts. Worst case: long name, big purse,
+    # ten hearts.
+    load("index.html")
+    d.execute_script("""
+        Save.reset();
+        Save.createProfile('Alexander', '🦖');
+        Save.award(99999, 0);
+        var w = Save.world('sky');
+        w.foes.math.concat(w.foes.language).forEach(function (f) {
+            Save.update(function (p) { p.cards[f.id] = 1; });
+        });
+        Save.buy('aegis');
+    """)
+    for game, track in (("math", "mul"), ("language", "letters")):
+        load(game + "/index.html")
+        click('[data-track="%s"]' % track)
+        click('[data-mode="normal"]')
+        click("#startBtn")
+        time.sleep(1.2)
+        box = d.execute_script("""
+            var hud = document.querySelector('.hud').getBoundingClientRect();
+            var pips = document.querySelector('.pips.player, #playerPips');
+            var kids = pips.children;
+            var first = kids[0].getBoundingClientRect();
+            var last = kids[kids.length - 1].getBoundingClientRect();
+            var foe = document.querySelector('.fighter-info.foe').getBoundingClientRect();
+            return { hearts: kids.length,
+                     onHearts: hud.right > first.left,
+                     onFoe: last.right > foe.left };
+        """)
+        check("%s: the hero chip clears the hearts" % game, not box["onHearts"])
+        check("%s: a full row of hearts clears the foe" % game, not box["onFoe"])
+        check("%s: all ten hearts are drawn" % game, box["hearts"] == 10,
+              "%d hearts" % box["hearts"])
+
+
 finally:
     d.quit()
 

@@ -220,7 +220,10 @@ button.choice.sel .sub { opacity: .85; }
   align-items: center;
   gap: 16px;
   margin-bottom: 8px;
-  padding-left: 172px;   /* clear the top-left hero chip (shared/hud.js) */
+  /* Keep clear of the two floating corners. The hero chip's width depends on
+     the name and how much gold is in it, so shared/hud.js measures itself and
+     publishes --hud-w rather than us guessing a number that goes stale. */
+  padding-left: calc(var(--hud-w, 160px) + 26px);
   padding-right: 66px;   /* clear the top-right mute button (~58px wide) */
   flex-shrink: 0;
 }
@@ -234,6 +237,10 @@ button.choice.sel .sub { opacity: .85; }
   height: 25px;
   transition: opacity .3s ease, transform .3s ease;
 }
+/* Armor can reach ten hearts. At full size that row is wider than its half of
+   the topbar, so past seven they shrink rather than collide with the foe. */
+.pips.many { gap: 5px; }
+.pips.many .pip { width: 20px; height: 20px; }
 .pip.heart {
   background: var(--good);
   -webkit-mask: var(--heart) center / contain no-repeat;

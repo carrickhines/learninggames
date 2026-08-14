@@ -279,6 +279,22 @@ try:
     load("math/index.html")
     shot("math-menu")
 
+    # the crowded topbar: a long name, a big purse, ten hearts
+    load("index.html")
+    d.execute_script("""
+        Save.createProfile('Alexander', '\ud83e\udd96');
+        Save.award(99999, 0);
+        var w = Save.world('sky');
+        w.foes.math.concat(w.foes.language).forEach(function (f) {
+            Save.update(function (p) { p.cards[f.id] = 1; });
+        });
+        Save.buy('aegis');
+    """)
+    battle("math/index.html", "mul", "normal", "math-topbar-crowded")
+    load("index.html")
+    d.execute_script("Save.setActive(Save.profiles().filter("
+                     "function (p) { return p.name === 'Rex'; })[0].id);")
+
     battle("math/index.html", "mul", "normal", "math-battle-mul")
 
     # the dragon is the largest foe — check the boss against the layout

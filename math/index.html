@@ -933,6 +933,7 @@
   // HP is a small integer, so we draw it as countable pips (hearts for the
   // hero, orbs for the foe) instead of a continuous bar — easy to count along.
   function renderPips(container, cur, max, kind) {
+    container.classList.toggle("many", max > 7);   // shrink a crowded row
     container.innerHTML = "";
     for (let i = 0; i < max; i++) {
       const p = document.createElement("span");

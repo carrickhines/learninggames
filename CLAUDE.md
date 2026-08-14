@@ -531,6 +531,14 @@ glassy dark panels with backdrop blur, gold gradient buttons with a 3D "lip",
 a rounded display font, and HP as countable pips — green hearts for the hero,
 pink orbs for the foe.
 
+**The topbar keeps clear of the two floating corners by measuring, not
+guessing.** The hero chip's width depends on the hero's name and how much gold
+is in it, so `shared/hud.js` measures itself and publishes `--hud-w`, which
+`.topbar` reserves. This was a hardcoded 172px until the economy grew to five
+figures, the chip grew with it, and it started sitting on top of the hearts.
+Armor can also reach ten hearts, so a pip row past seven shrinks (`.pips.many`)
+rather than colliding with the foe.
+
 Screens use one convention everywhere: `.screen` is hidden, `.screen.show` is
 visible, navigate with `showScreen(id)`. A screen that can outgrow the frame
 gets `.scrolls` plus a `.screen-inner` wrapper, which centers when it fits and

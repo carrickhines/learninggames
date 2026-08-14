@@ -1373,6 +1373,7 @@ function spawnFoe() {
 
 // HP as countable pips: hearts for the hero, orbs for the foe
 function renderPips(container, cur, max, kind) {
+  container.classList.toggle('many', max > 7);   // shrink a crowded row
   container.innerHTML = '';
   for (let i = 0; i < max; i++) {
     const p = document.createElement('span');
