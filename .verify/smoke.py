@@ -108,10 +108,19 @@ def reward_smoke(label):
     check(label + ": reward left no JS errors", errs() == [], str(errs()))
 
 
+def booted(label):
+    """window.TEST is assigned on the last line of each game's script, so its
+    absence means the script threw on the way down — which the window error
+    trap can't see, because it is installed only after the page has parsed."""
+    check(label + ": the script ran to the end",
+          d.execute_script("return typeof window.TEST !== 'undefined';"))
+
+
 def battle_smoke(relpath, track, mode, label):
     """Menu -> pick track -> pick mode -> start -> a question is on screen."""
     load(relpath)
     check(label + ": styles resolved", styles_resolved())
+    booted(label)
     check(label + ": the hero chip is up", exists(".hud"))
     check(label + ": menu visible", exists("#menu"))
     click('[data-track="%s"]' % track)
@@ -279,6 +288,7 @@ try:
     print("\nStory Quest")
     load("story/index.html")
     check("story: styles resolved", styles_resolved())
+    booted("story")
     cards = d.find_elements(By.CSS_SELECTOR, "#menu .choice")
     check("story: quest cards listed", len(cards) >= 8, "found %d" % len(cards))
     cards[0].click()

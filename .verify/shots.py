@@ -188,6 +188,22 @@ try:
     shot("math-battle-levelup")
 
     battle("math/index.html", "div", "normal", "math-battle-div")
+    battle("math/index.html", "skip", "easy", "math-battle-skip")
+    battle("math/index.html", "oneless", "easy", "math-battle-oneless")
+    battle("math/index.html", "pattern", "easy", "math-battle-pattern")
+    battle("math/index.html", "sort", "easy", "math-battle-sort")
+
+    # Rule Hunter at the top rung, where it stops asking for the next number
+    # and starts asking for the rule
+    battle("math/index.html", "rule", "normal", "math-battle-rule")
+    d.execute_script("""
+        Save.update(function (p) { p.progress.seqTier = 5; });
+        for (var i = 0; i < 12; i++) { TEST.newProblem();
+            if (TEST.state.choices) break; }
+    """)
+    time.sleep(0.4)
+    d.execute_script(NO_ANIM)
+    shot("math-battle-rule-tier5")
     battle("math/index.html", "next", "easy", "math-battle-next")
     battle("math/index.html", "alg", "normal", "math-battle-alg")
     battle("math/index.html", "count", "easy", "math-battle-count")

@@ -109,6 +109,44 @@
   #battle.with-blocks .problem-panel { padding: 14px 18px 16px; gap: 7px; }
   #battle.with-blocks .hint { display: none; }
 
+  /* ---------- Tap-to-answer tiles ---------- */
+  .tiles {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 4px 0 2px;
+  }
+  .tiles.hidden, .answer-row.hidden, .keypad.hidden { display: none; }
+  .tile {
+    font-family: var(--display);
+    font-size: 34px;
+    min-width: 92px;
+    padding: 12px 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.12);
+    color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+    box-shadow: 0 5px 0 rgba(0,0,0,.4), 0 8px 16px rgba(0,0,0,.25);
+  }
+  .tile:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+  .tile.right {
+    background: linear-gradient(180deg, #8affc4, var(--good));
+    color: var(--ink);
+    box-shadow: 0 5px 0 #2fa872, 0 0 0 3px rgba(92,232,160,.35);
+  }
+  .tile.wrongPick {
+    background: linear-gradient(180deg, #ff96ab, var(--bad));
+    color: #fff;
+    box-shadow: 0 5px 0 #c23a55;
+  }
+  /* the rule-naming tiles carry words, not a single glyph */
+  .tile.word { font-size: 22px; }
+
+  /* Sort It! and Rule Hunter ask a whole question, so the box has to fit a
+     sentence rather than "7 × 8". */
+  .question.wordy { font-size: clamp(20px, 3.4vw, 30px); letter-spacing: 0; }
+
   .answer-row { display: flex; gap: 12px; justify-content: center; align-items: center; }
   #answer {
     font-family: var(--display);
@@ -182,24 +220,44 @@
     <h1>Math RPG</h1>
     <div class="subtitle">Defeat the monster with your math powers!</div>
 
-    <div class="group-label">Choose your power</div>
+    <div class="group-label">Little hero powers</div>
     <div class="btn-row" id="trackRow">
       <button class="choice" data-track="next">
         <span class="emoji">🔢</span>Next Number
         <span class="sub">What comes after?</span>
       </button>
+      <button class="choice" data-track="oneless">
+        <span class="emoji">↕️</span>One More, One Less
+        <span class="sub">Both directions</span>
+      </button>
       <button class="choice" data-track="count">
         <span class="emoji">👣</span>Count On
         <span class="sub">Add 1, 2 or 3</span>
       </button>
+      <button class="choice" data-track="skip">
+        <span class="emoji">🦘</span>Skip Counting
+        <span class="sub">5, 10, 15…</span>
+      </button>
       <button class="choice" data-track="add">
         <span class="emoji">➕</span>Addition
-        <span class="sub">Ages 5+</span>
+        <span class="sub">Push blocks together</span>
       </button>
       <button class="choice" data-track="sub">
         <span class="emoji">➖</span>Subtraction
         <span class="sub">Take blocks away</span>
       </button>
+      <button class="choice" data-track="pattern">
+        <span class="emoji">🎨</span>Pattern Blocks
+        <span class="sub">What comes next?</span>
+      </button>
+      <button class="choice" data-track="sort">
+        <span class="emoji">🧺</span>Sort It!
+        <span class="sub">Which doesn't belong?</span>
+      </button>
+    </div>
+
+    <div class="group-label">Big hero powers</div>
+    <div class="btn-row" id="trackRow2">
       <button class="choice" data-track="mul">
         <span class="emoji">✖️</span>Multiplication
         <span class="sub">Times tables</span>
@@ -211,6 +269,10 @@
       <button class="choice" data-track="alg">
         <span class="emoji">🧩</span>Algebra
         <span class="sub">Solve for x</span>
+      </button>
+      <button class="choice" data-track="rule">
+        <span class="emoji">🔍</span>Rule Hunter
+        <span class="sub">Find the pattern's rule</span>
       </button>
     </div>
 
@@ -275,7 +337,11 @@
         <button class="push-btn" id="pushBtn">👐 Push together</button>
       </div>
 
-      <div class="answer-row">
+      <!-- Tap-to-answer tracks (patterns, sorting, naming a rule) use these
+           tiles instead of the number pad; only one is on screen at a time. -->
+      <div class="tiles hidden" id="tiles"></div>
+
+      <div class="answer-row" id="answerRow">
         <input id="answer" type="text" inputmode="none" readonly autocomplete="off" />
         <button id="backBtn" class="key-back-btn" aria-label="Delete">⌫</button>
         <button id="attackBtn">⚔️ Attack!</button>
@@ -335,6 +401,9 @@
   // scale evens out how much of the em-box each emoji actually fills, so a
   // solid circle and a sprawling dragon read as similar-sized foes (with the
   // boss nudged a touch larger). Tuned by screenshot.
+  // the tracks that show the number-blocks counting aid
+  const BLOCK_TRACKS = ["add", "count", "sub"];
+
   const PLAYER_DAMAGE = 1;
   const FOE_DAMAGE = 1;
 
@@ -361,6 +430,7 @@
     foeIndex: 0,
     foeHp: 0,
     answer: 0,
+    choices: null,       // set on tap-to-answer tracks; null means number pad
     a: 0,
     b: 0,
     merged: false,
@@ -376,7 +446,8 @@
   const $ = (id) => document.getElementById(id);
   const el = {
     menu: $("menu"), battle: $("battle"), end: $("endScreen"),
-    trackRow: $("trackRow"), modeRow: $("modeRow"), startBtn: $("startBtn"),
+    trackRow: $("trackRow"), trackRow2: $("trackRow2"),
+    modeRow: $("modeRow"), startBtn: $("startBtn"),
     playerHp: $("playerHp"), foeHp: $("foeHp"), foeName: $("foeName"),
     playerSprite: $("playerSprite"), foeSprite: $("foeSprite"), pet: $("pet"),
     slash: $("slash"), arena: $("arena"),
@@ -384,6 +455,7 @@
     fastMarker: $("fastMarker"), superLabel: $("superLabel"),
     question: $("question"), answer: $("answer"), attackBtn: $("attackBtn"),
     keypad: $("keypad"), backBtn: $("backBtn"),
+    answerRow: $("answerRow"), tiles: $("tiles"),
     flashOverlay: $("flashOverlay"),
     blocksArea: $("blocksArea"), towerA: $("towerA"), towerB: $("towerB"),
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
@@ -406,7 +478,9 @@
     row.addEventListener("click", (e) => {
       const btn = e.target.closest("button.choice");
       if (!btn) return;
-      [...row.children].forEach((c) => c.classList.remove("sel"));
+      // both track rows are one choice, so clear every card of this kind
+      document.querySelectorAll(`#menu .choice[data-${key}]`)
+        .forEach((c) => c.classList.remove("sel"));
       btn.classList.add("sel");
       state[key] = btn.dataset[key];
       Save.remember("math", state.track, state.mode);
@@ -414,23 +488,33 @@
     });
   }
   wireChoices(el.trackRow, "track");
+  wireChoices(el.trackRow2, "track");
   wireChoices(el.modeRow, "mode");
   // Start on whatever this hero played last, falling back to the defaults —
   // a kid who always plays one track shouldn't have to re-pick it every time.
   (function restoreChoices() {
     const me = Save.me();
-    const pick = (row, key, want, fallback) => {
-      const btn = row.querySelector(`[data-${key}="${want}"]`) ||
-                  row.querySelector(`[data-${key}="${fallback}"]`);
+    const restore = (key, want, fallback) => {
+      const q = (v) => document.querySelector(`#menu .choice[data-${key}="${v}"]`);
+      const btn = q(want) || q(fallback);
       btn.classList.add("sel");
       state[key] = btn.dataset[key];
     };
-    pick(el.trackRow, "track", me && me.settings.lastTrack.math, "add");
-    pick(el.modeRow, "mode", me && me.settings.modeByGame.math, "normal");
+    restore("track", me && me.settings.lastTrack.math, "add");
+    restore("mode", me && me.settings.modeByGame.math, "normal");
   })();
 
   // ---------- Problem generation ----------
   function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function pick(arr) { return arr[rand(0, arr.length - 1)]; }
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = rand(0, i);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
   // Algebra: solve for x. ~30% of problems are two-step (a × x ± b = c); the
   // rest are one-step across all four operations. Every form resolves to a
@@ -439,68 +523,284 @@
     if (Math.random() < 0.3) {
       // two-step: a × x + b = c  (or − b), with c kept positive
       const a = rand(2, 5), x = rand(2, 9);
-      state.answer = x;
       if (Math.random() < 0.5) {
         const b = rand(1, 9);
-        return `${a} × x + ${b} = ${a * x + b}`;
+        return { text: `${a} × x + ${b} = ${a * x + b}`, answer: x };
       }
       const b = rand(1, Math.min(9, a * x - 1));
-      return `${a} × x − ${b} = ${a * x - b}`;
+      return { text: `${a} × x − ${b} = ${a * x - b}`, answer: x };
     }
     // one-step, picked evenly across +, −, ×, ÷
     switch (rand(1, 6)) {
-      case 1: { const x = rand(1, 12), b = rand(1, 12); state.answer = x; return `x + ${b} = ${x + b}`; }
-      case 2: { const x = rand(1, 12), b = rand(1, 12); state.answer = x; return `${b} + x = ${x + b}`; }
-      case 3: { const b = rand(1, 9), c = rand(1, 9); state.answer = b + c; return `x − ${b} = ${c}`; }
-      case 4: { const x = rand(1, 9), c = rand(1, 9); state.answer = x; return `${x + c} − x = ${c}`; }
-      case 5: { const a = rand(2, 9), x = rand(2, 9); state.answer = x; return `${a} × x = ${a * x}`; }
-      default: { const a = rand(2, 9), c = rand(2, 9); state.answer = a * c; return `x ÷ ${a} = ${c}`; }
+      case 1: { const x = rand(1, 12), b = rand(1, 12); return { text: `x + ${b} = ${x + b}`, answer: x }; }
+      case 2: { const x = rand(1, 12), b = rand(1, 12); return { text: `${b} + x = ${x + b}`, answer: x }; }
+      case 3: { const b = rand(1, 9), c = rand(1, 9); return { text: `x − ${b} = ${c}`, answer: b + c }; }
+      case 4: { const x = rand(1, 9), c = rand(1, 9); return { text: `${x + c} − x = ${c}`, answer: x }; }
+      case 5: { const a = rand(2, 9), x = rand(2, 9); return { text: `${a} × x = ${a * x}`, answer: x }; }
+      default: { const a = rand(2, 9), c = rand(2, 9); return { text: `x ÷ ${a} = ${c}`, answer: a * c }; }
     }
   }
 
-  function newProblem() {
-    let text;
-    if (state.track === "add") {
+  // Every track is a function returning one problem:
+  //     { text, answer }                  answered on the number pad
+  //     { text, answer, choices: [...] }  answered by tapping a tile
+  // For the number-blocks tracks (add / count / sub) it also sets state.a and
+  // state.b, which is what renderBlocks() builds the towers from.
+  const MAKERS = {
+    add() {
       state.a = rand(1, 9); state.b = rand(1, 9);
-      text = `${state.a} + ${state.b}`;
-      state.answer = state.a + state.b;
-    } else if (state.track === "next") {
-      // counting practice: show a number 1-30, type the one that comes next.
+      return { text: `${state.a} + ${state.b}`, answer: state.a + state.b };
+    },
+
+    // counting practice: show a number 1-30, type the one that comes next
+    next() {
       state.a = rand(1, 30);
-      text = `${state.a} →  ?`;
-      state.answer = state.a + 1;
-    } else if (state.track === "count") {
-      // "count on": add only 1-3 to a starting number — a gentle step up from
-      // counting toward addition. Uses the same push-together blocks as add.
+      return { text: `${state.a} →  ?`, answer: state.a + 1 };
+    },
+
+    // "count on": add only 1-3 to a starting number — a gentle step up from
+    // counting toward addition. Uses the same push-together blocks as add.
+    count() {
       state.a = rand(2, 9); state.b = rand(1, 3);
-      text = `${state.a} + ${state.b}`;
-      state.answer = state.a + state.b;
-    } else if (state.track === "alg") {
-      text = makeAlgebra();
-    } else if (state.track === "sub") {
-      // single-digit take-away for the 5-year-old; keep the result >= 1 so
-      // there's always something left to count after taking blocks away.
+      return { text: `${state.a} + ${state.b}`, answer: state.a + state.b };
+    },
+
+    // single-digit take-away for the 5-year-old; keep the result >= 1 so
+    // there's always something left to count after taking blocks away.
+    sub() {
       state.a = rand(2, 9); state.b = rand(1, state.a - 1);
-      text = `${state.a} − ${state.b}`;
-      state.answer = state.a - state.b;
-    } else if (state.track === "div") {
-      // clean division, the inverse of the times tables: build the dividend
-      // from two 2-12 factors so it always divides evenly (no remainder).
+      return { text: `${state.a} − ${state.b}`, answer: state.a - state.b };
+    },
+
+    mul() {
+      state.a = rand(2, 12); state.b = rand(2, 12);
+      return { text: `${state.a} × ${state.b}`, answer: state.a * state.b };
+    },
+
+    // clean division, the inverse of the times tables: build the dividend
+    // from two 2-12 factors so it always divides evenly (no remainder).
+    div() {
       const divisor = rand(2, 12), quotient = rand(2, 12);
       state.a = divisor * quotient; state.b = divisor;
-      text = `${state.a} ÷ ${state.b}`;
-      state.answer = quotient;
-    } else {
-      state.a = rand(2, 12); state.b = rand(2, 12);
-      text = `${state.a} × ${state.b}`;
-      state.answer = state.a * state.b;
+      return { text: `${state.a} ÷ ${state.b}`, answer: quotient };
+    },
+
+    alg: makeAlgebra,
+
+    // ---------- Age 5: number sense ----------
+
+    // Skip counting: 5, 10, 15, ? — 5s and 10s to start. Counting by 2s and
+    // 3s unlocks after winning a battle on this track (progress.skipMastered),
+    // because those are the harder step sizes to hear the pattern in.
+    skip() {
+      const me = Save.me();
+      const steps = (me && me.progress.skipMastered) ? [2, 3, 5, 10] : [5, 10];
+      const step = pick(steps);
+      const start = step * rand(1, 4);
+      const shown = [start, start + step, start + step * 2];
+      return { text: shown.join(", ") + ", ?", answer: start + step * 3 };
+    },
+
+    // One more, one less — number-sense flexibility in both directions.
+    oneless() {
+      const n = rand(2, 20);
+      const more = Math.random() < 0.5;
+      return {
+        text: `${n} →  one ${more ? "more" : "less"}?`,
+        answer: more ? n + 1 : n - 1
+      };
+    },
+
+    // Repeating patterns: red, blue, red, blue, ? — proto-algebra, the idea
+    // that a pattern has a rule you can use to predict what comes next.
+    pattern() {
+      const shapes = ["🔴", "🔵", "🟡", "🟢", "🟣", "🟠", "⭐", "❤️"];
+      const bag = shuffle(shapes);
+      const shape = (i) => bag[i];
+      // the repeating unit: AB, ABC, AAB, ABB, or AABB
+      const unit = pick([[0, 1], [0, 1, 2], [0, 0, 1], [0, 1, 1], [0, 0, 1, 1]]);
+      const seq = [];
+      while (seq.length < Math.max(6, unit.length * 2)) {
+        unit.forEach((u) => seq.push(u));
+      }
+      const nextIdx = unit[seq.length % unit.length];
+      const answer = shape(nextIdx);
+      const wrong = bag.slice(0, 3).filter((s) => s !== answer);
+      return {
+        text: seq.map(shape).join(" ") + "  ❓",
+        answer: answer,
+        choices: shuffle([answer, wrong[0], wrong[1] || bag[3]])
+      };
+    },
+
+    // Sort It! — which one doesn't belong? Categorizing is the logic that
+    // later math leans on, and it's a pure looking-and-thinking task.
+    sort() {
+      const g = pick(SORT_GROUPS);
+      const three = shuffle(g.same).slice(0, 3);
+      const odd = pick(g.odd);
+      return {
+        text: g.q,
+        answer: odd,
+        choices: shuffle(three.concat([odd]))
+      };
+    },
+
+    // ---------- Age 8: find the rule ----------
+    rule: makeRule
+  };
+
+  // Sort It! content. Each group is a family of things that belong together
+  // and a few that clearly don't. Authoring rule: the odd one must be odd for
+  // exactly one obvious reason a 5-year-old can name out loud.
+  const SORT_GROUPS = [
+    { q: "Which is NOT an animal?", same: ["🐶", "🐱", "🐴", "🐸", "🐷", "🦊"], odd: ["🚗", "🍎", "⚽", "🏠"] },
+    { q: "Which is NOT food?",      same: ["🍎", "🍌", "🍕", "🥕", "🍇", "🍞"], odd: ["🚲", "🐶", "⭐", "👟"] },
+    { q: "Which does NOT go?",      same: ["🚗", "🚲", "✈️", "🚂", "🚌", "🚀"], odd: ["🍎", "🐱", "🏠", "⚽"] },
+    { q: "Which is NOT red?",       same: ["🍎", "🍒", "🌹", "❤️", "🔴", "🚒"], odd: ["🔵", "🟢", "🟡", "🟣"] },
+    { q: "Which is NOT round?",     same: ["⚽", "🏀", "🔴", "🍊", "🌕", "🪙"], odd: ["📕", "🚪", "🧊", "📦"] },
+    { q: "Which is NOT big?",       same: ["🐘", "🐋", "🦕", "🚂", "🏔️", "🦒"], odd: ["🐜", "🐭", "🐝", "🪶"] },
+    { q: "Which is NOT a number?",  same: ["1️⃣", "2️⃣", "3️⃣", "7️⃣", "9️⃣", "5️⃣"], odd: ["🅰️", "🐶", "⭐", "🍎"] },
+  ];
+
+  // Rule Hunter: a five-tier ladder from "what's the next number" up to
+  // "what's the rule". The tier lives on the profile and steps up after
+  // RULE_STEP correct answers, so the ladder is remembered between sessions.
+  const RULE_STEP = 5;
+
+  function ruleTier() {
+    const me = Save.me();
+    return Math.min(5, Math.max(1, (me && me.progress.seqTier) || 1));
+  }
+
+  // Called on every correct Rule Hunter answer; returns the new tier if the
+  // hero just climbed one.
+  function bumpRuleTier() {
+    const me = Save.me();
+    if (!me || state.track !== "rule") return null;
+    const tier = ruleTier();
+    if (tier >= 5) return null;
+    const got = ((me.progress.seqCorrect || 0) + 1) % RULE_STEP;
+    let climbed = null;
+    Save.update((p) => {
+      p.progress.seqCorrect = got;
+      if (got === 0) { p.progress.seqTier = tier + 1; climbed = tier + 1; }
+    });
+    return climbed;
+  }
+
+  function makeRule() {
+    const tier = ruleTier();
+
+    if (tier === 1) {
+      // one operation, always forwards: 3, 6, 9, ?
+      const step = rand(2, 9), start = rand(1, 9);
+      const seq = [start, start + step, start + step * 2];
+      return { text: seq.join(", ") + ", ?", answer: start + step * 3 };
     }
-    el.question.textContent = text;
+
+    if (tier === 2) {
+      // multiplicative: doubling and tripling. The leap from "add each time"
+      // to "multiply each time" is the point of this rung.
+      const mult = pick([2, 2, 3]);
+      const start = rand(1, 4);
+      const seq = [start, start * mult, start * mult * mult];
+      return { text: seq.join(", ") + ", ?", answer: start * Math.pow(mult, 3) };
+    }
+
+    if (tier === 3) {
+      // backwards and dividing, so "the next one is bigger" stops being a
+      // safe guess
+      if (Math.random() < 0.5) {
+        const step = rand(2, 9), start = step * 4 + rand(1, 9);
+        const seq = [start, start - step, start - step * 2];
+        return { text: seq.join(", ") + ", ?", answer: start - step * 3 };
+      }
+      const div = pick([2, 3]);
+      const answer = rand(1, 4);
+      const seq = [answer * div * div * div, answer * div * div, answer * div];
+      return { text: seq.join(", ") + ", ?", answer: answer };
+    }
+
+    if (tier === 4) {
+      // two rules interleaved: 1, 2, 4, 5, 7, 8, ? — stretches working memory
+      const a = rand(1, 4), b = rand(1, 4);
+      const start = rand(1, 5);
+      const seq = [start];
+      for (let i = 0; i < 5; i++) seq.push(seq[i] + (i % 2 === 0 ? a : b));
+      return { text: seq.join(", ") + ", ?", answer: seq[5] + a };
+    }
+
+    // tier 5: stop continuing the pattern and name it, or jump far ahead
+    if (Math.random() < 0.5) {
+      const step = rand(2, 9), start = rand(1, 9);
+      const seq = [start, start + step, start + step * 2, start + step * 3];
+      const nth = rand(7, 12);
+      return {
+        text: seq.join(", ") + `, …   what is number ${nth}?`,
+        answer: start + step * (nth - 1)
+      };
+    }
+    const step = rand(2, 9), start = rand(1, 9);
+    const mult = pick([2, 3]);
+    const adding = Math.random() < 0.5;
+    const seq = adding
+      ? [start, start + step, start + step * 2, start + step * 3]
+      : [start, start * mult, start * mult * mult, start * mult * mult * mult];
+    const answer = adding ? `add ${step}` : `times ${mult}`;
+    // Candidate wrong rules, most tempting first. They can collide with each
+    // other and with the answer (times 2 on a sequence starting at 2 makes
+    // "add 2" twice), so take the first two that are actually distinct.
+    const candidates = adding
+      ? [`add ${step + 1}`, `times ${step}`, `take away ${step}`, `add ${step + 2}`]
+      : [`times ${mult + 1}`, `add ${start * mult - start}`, `add ${mult}`,
+         `times ${mult === 2 ? 4 : 2}`, `take away ${mult}`];
+    const decoys = [];
+    shuffle(candidates).forEach((c) => {
+      if (decoys.length < 2 && c !== answer && decoys.indexOf(c) === -1) decoys.push(c);
+    });
+    return {
+      text: seq.join(", ") + ", …   what is the RULE?",
+      answer: answer,
+      choices: shuffle([answer].concat(decoys))
+    };
+  }
+
+  function newProblem() {
+    const q = MAKERS[state.track]();
+    state.answer = q.answer;
+    state.choices = q.choices || null;
+    el.question.textContent = q.text;
+    el.question.classList.toggle("wordy", String(q.text).length > 22);
     el.answer.value = "";
     el.answer.className = "";
+    renderAnswerMode();
     renderBlocks();
-    el.answer.focus();
+    if (!state.choices) el.answer.focus();
     startTimer();
+  }
+
+  // Some tracks are answered on the number pad, some by tapping a tile.
+  // Only one of the two is on screen at a time.
+  function renderAnswerMode() {
+    const tapping = !!state.choices;
+    el.answerRow.classList.toggle("hidden", tapping);
+    el.keypad.classList.toggle("hidden", tapping);
+    el.tiles.classList.toggle("hidden", !tapping);
+    el.tiles.innerHTML = "";
+    if (!tapping) return;
+    state.choices.forEach((c) => {
+      const b = document.createElement("button");
+      // rule names are phrases ("take away 7"), not single glyphs
+      b.className = "tile" + (String(c).indexOf(" ") !== -1 ? " word" : "");
+      b.textContent = c;
+      b.addEventListener("click", () => {
+        if (state.busy) return;
+        Sound.tap();
+        resolveAnswer(c, b);
+      });
+      el.tiles.appendChild(b);
+    });
   }
 
   // ---------- Timer ----------
@@ -796,25 +1096,35 @@
   }
 
   // ---------- Combat flow ----------
+  // The Attack button: read the number pad, then resolve like any other answer.
   function playerAttack() {
-    if (state.busy) return;
-    const val = parseInt(el.answer.value, 10);
-    if (el.answer.value.trim() === "" || isNaN(val)) {
+    if (state.busy || state.choices) return;
+    if (el.answer.value.trim() === "" || isNaN(parseInt(el.answer.value, 10))) {
       el.answer.classList.add("wrong");
       el.answer.focus();
       return;
     }
+    resolveAnswer(parseInt(el.answer.value, 10), null);
+  }
+
+  // One path for both answer styles. `given` is the number typed on the pad or
+  // the label of the tile tapped; `tile` is that tile, so it can be marked.
+  function resolveAnswer(given, tile) {
+    if (state.busy) return;
     state.busy = true;
     stopTimer();
+    const right = String(given) === String(state.answer);
 
-    if (val === state.answer) {
+    if (right) {
       const isSuper = isFastAnswer();
       // a sharper weapon sometimes lands an extra point of damage
       const crit = !isSuper && Math.random() < GEAR.crit;
       const dmg = isSuper ? GEAR.superDamage : PLAYER_DAMAGE + (crit ? 1 : 0);
-      el.answer.className = "correct";
+      if (tile) tile.classList.add("right"); else el.answer.className = "correct";
       Save.recordAnswer(true);
       Hud.applied(Save.awardEvent(isSuper ? "correctFast" : "correct"));
+      const climbed = bumpRuleTier();
+      if (climbed) setTimeout(() => Hud.levelUp(climbed), 900);
       if (isSuper) el.playerSprite.classList.add("super");
       animateAttack("player", "foe",
         () => {
@@ -837,7 +1147,15 @@
       );
     } else {
       // wrong answer -> foe gets a hit. Costs no gold: progress only goes up.
-      el.answer.className = "wrong";
+      if (tile) {
+        tile.classList.add("wrongPick");
+        // show what it should have been, so a miss still teaches something
+        [...el.tiles.children].forEach((t) => {
+          if (t.textContent === String(state.answer)) t.classList.add("right");
+        });
+      } else {
+        el.answer.className = "wrong";
+      }
       Sound.wrong();
       Save.recordAnswer(false);
       wrongOrTimeout();
@@ -933,7 +1251,7 @@
     el.foeSprite.style.opacity = "1";
     setupFoe();
     renderHp();
-    el.battle.classList.toggle("with-blocks", state.track === "add" || state.track === "sub" || state.track === "count");
+    el.battle.classList.toggle("with-blocks", BLOCK_TRACKS.indexOf(state.track) !== -1);
     showScreen("battle");
     newProblem();
   }
@@ -941,6 +1259,8 @@
   function win() {
     stopTimer();
     Save.recordRunWon("math");
+    // beating a whole run of skip counting unlocks the harder step sizes
+    if (state.track === "skip") Save.update((p) => { p.progress.skipMastered = true; });
     const bonus = Save.awardEvent("runWon");
     el.endEmoji.textContent = "🏆";
     el.endTitle.textContent = "Victory!";
@@ -999,7 +1319,7 @@
   el.backBtn.addEventListener("click", () => pressKey("back"));
   // Physical keyboards (laptops) keep working during a battle.
   document.addEventListener("keydown", (e) => {
-    if (!el.battle.classList.contains("show")) return;
+    if (!el.battle.classList.contains("show") || state.choices) return;
     if (e.key === "Enter") { e.preventDefault(); playerAttack(); }
     else if (e.key === "Backspace") { e.preventDefault(); pressKey("back"); }
     else if (/^\d$/.test(e.key)) { e.preventDefault(); pressKey(e.key); }
@@ -1015,7 +1335,8 @@
 
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.
-  window.TEST = { state, FOES, MODES, newProblem, playerAttack, showEarnings };
+  window.TEST = { state, FOES, MODES, newProblem, playerAttack, showEarnings,
+                 makers: MAKERS, sortGroups: SORT_GROUPS, bumpRuleTier };
 })();
 </script>
 </body>

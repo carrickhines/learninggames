@@ -186,7 +186,8 @@ var Save = (function () {
         unlockedWorlds: ['meadow'],
         runsWon: {},                 // game id -> wins
         questsDone: [],              // Story Quest quest indexes
-        seqTier: 1,                  // Rule Hunter ladder (math)
+        seqTier: 1,                  // Rule Hunter rung (math), 1-5
+        seqCorrect: 0,               // correct answers on the current rung
         skipMastered: false          // unlocks skip-counting by 2s and 3s
       },
       settings: { modeByGame: {}, lastTrack: {} },
