@@ -225,7 +225,14 @@ try:
     check("math: a perfect run reaches the win screen", won)
     check("math: the run banked gold", gold() > 0, "gold %d" % gold())
     check("math: the run earned XP", d.execute_script("return Save.me().xp;") > 0)
-    check("math: every foe dropped its card", cards_held() >= 4, "%d cards" % cards_held())
+    # Cards are rare now, so a four-foe run usually pays none. What must hold
+    # is that every KO was accounted for: either it dropped a card or it moved
+    # the pity counter along.
+    pity = d.execute_script("return Save.me().progress.koSinceCard;")
+    check("math: every KO either dropped a card or fed the pity counter",
+          cards_held() + pity >= 4, "%d cards, pity %d" % (cards_held(), pity))
+    check("math: the pity counter stays under its limit",
+          pity < d.execute_script("return Save.ECONOMY.cardPity;"))
     check("math: the run was recorded", d.execute_script(
         "return Save.me().progress.runsWon.math;") == 1)
     check("math: no JS errors", errs() == [], str(errs()))
@@ -240,7 +247,9 @@ try:
     won = play_language("twins")
     check("language: a perfect run reaches the win screen", won)
     check("language: the run banked gold", gold() > 0, "gold %d" % gold())
-    check("language: every foe dropped its card", cards_held() >= 5, "%d cards" % cards_held())
+    pity = d.execute_script("return Save.me().progress.koSinceCard;")
+    check("language: every KO either dropped a card or fed the pity counter",
+          cards_held() + pity >= 5, "%d cards, pity %d" % (cards_held(), pity))
     check("language: the run was recorded", d.execute_script(
         "return Save.me().progress.runsWon.language;") == 1)
     check("language: no JS errors", errs() == [], str(errs()))
