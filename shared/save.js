@@ -432,6 +432,41 @@ var Save = (function () {
           boss: true,
           needs: 'cave',
           foe: { id: 'b-ember', name: 'Emberling', emoji: '🔥', hp: 12, scale: 1.25 },
+          loot: 'boss' } ],
+
+      /* ---- Market Town ---- */
+      { g: 'math',     t: 'bonds',     m: 'easy',   label: 'Make 10' },
+      { g: 'language', t: 'blend',     m: 'easy',   label: 'Sound it out' },
+      [ { g: 'math',     t: 'coins',   m: 'easy',   label: 'Counting coins',
+          route: 'The market lane' },
+        { g: 'language', t: 'sight',   m: 'normal', label: 'Sight words, faster',
+          route: 'The signpost lane' } ],
+      { g: 'math',     t: 'clock',     m: 'easy',   label: 'What time is it?' },
+      [ { g: 'math', t: 'bonds', m: 'normal', label: 'Make 10, faster', route: 'The counting stall', weak: true,
+          boss: true,
+          foe: { id: 'b-market', name: 'The Coin Golem', emoji: '🪙', hp: 12, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'blend', m: 'normal', label: 'Blending, faster', route: 'The reading stall',
+          boss: true,
+          foe: { id: 'b-market', name: 'The Coin Golem', emoji: '🪙', hp: 12, scale: 1.25 },
+          loot: 'boss' } ],
+
+      { g: 'math',     t: 'coins',     m: 'normal', label: 'Coins, faster' },
+      [ { g: 'math',     t: 'clock',   m: 'normal', label: 'Clock, faster',
+          route: 'The clock tower' },
+        { g: 'language', t: 'opposites', m: 'normal', label: 'Opposites, faster',
+          route: 'The mirror hall' } ],
+      { g: 'story',    mini: 'finish',              label: 'What happens next?' },
+      { g: 'language', t: 'past',      m: 'normal', label: 'Time machine, faster' },
+      [ { g: 'math', t: 'clock', m: 'normal', label: 'Telling the time', route: 'The star dial', weak: true,
+          boss: true,
+          needs: 'sky',
+          foe: { id: 'b-observatory', name: 'The Hourglass Owl', emoji: '🦉', hp: 13, scale: 1.3 },
+          loot: 'boss' },
+        { g: 'language', t: 'read', m: 'normal', label: 'Read it yourself, faster', route: 'The long balcony',
+          boss: true,
+          needs: 'sky',
+          foe: { id: 'b-observatory', name: 'The Hourglass Owl', emoji: '🦉', hp: 13, scale: 1.3 },
           loot: 'boss' } ]
     ],
 
@@ -519,6 +554,41 @@ var Save = (function () {
           boss: true,
           needs: 'ember',
           foe: { id: 'b-ember2', name: 'The Ember King', emoji: '👑', hp: 14, scale: 1.3 },
+          loot: 'boss' } ],
+
+      /* ---- Market Town ---- */
+      { g: 'math',     t: 'fract',     m: 'normal', label: 'Halves and quarters' },
+      { g: 'story',    quest: 7,                    label: 'The Grumbly Volcano' },
+      [ { g: 'math',     t: 'wordprob', m: 'normal', label: 'Word problems',
+          route: 'The story road' },
+        { g: 'math',     t: 'place',   m: 'normal', label: 'Carrying and borrowing',
+          route: 'The counting house' } ],
+      { g: 'math',     t: 'applied',   m: 'normal', label: 'Making change' },
+      [ { g: 'math', t: 'applied', m: 'normal', label: 'Money and measuring', route: 'The weighbridge', weak: true,
+          boss: true,
+          foe: { id: 'b-market2', name: 'The Ledger Wraith', emoji: '📜', hp: 13, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'forge', m: 'normal', label: 'Word forge', route: 'The sign shop',
+          boss: true,
+          foe: { id: 'b-market2', name: 'The Ledger Wraith', emoji: '📜', hp: 13, scale: 1.25 },
+          loot: 'boss' } ],
+
+      { g: 'math',     t: 'fract',     m: 'expert', label: 'Fractions, fast' },
+      [ { g: 'math',     t: 'place',   m: 'expert', label: 'Big numbers, fast',
+          route: 'The high shelf' },
+        { g: 'language', t: 'grammar', m: 'expert', label: 'Grammar, fast',
+          route: 'The long sentence' } ],
+      { g: 'math',     t: 'wordprob',  m: 'expert', label: 'Word problems, fast' },
+      { g: 'math',     t: 'applied',   m: 'expert', label: 'Everyday maths, fast' },
+      [ { g: 'math', t: 'fract', m: 'expert', label: 'The last fraction', route: 'The great lens', weak: true,
+          boss: true,
+          needs: 'ember',
+          foe: { id: 'b-observatory2', name: 'The Astral Reckoner', emoji: '🔭', hp: 15, scale: 1.35 },
+          loot: 'boss' },
+        { g: 'math', t: 'place', m: 'expert', label: 'The last carry', route: 'The star ledger',
+          boss: true,
+          needs: 'ember',
+          foe: { id: 'b-observatory2', name: 'The Astral Reckoner', emoji: '🔭', hp: 15, scale: 1.35 },
           loot: 'boss' } ]
     ]
   };
@@ -540,7 +610,20 @@ var Save = (function () {
       props: ['🐠', '🪸', '🐚', '🫧', '🦀', '🐟'] },
     { id: 'ember',  name: 'Ember Peak',   emoji: '🌋', steps: 4,
       sky: ['#4a1020', '#c04a1c'], hills: ['#7a2a18', '#5f2013', '#45170e'],
-      props: ['🌋', '🔥', '🪨', '💀', '🗻', '🌑'] }
+      props: ['🌋', '🔥', '🪨', '💀', '🗻', '🌑'] },
+
+    /* Beyond the peak: the ground the everyday maths and the newer reading
+       tracks live on. `cards` points a region at the world its chests draw
+       from — these two have their own look but no monsters of their own, so
+       without it a boss chest would promise a card and hand over nothing.
+       (New worlds to go with them are the obvious next thing; the tracks
+       needed a home on the map first.) */
+    { id: 'market', name: 'Market Town',  emoji: '🏪', steps: 5, cards: 'reef',
+      sky: ['#2a2350', '#e0a24a'], hills: ['#8a5a3c', '#6f472f', '#553626'],
+      props: ['🏪', '🪙', '⚖️', '🧺', '🕰️', '🪧'] },
+    { id: 'observatory', name: 'The Observatory', emoji: '🔭', steps: 5, cards: 'ember',
+      sky: ['#08122e', '#2b3f7a'], hills: ['#1b2a54', '#152244', '#101a33'],
+      props: ['🔭', '⭐', '🪐', '🌠', '🌙', '☄️'] }
   ];
 
   /* Which region a step belongs to. */
@@ -693,7 +776,9 @@ var Save = (function () {
     if (p) { p.gold += chest.gold; write(); }
 
     // a boss always leaves a card; an ordinary chest sometimes does
-    var pool = node && node.region ? cardsOfWorld(node.region.id) : [];
+    // a region can draw its chests from another world's monsters (see REGIONS)
+    var pool = node && node.region
+      ? cardsOfWorld(node.region.cards || node.region.id) : [];
     if (pool.length && (boss || Math.random() < ECONOMY.chestCardChance)) {
       var pick = pool[Math.floor(Math.random() * pool.length)];
       var got = awardCard(pick.id, true);
@@ -1300,7 +1385,13 @@ var Save = (function () {
       h ^= str.charCodeAt(i);
       h = (h * 16777619) >>> 0;
     }
-    return h;
+    // Consecutive days differ only in their last character, and the pick is a
+    // modulo — so without a final avalanche the low bits barely move and the
+    // "daily" challenge repeats itself for days at a time.
+    h = (h + (h << 3)) >>> 0;
+    h ^= h >>> 11;
+    h = (h + (h << 15)) >>> 0;
+    return h >>> 0;
   }
 
   /* Today's challenge for the active hero, or null if there's no hero.
@@ -1675,6 +1766,7 @@ var Save = (function () {
 
     MAP: MAP,
     REGIONS: REGIONS,
+    cardsOfWorld: cardsOfWorld,
     mapTrail: mapTrail,
     mapLength: mapLength,
     mapAt: mapAt,

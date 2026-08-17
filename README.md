@@ -9,8 +9,8 @@ Three browser games for two kids, sharing one hero.
 - **📖 Story Quest** — reading comprehension as an adventure
 
 Pick a hero on the hub and every game feeds the same character. There's a
-**map** — a winding trail of stops that open as you beat them, one for each
-kid. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
+**map** — a 32-stop winding trail through seven regions that opens as you beat
+it, one trail for each kid, with boss fights that tell you what they fear. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
 new worlds to fight in, and iPad game time, priced so the best gear takes
 months. Beaten monsters rarely drop a collectible card, sometimes shiny;
 spares trade at the Card Trader, and finishing a world's set is the only way

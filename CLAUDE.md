@@ -52,14 +52,29 @@ no build step and the games still open straight from `file://`.
 
 ## The map
 
-A landscape the hero walks, not a menu. The trail climbs through five regions,
+A landscape the hero walks, not a menu. The trail climbs through seven regions,
 each with its own sky, hills and scenery, and the hero token slides along the
 path when a stop is beaten — that walk is the moment the screen exists for.
 
 **Two trails, deliberately.** The five-year-old and the eight-year-old play
 genuinely different content, so a single path would strand the younger one at
-the first Algebra stop. `MAP.little` and `MAP.big` are ~22 steps each, with
+the first Algebra stop. `MAP.little` and `MAP.big` are 32 steps each, with
 independent progress per profile.
+
+**New ground is appended, never inserted.** `progress.map` is an *index* into
+the trail, so removing or reordering a step teleports every hero standing past
+it. `save-test.html` freezes the first road of every step that has shipped and
+fails if one moves; see `AGENTS.md`. The last two regions — Market Town and The
+Observatory — were added this way, to give the everyday-maths, fractions and
+blending tracks somewhere to live on the journey.
+
+**A region draws its chests from a world.** `rollLoot()` looks up
+`cardsOfWorld(region.cards || region.id)`, so a region whose id isn't a world
+must name one in `cards` — otherwise a boss chest promises a card and hands
+over nothing, which is exactly what happened the first time the two drifted
+apart. Market Town and The Observatory have their own look but no monsters of
+their own yet, so they borrow the Reef's and the Peak's. New worlds to match
+them are the obvious next thing.
 
 **A step is one stop or a choice of two.** A fork always rejoins, so no route
 is a dead end and nothing is missable — the branch exists to make the journey
@@ -72,9 +87,10 @@ the road not taken is drawn faded. Which route was taken is remembered in
             └─●─┘
 ```
 
-**Bosses** fight one named monster with 8–14 hearts instead of the usual
+**Bosses** fight one named monster with 8–15 hearts instead of the usual
 lineup (`boss: true` plus a `foe`), get a bigger red node, and always drop a
-card. Story stops are never bosses — there's nothing to fight.
+card. Story stops are never bosses — there's nothing to fight. Every boss is
+also a fork with one road marked as its weakness — see below.
 
 **Every stop pays a chest**, revealed on the map when the hero arrives rather
 than on a win screen. That's deliberate: the reward lands where the progress

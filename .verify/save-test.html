@@ -657,24 +657,38 @@ try {
   })());
 
   // Walk a month of days: the same day must always give the same challenge,
-  // and the month as a whole must not be one challenge repeated.
-  function monthOf(label) {
-    var days = [], seen = {};
+  // and the month as a whole must not be one challenge repeated. Give the
+  // hero some road behind them first — a brand new hero has only a handful of
+  // stops to draw from, so "how varied is a month" is a meaningless question.
+  Save.update(function (p) { p.progress.map.little = 12; });
+  function monthOf() {
+    var days = [], seen = {}, stable = true;
     for (var dd = 1; dd <= 28; dd++) {
       var k = '2026-04-' + ('0' + dd).slice(-2);
       var got = Save.daily(k);
-      ok_quiet(Save.daily(k).node.label === got.node.label);
+      if (Save.daily(k).node.label !== got.node.label) stable = false;
       days.push(got.node.label);
       seen[got.node.label] = 1;
     }
-    return { days: days, distinct: Object.keys(seen).length };
+    return { days: days, distinct: Object.keys(seen).length, stable: stable };
   }
-  function ok_quiet(cond) { if (!cond) ok('a day always gives the same challenge', false); }
 
   var mine = monthOf();
-  ok('a day always gives the same challenge', true);
-  ok('a month is not the same challenge 28 times', mine.distinct >= 3,
-     mine.distinct + ' distinct in 28 days');
+  ok('a day always gives the same challenge', mine.stable);
+  // The pool is what it is, so measure against it rather than a bare number:
+  // a month must reach a decent share of what's actually available.
+  var poolSize = (function () {
+    var seen = {}, reach = 12 + Save.ECONOMY.dailyReach;
+    Save.mapTrail('little').slice(0, reach + 1).forEach(function (st) {
+      st.options.forEach(function (o) {
+        if (o.g !== 'story') seen[o.g + o.t + o.m] = 1;
+      });
+    });
+    return Object.keys(seen).length;
+  })();
+  ok('a month is not the same challenge over and over',
+     mine.distinct >= Math.min(6, Math.ceil(poolSize / 2)),
+     mine.distinct + ' distinct in 28 days, from a pool of ' + poolSize);
 
   // A second hero on the same days must get their own sequence, or the
   // "challenge" is really just a calendar everyone shares.
@@ -983,6 +997,71 @@ try {
     Save._reload();
     ok(tag + 'loading it again changes nothing',
        localStorage.getItem(Save._key) === afterOnce);
+  });
+
+  /* The map is an array and saves store an index into it. Removing or
+     reordering a step teleports every hero who was standing past it. So the
+     first road of every step that has ever shipped is frozen here: new ground
+     is appended, never inserted. Extend this list when steps are appended;
+     never change a line already in it. */
+  var TRAIL_PREFIX = {
+    little: [
+      'math:next:easy', 'story:mini-order:-', 'math:oneless:easy',
+      'math:count:easy', 'language:sounds:easy', 'math:add:easy',
+      'language:sight:easy', 'math:pattern:easy', 'math:sub:easy',
+      'language:rhyme:easy', 'math:skip:easy', 'language:opposites:easy',
+      'math:sort:easy', 'language:read:easy', 'math:add:normal',
+      'language:past:easy', 'math:count:normal', 'math:sub:normal',
+      'math:skip:normal', 'language:sounds:normal', 'math:next:normal',
+      'math:add:normal'
+    ],
+    big: [
+      'math:mul:normal', 'story:q0:-', 'math:div:normal',
+      'math:rule:normal', 'language:forge:normal', 'math:mul:expert',
+      'story:q1:-', 'language:grammar:normal', 'language:syllable:normal',
+      'story:q2:-', 'math:div:expert', 'language:twins:normal',
+      'story:q3:-', 'math:rule:normal', 'math:alg:expert',
+      'story:q4:-', 'language:fixit:expert', 'language:forge:expert',
+      'math:rule:expert', 'story:q6:-', 'language:syllable:expert',
+      'math:alg:expert'
+    ]
+  };
+
+  function stepSig(o) {
+    return [o.g,
+            o.t != null ? o.t : (o.quest != null ? 'q' + o.quest : 'mini-' + o.mini),
+            o.m || '-'].join(':');
+  }
+
+  Object.keys(TRAIL_PREFIX).forEach(function (tr) {
+    var want = TRAIL_PREFIX[tr];
+    var steps = Save.mapTrail(tr);
+    ok(tr + ' trail: it only ever got longer', steps.length >= want.length,
+       steps.length + ' vs ' + want.length);
+    var drift = [];
+    want.forEach(function (sig, i) {
+      if (!steps[i] || stepSig(steps[i].options[0]) !== sig) {
+        drift.push(i + ': ' + sig + ' -> ' +
+                   (steps[i] ? stepSig(steps[i].options[0]) : 'gone'));
+      }
+    });
+    ok(tr + ' trail: no shipped stop moved or changed', drift.length === 0,
+       drift.join('; '));
+  });
+
+  // Every region's chests must have monsters to draw from. A region with no
+  // card pool makes a boss chest promise a card and hand over nothing — which
+  // is exactly what happened the first time regions and worlds drifted apart.
+  Save.REGIONS.forEach(function (rg) {
+    ok('region "' + rg.id + '" has cards for its chests',
+       Save.cardsOfWorld(rg.cards || rg.id).length > 0);
+  });
+  ['little', 'big'].forEach(function (tr) {
+    Save.mapTrail(tr).forEach(function (step) {
+      if (!step.boss) return;
+      ok('boss at ' + tr + ' ' + step.i + ' can actually pay its card',
+         Save.cardsOfWorld(step.region.cards || step.region.id).length > 0);
+    });
   });
 
   // The rule that makes the above possible: every boss fork's first road is
