@@ -627,6 +627,110 @@ try:
     check("map: free play arms no stop",
           d.execute_script("return Save.activeNode();") is None)
 
+    print("\nBoss weaknesses")
+    # Find a maths boss on the big trail and play both of its roads, checking
+    # that the weak one really does more per hit. This is the wiring the unit
+    # tests can't see: that `weak` survives the trip from MAP into the battle.
+    load("index.html")
+    fresh_hero("Boss Tester")
+    d.execute_script("Save.award(200000, 0);"
+                     "['cave','sky','reef','ember'].forEach(function (w) {"
+                     "  Save.buy('world-' + w); });")
+    boss = d.execute_script("""
+        var out = null;
+        Save.mapTrail('big').forEach(function (step) {
+            if (out || !step.boss) return;
+            var w = step.options.filter(function (o) { return o.weak; })[0];
+            if (w && w.g === 'math') out = { i: step.i, hp: w.foe.hp };
+        });
+        return out;
+    """)
+    check("weakness: the big trail has a maths boss to test", boss is not None)
+
+    def one_hit():
+        """Land one ordinary hit on whatever fight is up; report the HP it took.
+
+        Waits past the gold zone first, so this is always a single hit and
+        never a double — otherwise the weakness bonus would be measured
+        against a moving baseline."""
+        time.sleep(2.2)
+        before = d.execute_script("return TEST.state.foeHp;")
+        d.execute_script("""
+            document.getElementById('answer').value = String(TEST.state.answer);
+            document.getElementById('attackBtn').click();
+        """)
+        time.sleep(0.9)
+        return before - d.execute_script("return TEST.state.foeHp;")
+
+    weak = d.execute_script(
+        "return Save.mapTrail('big')[arguments[0]].options[0];", boss["i"])
+
+    # baseline: the very same track and mode, played from the menu with no
+    # boss node in play. The other road of this fork is a language track, so
+    # free play — not that road — is what "a normal hit" means here.
+    load("math/index.html")
+    click('[data-track="%s"]' % weak["t"])
+    click('[data-mode="%s"]' % weak["m"])
+    click("#startBtn")
+    time.sleep(1.0)
+    normal_hit = one_hit()
+
+    d.execute_script(
+        "var i = arguments[0];"
+        "Save.update(function (p) { p.progress.map.big = i; });"
+        "Save.startNode('big', i, 0);", boss["i"])
+    load("math/index.html")
+    time.sleep(1.0)
+    check("weakness: the weak road really starts the boss fight",
+          d.execute_script("return TEST.state.node && TEST.state.node.weak === true;"))
+    weak_hit = one_hit()
+
+    check("weakness: the road it fears takes more off it than a normal hit",
+          weak_hit > normal_hit, "%s vs %s" % (weak_hit, normal_hit))
+    check("weakness: it is a bonus, not a different game",
+          weak_hit - normal_hit == d.execute_script("return Save.ECONOMY.weaknessDamage;"),
+          "%s vs %s" % (weak_hit, normal_hit))
+    check("weakness: the boss still needs a real fight",
+          boss["hp"] / max(weak_hit, 1) >= 3,
+          "%d HP / %s a hit" % (boss["hp"], weak_hit))
+    check("weakness: no JS errors", not errs(), str(errs()))
+
+    print("\nPets grow up")
+    load("index.html")
+    fresh_hero("Pet Raiser")
+    d.execute_script("Save.award(100000, 0); Save.buy('chick');")
+    first = d.execute_script("return Save.petStage().emoji;")
+    # stand the pet one monster short of growing, then let a battle finish it
+    d.execute_script("var need = Save.ECONOMY.petGrowth[1];"
+                     "Save.update(function (p) { p.inventory.petXp.chick = need - 1; });")
+    load("math/index.html")
+    click('[data-track="add"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.0)
+    check("pets: the arena shows the form it has now",
+          d.execute_script("return document.getElementById('pet').textContent;") == first)
+    for _ in range(30):
+        if d.execute_script("return TEST.state.foeIndex;") > 0:
+            break
+        d.execute_script("""
+            if (TEST.state.busy) return;
+            document.getElementById('answer').value = String(TEST.state.answer);
+            document.getElementById('attackBtn').click();
+        """)
+        time.sleep(0.75)
+    time.sleep(0.6)
+    check("pets: beating a monster grew it",
+          d.execute_script("return Save.petStage().idx;") == 1)
+    grown = d.execute_script("return Save.petStage().emoji;")
+    check("pets: it wears a new face", grown != first, "%s -> %s" % (first, grown))
+    check("pets: the arena swapped to the new form without a reload",
+          d.execute_script("return document.getElementById('pet').textContent;") == grown)
+    check("pets: growing up bought thinking time",
+          d.execute_script("return Save.loadout().bonusTime;") >
+          d.execute_script("return Save.item('chick').bonusTime;"))
+    check("pets: no JS errors", not errs(), str(errs()))
+
     print("\nWild allies")
     # The odds are unit-tested in save-test.html; what needs proving here is
     # the wiring — that a beaten monster ends up standing beside the hero and

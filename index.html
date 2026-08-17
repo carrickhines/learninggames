@@ -292,6 +292,14 @@
   }
   .mapstop.boss .face { font-size: 36px; }
   .mapstop.boss .tag { color: #ffc9d4; font-weight: bold; }
+  /* the road a boss fears: gold rather than the boss's pink */
+  .mapstop.boss.weak .tag { color: var(--accent); }
+  .mapstop.boss.weak.next .ring { box-shadow: 0 0 0 4px rgba(255,210,63,.5), 0 0 26px rgba(255,210,63,.55); }
+  .forksign.boss {
+    color: #ffc9d4;
+    background: linear-gradient(180deg, #3a1c2c, #2a1320);
+    box-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 0 1px rgba(255,201,212,.35);
+  }
   .mapstop.boss.next .ring {
     border-color: var(--accent);
     box-shadow: 0 6px 0 var(--accent-2), 0 0 0 5px rgba(255,94,126,.3), 0 0 30px rgba(255,210,63,.55);
@@ -1055,8 +1063,20 @@ function shopCard(it, me) {
   else if (setLocked) price = `🔒 ${Save.world(it.set).name} set`;
   else price = '🪙 ' + it.cost;
 
-  b.innerHTML = `<span class="emoji">${it.emoji}</span>${escapeHtml(it.name)}` +
-    `<span class="sub">${escapeHtml(it.sub)}</span>` +
+  // A pet you own wears the form it has grown into, and says how far it is
+  // from the next one — the only thing in the shop that keeps changing after
+  // you've paid for it, so it has to be visible somewhere.
+  const stage = it.kind === 'pet' && owned ? Save.petStage(it.id) : null;
+  const face = stage ? stage.emoji : it.emoji;
+  const name = stage ? stage.name : it.name;
+  const sub = stage
+    ? (stage.next == null
+        ? `${it.sub} · fully grown`
+        : `${it.sub} · ${stage.next - stage.xp} more monsters to grow`)
+    : it.sub;
+
+  b.innerHTML = `<span class="emoji">${face}</span>${escapeHtml(name)}` +
+    `<span class="sub">${escapeHtml(sub)}</span>` +
     `<span class="price"></span>`;
   b.querySelector('.price').textContent = price;
 
@@ -1299,7 +1319,13 @@ function drawNodes(steps, at) {
     if (step.choice && step.i === at) {
       const sign = document.createElement('div');
       sign.className = 'forksign';
-      sign.textContent = 'Which way?';
+      // A boss names itself and admits what it fears. Announcing the weakness
+      // is the whole feature — a secret one a child can't deduce is a dice
+      // roll, an announced one is a decision about which subject to face.
+      sign.textContent = step.boss
+        ? `${step.options[0].foe.emoji} ${step.options[0].foe.name} fears 🎯`
+        : 'Which way?';
+      if (step.boss) sign.classList.add('boss');
       const jp = joinPoint(step.i);
       sign.style.left = jp.x + 'px';
       sign.style.top = (jp.y - 52) + 'px';
@@ -1316,9 +1342,11 @@ function drawNodes(steps, at) {
       b.innerHTML =
         `<span class="ring"><span class="face">${state === 'done' ? '⭐' : node.emoji}</span></span>` +
         `<span class="tag"></span>`;
-      b.querySelector('.tag').textContent =
-        step.choice && state === 'next' ? (node.route || node.label) : node.label;
-      b.title = node.label + (node.needs ? ` — needs ${Save.world(node.needs).name}` : '');
+      const road = step.choice && state === 'next' ? (node.route || node.label) : node.label;
+      b.querySelector('.tag').textContent = node.weak ? `🎯 ${road}` : road;
+      if (node.weak) b.classList.add('weak');
+      b.title = (node.weak ? `${node.label} — its weakness: your hits do more` : node.label) +
+                (node.needs ? ` — needs ${Save.world(node.needs).name}` : '');
       b.addEventListener('click', () => tapStop(node, state));
       box.appendChild(b);
     });

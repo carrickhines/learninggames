@@ -166,6 +166,7 @@ var Hud = (function () {
       badge();
       var hold = item.kind === 'card' ? (item.drop.foil ? 2400 : 1800) : 1800;
       if (item.kind === 'card') showCard(item.drop);
+      else if (item.kind === 'pet') showPet(item.stage);
       else showLevel(item.level);
       setTimeout(play, hold + 220);
     };
@@ -183,6 +184,19 @@ var Hud = (function () {
       el.appendChild(b);
     }
     b.textContent = '🎁' + (queued.length > 1 ? queued.length : '');
+  }
+
+  /* "Your pet grew up!" — the only reward that comes from turning up rather
+     than from gold or luck, so it gets the same moment a level does. */
+  function showPet(stage) {
+    if (!stage) return;
+    Sound.levelUp();
+    var box = document.createElement('div');
+    box.className = 'levelup';
+    box.innerHTML = '<div class="card"><div class="big">' + stage.emoji + ' GREW UP!</div>' +
+                    '<div class="small">Say hello to ' + stage.name + '</div></div>';
+    document.getElementById('app').appendChild(box);
+    setTimeout(function () { box.remove(); }, 1800);
   }
 
   /* "You caught a card!" — the drop moment.

@@ -11,6 +11,10 @@ between sessions. They're now one site with a hub, a shared design system,
 and a persistent hero who carries gold, levels, gear, and a monster-card
 collection across all three games.
 
+> **Read [`AGENTS.md`](AGENTS.md) before changing anything.** It holds the rules
+> that outrank every design note here — chiefly that a deploy must never cost
+> the kids their progress, since their saves live only on their iPads.
+
 ## Who it's for
 
 - **Younger son (age 5)** — learning to count, read, and sequence. His tracks
@@ -207,6 +211,40 @@ tweak can't quietly make it a week again.
 
 Card ids must be unique across the entire site — `.verify/content.py` checks
 this, because a collision would silently merge two monsters into one card.
+
+## Boss weaknesses
+
+Every boss stop is a **fork**, and one road is marked `weak` — the track that
+boss can't stand. Take it and every hit lands `ECONOMY.weaknessDamage` extra;
+take the other and the fight is honest but longer. Both roads fight the same
+boss for the same chest, so it's "on its terms or on mine", never a wrong turn.
+
+- **The weakness is announced**, on the signpost and with a 🎯 on the stop. A
+  secret a child can't deduce is a dice roll, not a decision.
+- The weak road is usually the **harder subject**, which is the point: the
+  reward is aimed at the track they'd otherwise dodge.
+- **Option 0 of every boss fork is the stop as it was before forking.** Saves
+  store `activeNode` as `{ trail, i, o }`, so a boss half-played at deploy time
+  resumes as `o: 0` and has to land in the same game. `save-test.html` enforces
+  this; see `AGENTS.md`.
+
+## Pets grow up
+
+A pet is the one thing you own that isn't finished when you buy it. It counts
+the monsters it has seen fall (`inventory.petXp`, keyed by pet id) and grows
+through **three forms**, changing emoji and name and deepening its passive.
+
+- `ECONOMY.petGrowth` sets the thresholds — a few days to the second form, a
+  couple of weeks to the last, at the pace the kids play.
+- **Growth scales the pet you have** (`petStageTimeScale`) rather than adding a
+  flat bonus, so raising a 200-gold chick can't out-perform an 8,000-gold
+  griffin. A pet with no shield never grows one; the last form only deepens a
+  shield it already had. `save-test.html` asserts a grown starter never beats a
+  better pet on every stat at once.
+- XP is **per pet id**, so putting one away and bringing it back keeps what it
+  earned. Swapping is not punished.
+- It's the only reward that comes from turning up rather than from gold or
+  luck, which is exactly why it exists.
 
 ## Wild allies
 

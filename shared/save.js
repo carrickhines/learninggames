@@ -70,6 +70,25 @@ var Save = (function () {
 
        Allies last the run and no longer. Nothing permanent means no power
        creep, and every run gets its own shape. */
+    /* Monsters a pet must see fall before it grows into its next form, and
+       what that form adds. Not gold — a pet is raised, not bought twice, and
+       it's the one reward in the game that comes only from turning up. At the
+       pace the kids play this is a few days to the second form and a couple of
+       weeks to the last. */
+    petGrowth: [0, 60, 200],
+    /* Growth scales the pet you have rather than adding a flat bonus, so
+       raising a 200-gold chick can't quietly out-perform an 8,000-gold
+       griffin — the shop's ladder still decides which pet is better, and
+       growth decides how much of it you've earned. For the same reason a pet
+       with no shield never grows one; the last form only deepens a shield the
+       pet already had. */
+    petStageTimeScale: 0.25,  // each form adds 25% of the pet's own thinking time
+    petStageShield: [0, 0, 1],// the last form blocks one more hit — if it blocked any
+
+    /* A boss fork's weak road lands this much extra damage a hit. Enough to
+       be worth taking, not enough to make the other road unplayable. */
+    weaknessDamage: 1,
+
     allyJoinChance: 0.18,
     allyKnownBonus: 0.22,     // added when its card is already in the book
     allyStrikeChance: 0.25,   // each ally, on each of your hits
@@ -243,17 +262,27 @@ var Save = (function () {
     { id: 'aegis', kind: 'armor', name: 'Star Aegis', emoji: '🌟', cost: 26000,
       set: 'sky', sub: '10 hearts', bonusHp: 5 },
 
-    // ---- Pets: a companion in the arena, plus one small passive ----
+    /* ---- Pets: a companion in the arena, plus one small passive ----
+       A pet is the one thing you own that isn't finished when you buy it: it
+       grows. `stages` are [emoji, name] from the newly-bought form onwards,
+       so stage 0 must match `emoji`. Growth is the same for every pet
+       (PET_GROWTH), so the shop's ladder still decides which is better —
+       raising a chick can't overtake a phoenix. */
     { id: 'chick', kind: 'pet', name: 'Cheep', emoji: '🐣', cost: 200,
-      sub: '+2 seconds to think', bonusTime: 2000 },
+      sub: '+2 seconds to think', bonusTime: 2000,
+      stages: [['🐣', 'Cheep'], ['🐤', 'Fluff'], ['🐓', 'Big Red']] },
     { id: 'cat', kind: 'pet', name: 'Whiskers', emoji: '🐱', cost: 950,
-      sub: '+3 seconds to think', bonusTime: 3000 },
+      sub: '+3 seconds to think', bonusTime: 3000,
+      stages: [['🐱', 'Whiskers'], ['🐈', 'Prowl'], ['🐅', 'Fang']] },
     { id: 'drake', kind: 'pet', name: 'Ember', emoji: '🐲', cost: 3000,
-      sub: 'Blocks one hit each run', shield: 1, bonusTime: 1000 },
+      sub: 'Blocks one hit each run', shield: 1, bonusTime: 1000,
+      stages: [['🐲', 'Ember'], ['🐉', 'Emberwing'], ['🦖', 'Emberlord']] },
     { id: 'griffin', kind: 'pet', name: 'Skyclaw', emoji: '🦅', cost: 8000,
-      sub: 'Blocks a hit, +3 seconds', shield: 1, bonusTime: 3000 },
+      sub: 'Blocks a hit, +3 seconds', shield: 1, bonusTime: 3000,
+      stages: [['🦅', 'Skyclaw'], ['🦉', 'Stormclaw'], ['🦚', 'Skylord']] },
     { id: 'phoenix', kind: 'pet', name: 'Blaze', emoji: '🔥', cost: 22000,
-      set: 'reef', sub: 'Blocks two hits, +4 seconds', shield: 2, bonusTime: 4000 },
+      set: 'reef', sub: 'Blocks two hits, +4 seconds', shield: 2, bonusTime: 4000,
+      stages: [['🔥', 'Blaze'], ['☄️', 'Solar'], ['🌟', 'Everflame']] },
 
     // ---- Trinkets: a fourth slot, and the effects that don't touch damage ----
     { id: 'coin', kind: 'trinket', name: 'Lucky Coin', emoji: '🪙', cost: 400,
@@ -305,6 +334,14 @@ var Save = (function () {
      how the map and the shop pull on each other. `loot` sets the size of the
      chest the stop pays.
 
+     Every boss is a fork, and one road is marked `weak`: the track the boss
+     can't stand. Take it and your hits land extra damage; take the other and
+     the fight is honest but longer. Both roads beat the same boss for the same
+     chest, so the choice is "fight it on its terms or on mine", never a wrong
+     turn — and the weak road is usually the harder subject, which is the
+     point. Bosses are announced, not hidden: a secret weakness a child can't
+     deduce is just a dice roll.
+
      Positions are computed by the hub, not stored — the path winds itself, so
      inserting a stop is a one-line change here with nothing to re-place. */
 
@@ -318,9 +355,14 @@ var Save = (function () {
           route: 'The forest path' } ],
       { g: 'math',     t: 'count',     m: 'easy',   label: 'Count on' },
       { g: 'language', t: 'sounds',    m: 'easy',   label: 'Beginning sounds' },
-      { g: 'math',     t: 'add',       m: 'easy',   label: 'Adding blocks',
-        boss: true, foe: { id: 'b-meadow', name: 'Bramble King', emoji: '🌳', hp: 8, scale: 1.2 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'add', m: 'easy', label: 'Adding blocks', route: 'The bramble gate', weak: true,
+          boss: true,
+          foe: { id: 'b-meadow', name: 'Bramble King', emoji: '🌳', hp: 8, scale: 1.2 },
+          loot: 'boss' },
+        { g: 'language', t: 'sight', m: 'easy', label: 'Sight words', route: 'The mossy gate',
+          boss: true,
+          foe: { id: 'b-meadow', name: 'Bramble King', emoji: '🌳', hp: 8, scale: 1.2 },
+          loot: 'boss' } ],
 
       { g: 'language', t: 'sight',     m: 'easy',   label: 'Sight words' },
       [ { g: 'math',     t: 'pattern', m: 'easy',   label: 'Patterns',
@@ -329,9 +371,14 @@ var Save = (function () {
           route: 'The whispering caves' } ],
       { g: 'math',     t: 'sub',       m: 'easy',   label: 'Taking away' },
       { g: 'language', t: 'rhyme',     m: 'easy',   label: 'Rhyme time' },
-      { g: 'math',     t: 'skip',      m: 'easy',   label: 'Skip counting',
-        boss: true, foe: { id: 'b-cave', name: 'Crystal Ogre', emoji: '💠', hp: 9, scale: 1.2 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'skip', m: 'easy', label: 'Skip counting', route: 'The crystal stair', weak: true,
+          boss: true,
+          foe: { id: 'b-cave', name: 'Crystal Ogre', emoji: '💠', hp: 9, scale: 1.2 },
+          loot: 'boss' },
+        { g: 'language', t: 'rhyme', m: 'easy', label: 'Rhyme time', route: 'The echo stair',
+          boss: true,
+          foe: { id: 'b-cave', name: 'Crystal Ogre', emoji: '💠', hp: 9, scale: 1.2 },
+          loot: 'boss' } ],
 
       { g: 'language', t: 'opposites', m: 'easy',   label: 'Opposites' },
       [ { g: 'math',     t: 'sort',    m: 'easy',   label: "What doesn't belong",
@@ -339,9 +386,14 @@ var Save = (function () {
         { g: 'story',    mini: 'finish',            label: 'What happens next?',
           route: 'The storybook stair' } ],
       { g: 'language', t: 'read',      m: 'easy',   label: 'Read it yourself' },
-      { g: 'math',     t: 'add',       m: 'normal', label: 'Adding, faster',
-        boss: true, foe: { id: 'b-sky', name: 'Thunder Roc', emoji: '🦅', hp: 10, scale: 1.2 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'add', m: 'normal', label: 'Adding, faster', route: 'The updraft', weak: true,
+          boss: true,
+          foe: { id: 'b-sky', name: 'Thunder Roc', emoji: '🦅', hp: 10, scale: 1.2 },
+          loot: 'boss' },
+        { g: 'language', t: 'builder', m: 'normal', label: 'Build a word, faster', route: 'The long glide',
+          boss: true,
+          foe: { id: 'b-sky', name: 'Thunder Roc', emoji: '🦅', hp: 10, scale: 1.2 },
+          loot: 'boss' } ],
 
       { g: 'language', t: 'past',      m: 'easy',   label: 'Time machine' },
       [ { g: 'math',     t: 'count',   m: 'normal', label: 'Counting on, faster',
@@ -349,19 +401,30 @@ var Save = (function () {
         { g: 'story',    mini: 'order',             label: 'Order it again',
           route: 'The deep reef' } ],
       { g: 'math',     t: 'sub',       m: 'normal', label: 'Taking away, faster' },
-      { g: 'math',     t: 'skip',      m: 'normal', label: 'Skip counting, faster',
-        boss: true, foe: { id: 'b-reef', name: 'Old Barnacle', emoji: '🐚', hp: 11, scale: 1.2 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'skip', m: 'normal', label: 'Skip counting, faster', route: 'The tide pool', weak: true,
+          boss: true,
+          foe: { id: 'b-reef', name: 'Old Barnacle', emoji: '🐚', hp: 11, scale: 1.2 },
+          loot: 'boss' },
+        { g: 'language', t: 'sounds', m: 'normal', label: 'Sounds, faster', route: 'The kelp maze',
+          boss: true,
+          foe: { id: 'b-reef', name: 'Old Barnacle', emoji: '🐚', hp: 11, scale: 1.2 },
+          loot: 'boss' } ],
 
       { g: 'language', t: 'sounds',    m: 'normal', label: 'Sounds, faster' },
       [ { g: 'math',     t: 'next',    m: 'normal', label: 'Counting, faster',
           route: 'The ash road' },
         { g: 'language', t: 'sight',   m: 'normal', label: 'Sight words, faster',
           route: 'The lava road' } ],
-      { g: 'math',     t: 'add',       m: 'normal', label: 'The last climb',
-        boss: true, needs: 'cave',
-        foe: { id: 'b-ember', name: 'Emberling', emoji: '🔥', hp: 12, scale: 1.25 },
-        loot: 'boss' }
+      [ { g: 'math', t: 'add', m: 'normal', label: 'The last climb', route: 'The ember stair', weak: true,
+          boss: true,
+          needs: 'cave',
+          foe: { id: 'b-ember', name: 'Emberling', emoji: '🔥', hp: 12, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'read', m: 'normal', label: 'Read it yourself, faster', route: 'The smoke stair',
+          boss: true,
+          needs: 'cave',
+          foe: { id: 'b-ember', name: 'Emberling', emoji: '🔥', hp: 12, scale: 1.25 },
+          loot: 'boss' } ]
     ],
 
     big: [
@@ -373,9 +436,14 @@ var Save = (function () {
           route: 'The word road' } ],
       { g: 'math',     t: 'rule',      m: 'normal', label: 'Find the rule' },
       { g: 'language', t: 'forge',     m: 'normal', label: 'Word forge' },
-      { g: 'math',     t: 'mul',       m: 'expert', label: 'Times tables, fast',
-        boss: true, foe: { id: 'b-meadow2', name: 'Thorn Warden', emoji: '🌿', hp: 9, scale: 1.2 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'mul', m: 'expert', label: 'Times tables, fast', route: 'The thorn gate', weak: true,
+          boss: true,
+          foe: { id: 'b-meadow2', name: 'Thorn Warden', emoji: '🌿', hp: 9, scale: 1.2 },
+          loot: 'boss' },
+        { g: 'language', t: 'fixit', m: 'normal', label: 'Fix the mistake', route: 'The briar gate',
+          boss: true,
+          foe: { id: 'b-meadow2', name: 'Thorn Warden', emoji: '🌿', hp: 9, scale: 1.2 },
+          loot: 'boss' } ],
 
       { g: 'story',    quest: 1,                    label: "The Dragon's Library" },
       [ { g: 'language', t: 'grammar', m: 'normal', label: 'Grammar hunt',
@@ -384,10 +452,16 @@ var Save = (function () {
           route: 'The tunnel of x' } ],
       { g: 'language', t: 'syllable',  m: 'normal', label: 'Syllable smith' },
       { g: 'story',    quest: 2,                    label: 'The Ghost Ship' },
-      { g: 'math',     t: 'div',       m: 'expert', label: 'Division, fast',
-        boss: true, needs: 'cave',
-        foe: { id: 'b-cave2', name: 'Geode Colossus', emoji: '🗿', hp: 10, scale: 1.25 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'div', m: 'expert', label: 'Division, fast', route: 'The geode vault', weak: true,
+          boss: true,
+          needs: 'cave',
+          foe: { id: 'b-cave2', name: 'Geode Colossus', emoji: '🗿', hp: 10, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'grammar', m: 'normal', label: 'Grammar hunt', route: 'The fossil vault',
+          boss: true,
+          needs: 'cave',
+          foe: { id: 'b-cave2', name: 'Geode Colossus', emoji: '🗿', hp: 10, scale: 1.25 },
+          loot: 'boss' } ],
 
       { g: 'language', t: 'twins',     m: 'normal', label: 'Word twins' },
       [ { g: 'story',    quest: 3,                  label: "The Wizard's Maze",
@@ -395,10 +469,16 @@ var Save = (function () {
         { g: 'language', t: 'marks',   m: 'normal', label: 'Mark it',
           route: 'The scholar route' } ],
       { g: 'math',     t: 'rule',      m: 'normal', label: 'Rules, harder' },
-      { g: 'math',     t: 'alg',       m: 'expert', label: 'Algebra, fast',
-        boss: true, needs: 'sky',
-        foe: { id: 'b-sky2', name: 'Storm Sovereign', emoji: '⚡', hp: 11, scale: 1.25 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'alg', m: 'expert', label: 'Algebra, fast', route: 'The eye of the storm', weak: true,
+          boss: true,
+          needs: 'sky',
+          foe: { id: 'b-sky2', name: 'Storm Sovereign', emoji: '⚡', hp: 11, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'twins', m: 'normal', label: 'Word twins', route: 'The long updraft',
+          boss: true,
+          needs: 'sky',
+          foe: { id: 'b-sky2', name: 'Storm Sovereign', emoji: '⚡', hp: 11, scale: 1.25 },
+          loot: 'boss' } ],
 
       { g: 'story',    quest: 4,                    label: 'The Robot Bakery' },
       [ { g: 'language', t: 'fixit',   m: 'expert', label: 'Proofread, fast',
@@ -406,20 +486,32 @@ var Save = (function () {
         { g: 'story',    quest: 5,                  label: "The Yeti's Birthday",
           route: 'The trench' } ],
       { g: 'language', t: 'forge',     m: 'expert', label: 'Forge, fast' },
-      { g: 'math',     t: 'rule',      m: 'expert', label: 'Rules, fast',
-        boss: true, needs: 'reef',
-        foe: { id: 'b-reef2', name: 'Abyss Warden', emoji: '🦑', hp: 12, scale: 1.25 },
-        loot: 'boss' },
+      [ { g: 'math', t: 'rule', m: 'expert', label: 'Rules, fast', route: 'The trench mouth', weak: true,
+          boss: true,
+          needs: 'reef',
+          foe: { id: 'b-reef2', name: 'Abyss Warden', emoji: '🦑', hp: 12, scale: 1.25 },
+          loot: 'boss' },
+        { g: 'language', t: 'syllable', m: 'normal', label: 'Syllable smith', route: 'The slow drift',
+          boss: true,
+          needs: 'reef',
+          foe: { id: 'b-reef2', name: 'Abyss Warden', emoji: '🦑', hp: 12, scale: 1.25 },
+          loot: 'boss' } ],
 
       { g: 'story',    quest: 6,                    label: 'The Moon Rescue' },
       [ { g: 'language', t: 'syllable', m: 'expert', label: 'Syllables, fast',
           route: 'The obsidian way' },
         { g: 'language', t: 'twins',   m: 'expert', label: 'Twins, fast',
           route: 'The cinder way' } ],
-      { g: 'math',     t: 'alg',       m: 'expert', label: 'The summit',
-        boss: true, needs: 'ember',
-        foe: { id: 'b-ember2', name: 'The Ember King', emoji: '👑', hp: 14, scale: 1.3 },
-        loot: 'boss' }
+      [ { g: 'math', t: 'alg', m: 'expert', label: 'The summit', route: 'The summit path', weak: true,
+          boss: true,
+          needs: 'ember',
+          foe: { id: 'b-ember2', name: 'The Ember King', emoji: '👑', hp: 14, scale: 1.3 },
+          loot: 'boss' },
+        { g: 'language', t: 'forge', m: 'expert', label: 'Forge, fast', route: 'The long ridge',
+          boss: true,
+          needs: 'ember',
+          foe: { id: 'b-ember2', name: 'The Ember King', emoji: '👑', hp: 14, scale: 1.3 },
+          loot: 'boss' } ]
     ]
   };
 
@@ -631,6 +723,9 @@ var Save = (function () {
         weapon: 'stick',
         armor: 'tunic',
         pet: null,
+        // monsters each pet has seen fall, keyed by pet id: a pet you put
+        // away keeps what it grew, so swapping isn't punished
+        petXp: {},
         trinket: null,
         tokens: 0
       },
@@ -655,7 +750,7 @@ var Save = (function () {
     };
   }
 
-  var VERSION = 2;
+  var VERSION = 3;
   var V2_GOLD_SCALE = 20;   // see migrate(): the v2 price rebalance factor
 
   function blankSave() {
@@ -700,6 +795,17 @@ var Save = (function () {
         if (!p.progress.mapPicks) p.progress.mapPicks = { little: {}, big: {} };
         if (p.progress.mapWalk === undefined) p.progress.mapWalk = null;
         if (p.progress.activeNode === undefined) p.progress.activeNode = null;
+      });
+    }
+
+    if (v < 3) {
+      // v3 added pet growth. An existing pet starts from scratch rather than
+      // being credited for monsters it fought before it could grow — there's
+      // no record of those, and starting a pet at zero is the honest reading.
+      Object.keys(d.profiles).forEach(function (id) {
+        var p = d.profiles[id];
+        if (!p.inventory) p.inventory = {};
+        if (!p.inventory.petXp) p.inventory.petXp = {};
       });
     }
 
@@ -1137,11 +1243,52 @@ var Save = (function () {
      What the games actually need to know at the start of a run: the numbers
      the equipped gear adds up to. */
 
+  /* ---------- Pets grow up -------------------------------------------------
+     The one thing you own that isn't finished when you bought it. A pet counts
+     the monsters it has seen fall and grows into a stronger form twice. The
+     count is per pet id, so putting one away and bringing it back later keeps
+     what it earned. */
+
+  /* The equipped pet's current form, or null if there's no pet.
+     { id, idx, emoji, name, xp, need, next } — `next` is null at full grown. */
+  function petStage(petId) {
+    var p = me();
+    if (!p) return null;
+    var id = petId || p.inventory.pet;
+    var it = item(id);
+    if (!it || it.kind !== 'pet') return null;
+    var xp = (p.inventory.petXp && p.inventory.petXp[id]) || 0;
+    var steps = ECONOMY.petGrowth;
+    var idx = 0;
+    for (var i = 0; i < steps.length; i++) if (xp >= steps[i]) idx = i;
+    var stage = (it.stages && it.stages[idx]) || [it.emoji, it.name];
+    return {
+      id: id, idx: idx, emoji: stage[0], name: stage[1],
+      xp: xp, need: steps[idx], next: idx + 1 < steps.length ? steps[idx + 1] : null
+    };
+  }
+
+  /* One more monster down. Returns the new stage if the pet just grew into
+     it, otherwise null — so a caller can celebrate without asking twice. */
+  function growPet() {
+    var p = me();
+    if (!p || !p.inventory.pet) return null;
+    var before = petStage();
+    if (!before) return null;
+    update(function (pr) {
+      if (!pr.inventory.petXp) pr.inventory.petXp = {};
+      pr.inventory.petXp[pr.inventory.pet] = (pr.inventory.petXp[pr.inventory.pet] || 0) + 1;
+    });
+    var after = petStage();
+    return (after && after.idx > before.idx) ? after : null;
+  }
+
   function loadout() {
     var p = me();
     var base = {
       maxHp: 5, bonusTime: 0, fastBonus: 0, crit: 0, superDamage: 2,
-      slash: '💥', pet: null, shield: 0, goldBonus: 0, cardBonus: 0
+      slash: '💥', pet: null, petName: '', petStage: 0,
+      shield: 0, goldBonus: 0, cardBonus: 0
     };
     if (!p) return base;
     var w = item(p.inventory.weapon);
@@ -1155,9 +1302,15 @@ var Save = (function () {
     }
     if (a) base.maxHp = 5 + (a.bonusHp || 0);
     if (pet) {
-      base.pet = pet.emoji;
-      base.bonusTime = pet.bonusTime || 0;
-      base.shield = pet.shield || 0;
+      // a grown pet wears its later form and carries the growth bonus
+      var stage = petStage();
+      base.pet = (stage && stage.emoji) || pet.emoji;
+      base.petName = (stage && stage.name) || pet.name;
+      base.petStage = stage ? stage.idx : 0;
+      base.bonusTime = Math.round((pet.bonusTime || 0) *
+                                  (1 + base.petStage * ECONOMY.petStageTimeScale));
+      base.shield = (pet.shield || 0) +
+                    (pet.shield ? (ECONOMY.petStageShield[base.petStage] || 0) : 0);
     }
     if (tr) {
       base.goldBonus = tr.goldBonus || 0;
@@ -1344,6 +1497,12 @@ var Save = (function () {
     recordAnswer: recordAnswer,
 
     awardCard: awardCard,
+    /* Extra damage a hit does on this stop — a boss's weak road, or nothing. */
+    petStage: petStage,
+    growPet: growPet,
+    weaknessBonus: function (node) {
+      return (node && node.boss && node.weak) ? ECONOMY.weaknessDamage : 0;
+    },
     rollAlly: rollAlly,
     allyStrikes: allyStrikes,
     allCards: allCards,

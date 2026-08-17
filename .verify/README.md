@@ -18,7 +18,7 @@ Requires Python 3 and network access; reuses whatever `firefox` is on `PATH`.
 | Script | What it proves | Runtime |
 |---|---|---|
 | `smoke.py` | every page loads and its script runs to the end, styles resolve, each game starts and pays for a right answer, the hub / shop / cards / token flows work | ~1 min |
-| `run-save-test.py` | runs `save-test.html`: 81 assertions over `shared/save.js` — profiles, XP→level rollover, buying and refusing, card drops and duplicates, export→wipe→import, a corrupt save, a `localStorage` that throws | ~10 s |
+| `run-save-test.py` | runs `save-test.html` and `log-test.html`: profiles, XP→level rollover, buying and refusing, card drops and duplicates, boss weaknesses, pet growth, wild allies, export→wipe→import, a corrupt save, a `localStorage` that throws — **and that every schema version ever shipped still loads with nothing lost** | ~10 s |
 | `tracks.py [rounds]` | generates hundreds of problems on every math track and re-derives each answer independently | ~1 min |
 | `content.py` | the authoring rules that nothing at runtime can notice being broken — one right answer per question, no decoy that's secretly correct, unique card ids | ~30 s |
 | `playthrough.py` | plays every game all the way to its win screen and checks the gold, XP, cards and progress that resulted, then that they survive a reload | ~3 min |
@@ -63,6 +63,14 @@ d.execute_script("var tier = arguments[0];"
 
 This has bitten three separate checks, each time producing a test that passed
 while measuring nothing.
+
+## The save fixtures
+
+`save-test.html` holds a `FIXTURES` map — one real save blob per schema version
+that has ever been deployed — and checks each still loads with its gold, gear,
+cards, map position and half-played stop intact. **Bumping `VERSION` means
+adding a fixture for the version you're leaving, and never editing an old one.**
+The kids' saves exist only on their iPads; see `AGENTS.md`.
 
 ## Notes
 

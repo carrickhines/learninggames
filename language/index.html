@@ -2054,7 +2054,9 @@ function animateAttack(attacker, defender, onImpact, onDone) {
 function playerAttack(double) {
   // a sharper weapon sometimes lands an extra point of damage
   const crit = !double && Math.random() < GEAR.crit;
-  const dmg = double ? GEAR.superDamage : 1 + (crit ? 1 : 0);
+  // a boss fought on the road it fears takes more from every blow
+  const weak = Save.weaknessBonus(state.node);
+  const dmg = (double ? GEAR.superDamage : 1 + (crit ? 1 : 0)) + weak;
   if (double) $('playerSprite').classList.add('super');
 
   animateAttack('player', 'foe',
@@ -2072,7 +2074,8 @@ function playerAttack(double) {
         floatText('DOUBLE! -' + dmg, '#ffd23f', true);
         setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
       } else {
-        floatText((crit ? 'CRIT! -' : '-') + dmg, crit ? '#ffd23f' : '#fff', true);
+        floatText((weak ? 'WEAKNESS! -' : crit ? 'CRIT! -' : '-') + dmg,
+                  (weak || crit) ? '#ffd23f' : '#fff', true);
       }
       $('feedback').textContent = double ? '⭐ DOUBLE HIT! ⭐' : 'Great hit!';
     },
@@ -2087,6 +2090,9 @@ function playerAttack(double) {
         Hud.cardDrop(Save.awardCard(FOES[state.foeIdx].id));
         // ...and may decide it would rather fight beside you than against you
         state.joining = Save.rollAlly(FOES[state.foeIdx], Allies.count());
+        // the pet counts the monsters it has seen fall, and grows on the way
+        const grown = Save.growPet();
+        if (grown) { GEAR = Save.loadout(); renderPet(); Hud.queue({ kind: 'pet', stage: grown }); }
         setTimeout(nextFoeOrWin, 900);
       } else {
         setTimeout(newQuestion, 600);

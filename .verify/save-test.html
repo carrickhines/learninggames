@@ -480,10 +480,14 @@ try {
 
   /* a stop that needs a world stays shut until it is bought */
   fresh();
-  var gate = null, gateTrail = null;
+  // read the normalized trail, not raw MAP: a forked step is an array there,
+  // so `step.needs` would silently be undefined and find nothing
+  var gate = null, gateTrail = null, gateNeeds = null;
   ['little', 'big'].forEach(function (tr) {
-    Save.MAP[tr].forEach(function (n, i) {
-      if (!gate && n.needs) { gate = i; gateTrail = tr; }
+    Save.mapTrail(tr).forEach(function (step, i) {
+      if (gate === null && step.options[0].needs) {
+        gate = i; gateTrail = tr; gateNeeds = step.options[0].needs;
+      }
     });
   });
   ok('some stop needs a world', gate !== null);
@@ -492,7 +496,7 @@ try {
      Save.nodeState(gateTrail, gate) === 'needs');
   ok('it cannot be started', Save.startNode(gateTrail, gate) === false);
   Save.award(100000, 0);
-  Save.buy('world-' + Save.MAP[gateTrail][gate].needs);
+  Save.buy('world-' + gateNeeds);
   ok('buying the world opens it', Save.nodeState(gateTrail, gate) === 'next');
   ok('now it can be started', Save.startNode(gateTrail, gate) === true);
 
@@ -618,6 +622,105 @@ try {
   ok('the last track is remembered', Save.me().settings.lastTrack.math === 'mul');
   ok('the mode is remembered per game', Save.me().settings.modeByGame.math === 'expert');
 
+  /* ---------- boss weaknesses ---------- */
+  fresh();
+  var bosses = [];
+  ['little', 'big'].forEach(function (tr) {
+    Save.mapTrail(tr).forEach(function (step) { if (step.boss) bosses.push(step); });
+  });
+  ok('every trail has bosses', bosses.length >= 8, bosses.length + ' found');
+  ok('every boss is a fork',
+     bosses.every(function (b) { return b.options.length === 2; }));
+  ok('every boss fork marks exactly one weakness',
+     bosses.every(function (b) {
+       return b.options.filter(function (o) { return o.weak; }).length === 1;
+     }));
+  ok('both roads fight the same boss for the same chest',
+     bosses.every(function (b) {
+       return b.options[0].foe.id === b.options[1].foe.id &&
+              b.options[0].loot === b.options[1].loot &&
+              (b.options[0].needs || null) === (b.options[1].needs || null);
+     }));
+  ok('the two roads are different work',
+     bosses.every(function (b) {
+       return b.options[0].g + b.options[0].t + b.options[0].m !==
+              b.options[1].g + b.options[1].t + b.options[1].m;
+     }));
+  ok('every road is named, so the choice reads before you tap',
+     bosses.every(function (b) { return b.options.every(function (o) { return !!o.route; }); }));
+
+  var weakOpt = bosses[0].options.filter(function (o) { return o.weak; })[0];
+  var hardOpt = bosses[0].options.filter(function (o) { return !o.weak; })[0];
+  ok('the weak road hits harder', Save.weaknessBonus(weakOpt) > 0);
+  ok('the other road hits normally', Save.weaknessBonus(hardOpt) === 0);
+  ok('an ordinary stop has no weakness bonus',
+     Save.weaknessBonus(Save.mapTrail('little')[0].options[0]) === 0);
+  ok('a missing node is not a weakness', Save.weaknessBonus(null) === 0);
+  ok('a weak flag outside a boss fight does nothing',
+     Save.weaknessBonus({ weak: true }) === 0);
+  // The bonus must help without making the boss a formality: at worst it turns
+  // a 1-damage hit into 2, so the shortest possible fight is still half the HP.
+  ok('the weak road cannot end a boss in a couple of hits',
+     bosses.every(function (b) {
+       var perHit = 2 + Save.ECONOMY.weaknessDamage;   // best gear, double hit
+       return Math.ceil(b.options[0].foe.hp / perHit) >= 3;
+     }));
+
+  /* ---------- pets grow up ---------- */
+  fresh();
+  ok('no pet, no stage', Save.petStage() === null);
+  ok('growing without a pet is harmless', Save.growPet() === null);
+  Save.award(100000, 0);
+  Save.buy('chick');
+  var st = Save.petStage();
+  ok('a new pet is at its first form', st.idx === 0);
+  ok('...wearing the face the shop sold you', st.emoji === Save.item('chick').emoji);
+  ok('...and knows what it is working towards', st.next === Save.ECONOMY.petGrowth[1]);
+  ok('the arena shows the first form', Save.loadout().pet === st.emoji);
+
+  var grewAt = [];
+  for (var g = 0; g < Save.ECONOMY.petGrowth[2] + 5; g++) {
+    var got = Save.growPet();
+    if (got) grewAt.push({ n: g + 1, idx: got.idx });
+  }
+  ok('a pet grows exactly twice', grewAt.length === 2,
+     JSON.stringify(grewAt));
+  ok('...at the counts the tuning names',
+     grewAt[0].n === Save.ECONOMY.petGrowth[1] && grewAt[1].n === Save.ECONOMY.petGrowth[2],
+     JSON.stringify(grewAt));
+  var full = Save.petStage();
+  ok('the last form is the last', full.idx === 2 && full.next === null);
+  ok('it wears a different face now', full.emoji !== Save.item('chick').emoji);
+  ok('and answers to a different name', full.name !== Save.item('chick').name);
+  ok('the arena shows the grown form', Save.loadout().pet === full.emoji);
+  ok('growing up buys thinking time',
+     Save.loadout().bonusTime ===
+       Math.round(Save.item('chick').bonusTime * (1 + 2 * Save.ECONOMY.petStageTimeScale)));
+  ok('a pet that never blocked a hit does not grow a shield',
+     Save.loadout().shield === 0);
+  ok('a fully grown pet stops growing', Save.growPet() === null);
+
+  // Raising a cheap pet must not overtake buying a better one. The check is
+  // the whole loadout, not one stat: a grown cat can out-think a fresh
+  // griffin, but it will never also block the hit the griffin blocks.
+  var grownChick = Save.loadout();
+  Save.buy('drake');
+  var freshDrake = Save.loadout();
+  ok('a fully grown starter never beats a better pet on everything at once',
+     !(grownChick.bonusTime >= freshDrake.bonusTime &&
+       grownChick.shield >= freshDrake.shield));
+  ok('a shielded pet does grow a deeper shield', (function () {
+    var p = Save.me();
+    p.inventory.petXp.drake = Save.ECONOMY.petGrowth[2];
+    return Save.loadout().shield === Save.item('drake').shield + 1;
+  })());
+
+  Save.equip('chick');
+  ok('putting a pet away and bringing it back keeps what it grew',
+     Save.petStage().idx === 2);
+  ok('a pet you never raised starts at the beginning',
+     Save.petStage('phoenix').idx === 0);
+
   /* ---------- wild allies ---------- */
   fresh();
   var realRandom = Math.random;
@@ -681,6 +784,106 @@ try {
   var reparsed = JSON.parse(raw);
   ok('the written blob holds the gold',
      reparsed.profiles[reparsed.active].gold === 77);
+
+  /* ---------- an older save must never lose a thing ----------
+
+     The kids play the deployed site. Every push replaces the code under a
+     save that is already on their iPads, and there is no server copy to fall
+     back on — a save lost is a lost month. So each shipped schema version
+     keeps a fixture here, and every one of them has to still load with
+     everything intact. Add a new fixture when VERSION goes up; never edit an
+     old one, because the whole point is that it is what really shipped. */
+
+  var FIXTURES = {
+    2: {
+      v: 2, active: 'kid',
+      profiles: { kid: {
+        name: 'Sam', avatar: '🦖', xp: 1240, gold: 5600, level: 5,
+        inventory: { owned: ['sword', 'tunic', 'chick', 'coin'], weapon: 'sword',
+                     armor: 'tunic', pet: 'chick', trinket: 'coin', tokens: 2 },
+        cards: { 'm-slime': 3, 'b-meadow': 1 }, foils: { 'm-slime': 1 },
+        progress: { world: 'cave', unlockedWorlds: ['meadow', 'cave'],
+                    runsWon: { math: 12 }, questsDone: [0, 1], seqTier: 3,
+                    koSinceCard: 11,
+                    map: { little: 0, big: 5 },
+                    mapPicks: { little: {}, big: { 2: 1 } },
+                    mapWalk: null,
+                    activeNode: { trail: 'big', i: 5, o: 0 } },
+        settings: { modeByGame: { math: 'expert' }, lastTrack: { math: 'mul' } },
+        stats: { correct: 900, wrong: 120, streak: 4, bestStreak: 31 }
+      } }
+    }
+  };
+
+  Object.keys(FIXTURES).forEach(function (ver) {
+    var fx = FIXTURES[ver];
+    var was = JSON.parse(JSON.stringify(fx.profiles.kid));
+    localStorage.setItem(Save._key, JSON.stringify(fx));
+    Save._reload();
+    var p = Save.me();
+    var tag = 'v' + ver + ' save: ';
+
+    ok(tag + 'the hero is still there', !!p && p.name === was.name);
+    ok(tag + 'the gold is untouched', p.gold === was.gold, p && p.gold);
+    ok(tag + 'the XP is untouched', p.xp === was.xp);
+    ok(tag + 'the gear is still equipped',
+       p.inventory.weapon === was.inventory.weapon &&
+       p.inventory.armor === was.inventory.armor &&
+       p.inventory.pet === was.inventory.pet &&
+       p.inventory.trinket === was.inventory.trinket);
+    ok(tag + 'everything bought is still owned',
+       was.inventory.owned.every(function (id) { return Save.owns(id); }));
+    ok(tag + 'the iPad-time tokens survived',
+       p.inventory.tokens === was.inventory.tokens);
+    ok(tag + 'the cards survived, counts and all',
+       JSON.stringify(p.cards) === JSON.stringify(was.cards));
+    ok(tag + 'the foils survived', JSON.stringify(p.foils) === JSON.stringify(was.foils));
+    ok(tag + 'the unlocked worlds survived',
+       p.progress.unlockedWorlds.join() === was.progress.unlockedWorlds.join());
+    ok(tag + 'the map position is exactly where they left it',
+       p.progress.map.big === was.progress.map.big &&
+       p.progress.map.little === was.progress.map.little);
+    ok(tag + 'the roads already taken are still remembered',
+       JSON.stringify(p.progress.mapPicks) === JSON.stringify(was.progress.mapPicks));
+    ok(tag + 'the quests done survived',
+       p.progress.questsDone.join() === was.progress.questsDone.join());
+    ok(tag + 'the lifetime stats survived',
+       p.stats.correct === was.stats.correct && p.stats.bestStreak === was.stats.bestStreak);
+    ok(tag + 'the pity counter survived', p.progress.koSinceCard === was.progress.koSinceCard);
+    ok(tag + 'the remembered track and mode survived',
+       p.settings.lastTrack.math === was.settings.lastTrack.math &&
+       p.settings.modeByGame.math === was.settings.modeByGame.math);
+
+    // A stop half-played when the deploy landed must still resume, and must
+    // resume into the same game — this is what broke when bosses became forks,
+    // if option 0 hadn't been kept as the original road.
+    var live = Save.activeNode();
+    ok(tag + 'a stop left half-played still resumes', !!live);
+    ok(tag + 'it resumes into the same game it was',
+       live && live.g === 'math' && live.t === 'mul' && live.m === 'expert',
+       live && [live.g, live.t, live.m].join('/'));
+
+    ok(tag + 'it is stamped with the current schema afterwards',
+       JSON.parse(localStorage.getItem(Save._key)).v === Save._version);
+    // migrating twice must not double anything (a reload is not a migration)
+    var afterOnce = localStorage.getItem(Save._key);
+    Save._reload();
+    ok(tag + 'loading it again changes nothing',
+       localStorage.getItem(Save._key) === afterOnce);
+  });
+
+  // The rule that makes the above possible: every boss fork's first road is
+  // the stop as it was before bosses forked, so an activeNode saved with o: 0
+  // still points at the same game, track and mode.
+  ['little', 'big'].forEach(function (tr) {
+    Save.mapTrail(tr).forEach(function (step) {
+      if (!step.boss) return;
+      ok('boss forks keep the original road first (' + tr + ' ' + step.i + ')',
+         step.options[0].weak === true);
+    });
+  });
+
+  fresh();
 
   /* ---------- corrupt storage ---------- */
   localStorage.setItem(Save._key, 'this is not json{{{');

@@ -1791,7 +1791,9 @@
       const isSuper = isFastAnswer();
       // a sharper weapon sometimes lands an extra point of damage
       const crit = !isSuper && Math.random() < GEAR.crit;
-      const dmg = isSuper ? GEAR.superDamage : PLAYER_DAMAGE + (crit ? 1 : 0);
+      // a boss fought on the road it fears takes more from every blow
+      const weak = Save.weaknessBonus(state.node);
+      const dmg = (isSuper ? GEAR.superDamage : PLAYER_DAMAGE + (crit ? 1 : 0)) + weak;
       if (tile) tile.classList.add("right"); else el.answer.className = "correct";
       Save.recordAnswer(true);
       Hud.applied(Save.awardEvent(isSuper ? "correctFast" : "correct"));
@@ -1813,7 +1815,8 @@
             floatText("DOUBLE! -" + dmg, "#ffd23f", true);
             setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
           } else {
-            floatText((crit ? "CRIT! -" : "-") + dmg, crit ? "#ffd23f" : "#fff", true);
+            floatText((weak ? "WEAKNESS! -" : crit ? "CRIT! -" : "-") + dmg,
+                      (weak || crit) ? "#ffd23f" : "#fff", true);
           }
         },
         () => {
@@ -1883,6 +1886,9 @@
     Hud.cardDrop(Save.awardCard(foe.id));
     // ...and may decide it would rather fight beside you than against you
     state.joining = Save.rollAlly(foe, Allies.count());
+    // the pet counts the monsters it has seen fall, and grows on the way
+    const grown = Save.growPet();
+    if (grown) { GEAR = Save.loadout(); renderPet(); Hud.queue({ kind: "pet", stage: grown }); }
     el.foeSprite.style.transition = "transform .6s, opacity .6s";
     el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
     el.foeSprite.style.opacity = "0";
