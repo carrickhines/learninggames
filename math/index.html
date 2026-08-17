@@ -1949,6 +1949,10 @@
     renderPet();
     state.playerHp = GEAR.maxHp;
     state.shield = GEAR.shield;
+    // double gold applies to this run only, so a game played afterwards from
+    // the menu pays the normal rate
+    Save.setDailyRun(!!state.daily);
+    Save.touchDay();
     state.joining = null;
     Allies.reset();          // allies last the run, not forever
     state.foeIndex = 0;
@@ -1976,9 +1980,13 @@
     // beating a whole run of skip counting unlocks the harder step sizes
     if (state.track === "skip") Save.update((p) => { p.progress.skipMastered = true; });
     const bonus = Save.awardEvent("runWon");
-    el.endEmoji.textContent = "🏆";
-    el.endTitle.textContent = "Victory!";
-    el.endText.textContent = node && node.advanced
+    // today's challenge counts once it's beaten, not once it's started
+    const daily = state.daily ? Save.claimDaily() : false;
+    el.endEmoji.textContent = daily ? "⭐" : "🏆";
+    el.endTitle.textContent = daily ? "Challenge beaten!" : "Victory!";
+    el.endText.textContent = daily
+      ? "Today's challenge is done — everything paid double."
+      : node && node.advanced
       ? "Stop " + (node.i + 1) + " beaten! The path goes on."
       : "You defeated every monster. You're a math hero!";
     showEarnings();
@@ -2077,6 +2085,18 @@
       startGame();
       return;
     }
+    // ...or today's challenge, which is free play of a stop's content at
+    // double gold rather than the stop itself
+    if (/[?&]daily=1/.test(location.search)) {
+      const d = Save.daily();
+      if (d && d.node.g === "math") {
+        state.track = d.node.t;
+        state.mode = d.node.m;
+        state.daily = true;
+        startGame();
+        return;
+      }
+    }
     const node = Save.activeNode();
     if (!node || node.g !== "math") return showScreen("menu");
     state.track = node.t;
@@ -2088,7 +2108,7 @@
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.
   window.TEST = { state, FOES, MODES, TRACK_TIME, timing, MAX_ANSWER_DIGITS, newProblem, playerAttack, showEarnings,
-                 makers: MAKERS, sortGroups: SORT_GROUPS, bumpRuleTier };
+                 makers: MAKERS, TRACKS, sortGroups: SORT_GROUPS, bumpRuleTier };
 })();
 </script>
 </body>

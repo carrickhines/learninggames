@@ -1385,6 +1385,10 @@ function startGame() {
   renderPet();
   state.playerHp = GEAR.maxHp;
   state.shield = GEAR.shield;
+  // double gold applies to this run only, so a game played afterwards from
+  // the menu pays the normal rate
+  Save.setDailyRun(!!state.daily);
+  Save.touchDay();
   state.joining = null;
   Allies.reset();          // allies last the run, not forever
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
@@ -2227,6 +2231,11 @@ function winGame() {
   state.mapReturn = node && node.advanced ? node : null;
   $('winAgainBtn').textContent = state.mapReturn ? '🗺️ Back to the map' : 'Play Again';
   Save.recordRunWon('language');
+  // today's challenge counts once it's beaten, not once it's started
+  if (state.daily && Save.claimDaily()) {
+    $('win').querySelector('.subtitle').textContent =
+      "Today's challenge is done — everything paid double.";
+  }
   const bonus = Save.awardEvent('runWon');
   Sound.victory();
   Voice.play(['P_win'], 'Victory! You beat every monster! Amazing reading!');
@@ -2272,6 +2281,19 @@ $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('m
 
 // Arrived from a map stop? Play exactly that, and skip the menu.
 (function fromMap() {
+  // today's challenge: free play of a stop's content at double gold
+  if (/[?&]daily=1/.test(location.search)) {
+    const d = Save.daily();
+    if (d && d.node.g === 'language') {
+      state.track = d.node.t;
+      state.mode = d.node.m;
+      state.daily = true;
+      Voice.unlock();
+      Speech.init();
+      startGame();
+      return;
+    }
+  }
   const node = Save.activeNode();
   if (!node || node.g !== 'language') return;
   state.track = node.t;

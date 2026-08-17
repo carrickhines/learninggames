@@ -212,6 +212,30 @@ tweak can't quietly make it a week again.
 Card ids must be unique across the entire site — `.verify/content.py` checks
 this, because a collision would silently merge two monsters into one card.
 
+## Today's challenge, and a streak that can't hurt
+
+One challenge a day, the same one all day, worth **double gold**
+(`ECONOMY.dailyGold`). It's drawn from the hero's own trail — deterministically,
+from the date and the hero's id — so it can only ever be work they've already
+met, and there's no second registry of tracks to keep in step with the games.
+
+- **It's free play of a stop's content, not the stop.** The map stays the map;
+  the challenge just picks the track and difficulty and doubles the payout.
+  `?daily=1` on either battle game is the deep link.
+- **Battle games only.** A Story Quest stop has no difficulty to name and pays
+  a fixed amount, so doubling it means little.
+- **`ECONOMY.dailyReach`** caps how far past their furthest stop it may draw
+  from — gentle early, wider as they get on.
+- It's claimed when it's **beaten**, not when it's started.
+
+**The streak grants nothing, so it can take nothing away.** It's a flame and a
+number. A missed day steps it back by **one**, never to zero, however long the
+gap — a child who was ill for a week should not be shown what they lost. This
+was the risk flagged when the feature was chosen, and it's why the streak has
+no reward attached: the daily's double gold is the reason to come back, and the
+flame is just nice to look at. `save-test.html` asserts that breaking a streak
+costs no gold and no XP.
+
 ## Boss weaknesses
 
 Every boss stop is a **fork**, and one road is marked `weak` — the track that

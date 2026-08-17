@@ -414,6 +414,37 @@ try:
 
     check("worlds: each has a full lineup for both battle games",
           all(len(w["foes"]["math"]) == 4 and len(w["foes"]["language"]) == 5 for w in worlds))
+
+    # =================== The hub's own claims ===================
+    # The hub advertises how much there is to play in hand-written HTML. Those
+    # numbers drifted badly once already — it still said 7 maths tracks when
+    # there were 19 — so they are checked against the registries themselves.
+    print("\nThe hub tells the truth")
+    d.get("file://" + os.path.join(ROOT, "math/index.html"))
+    time.sleep(1.0)
+    # the registry, not MAKERS: MAKERS also holds the Rematch, which is
+    # a mode rather than a track and never appears in the menu
+    n_math = len(js("TEST.TRACKS"))
+    d.get("file://" + os.path.join(ROOT, "language/index.html"))
+    time.sleep(1.0)
+    n_lang = len(js("TEST.TRACKS"))
+    d.get("file://" + os.path.join(ROOT, "story/index.html"))
+    time.sleep(1.0)
+    n_quest = js("TEST.QUESTS.length")
+
+    d.get("file://" + os.path.join(ROOT, "index.html"))
+    time.sleep(0.8)
+    claims = js("Array.prototype.map.call("
+                "document.querySelectorAll('.games .game-card .who-for'),"
+                "function (e) { return e.textContent; })")
+    check("hub: it claims a count for each game", len(claims) == 3, str(claims))
+    check("hub: the maths track count is right",
+          str(n_math) in claims[0], "%s vs %d tracks" % (claims[0], n_math))
+    check("hub: the language track count is right",
+          str(n_lang) in claims[1], "%s vs %d tracks" % (claims[1], n_lang))
+    check("hub: the quest count is right",
+          str(n_quest) in claims[2], "%s vs %d quests" % (claims[2], n_quest))
+
 finally:
     d.quit()
 

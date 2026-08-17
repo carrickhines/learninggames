@@ -622,6 +622,119 @@ try {
   ok('the last track is remembered', Save.me().settings.lastTrack.math === 'mul');
   ok('the mode is remembered per game', Save.me().settings.modeByGame.math === 'expert');
 
+  /* ---------- today's challenge ---------- */
+  fresh();
+  var d1 = Save.daily();
+  ok('there is a challenge today', !!d1);
+  ok("it is today's date", d1.key === Save.dayKey());
+  ok('it is a real stop off the trail', !!d1.node && !!d1.node.label);
+  ok('it names a game with a track and a difficulty',
+     !!d1.node.t && !!d1.node.m && (d1.node.g === 'math' || d1.node.g === 'language'));
+  ok('it is never a Story Quest, which has no difficulty to name',
+     d1.node.g !== 'story');
+  ok('it starts unclaimed', d1.done === false);
+  ok('asking twice gives the same challenge',
+     JSON.stringify(Save.daily().node) === JSON.stringify(d1.node));
+
+  // early on it must stay near the start of the trail, not throw expert
+  // algebra at a hero who has played once
+  ok('a brand new hero is not sent to the far end of the trail',
+     d1.node.i <= Save.ECONOMY.dailyReach, 'stop ' + d1.node.i);
+
+  ok('claiming it works', Save.claimDaily() === true);
+  ok('...and it reads as done afterwards', Save.daily().done === true);
+  ok('...and it cannot be claimed twice', Save.claimDaily() === false);
+  ok('a claimed challenge is still the same challenge',
+     JSON.stringify(Save.daily().node) === JSON.stringify(d1.node));
+
+  // tomorrow brings a new one, and unclaims
+  Save.update(function (p) { p.progress.dailyDone = '1999-01-01'; });
+  ok('a new day brings an unclaimed challenge', Save.daily().done === false);
+
+  ok('the challenge is drawn from the day, not at random', (function () {
+    var a = Save.daily(), b = Save.daily(), c = Save.daily();
+    return a.node.label === b.node.label && b.node.label === c.node.label;
+  })());
+
+  // Walk a month of days: the same day must always give the same challenge,
+  // and the month as a whole must not be one challenge repeated.
+  function monthOf(label) {
+    var days = [], seen = {};
+    for (var dd = 1; dd <= 28; dd++) {
+      var k = '2026-04-' + ('0' + dd).slice(-2);
+      var got = Save.daily(k);
+      ok_quiet(Save.daily(k).node.label === got.node.label);
+      days.push(got.node.label);
+      seen[got.node.label] = 1;
+    }
+    return { days: days, distinct: Object.keys(seen).length };
+  }
+  function ok_quiet(cond) { if (!cond) ok('a day always gives the same challenge', false); }
+
+  var mine = monthOf();
+  ok('a day always gives the same challenge', true);
+  ok('a month is not the same challenge 28 times', mine.distinct >= 3,
+     mine.distinct + ' distinct in 28 days');
+
+  // A second hero on the same days must get their own sequence, or the
+  // "challenge" is really just a calendar everyone shares.
+  var firstId = Save.profiles()[0].id;
+  Save.createProfile('Other Kid', '🐙');
+  var theirs = monthOf();
+  var sameDays = 0;
+  for (var mi = 0; mi < mine.days.length; mi++) {
+    if (mine.days[mi] === theirs.days[mi]) sameDays++;
+  }
+  ok('two heroes get their own challenges', sameDays < mine.days.length,
+     sameDays + ' of 28 days matched');
+  Save.setActive(firstId);
+
+  /* ---------- the streak ---------- */
+  fresh();
+  ok('a hero who has never played has no streak', Save.streak() === 0);
+  ok('playing today starts it at one', Save.touchDay() === 1);
+  ok('playing again the same day does not double-count', Save.touchDay() === 1);
+
+  function playedOn(daysAgo, days) {
+    // stand the record at a past day, with a streak already going
+    var when = new Date(Date.now() - daysAgo * 86400000);
+    Save.update(function (p) {
+      p.progress.streak = { days: days, last: Save.dayKey(when) };
+    });
+  }
+
+  playedOn(1, 4);
+  ok('playing the next day continues the streak', Save.touchDay() === 5);
+
+  playedOn(2, 6);
+  ok('missing a day steps back by one, not to zero', Save.touchDay() === 5);
+  playedOn(30, 9);
+  ok('missing a month still only steps back by one', Save.touchDay() === 8);
+  playedOn(9, 1);
+  ok('a streak never falls below one while they are playing today',
+     Save.touchDay() === 1);
+  playedOn(400, 0);
+  ok('a zero streak cannot go negative', Save.touchDay() >= 1);
+
+  // the whole point: it grants nothing, so it can cost nothing
+  playedOn(5, 7);
+  var goldBefore = Save.me().gold;
+  var xpBefore = Save.me().xp;
+  Save.touchDay();
+  ok('breaking a streak takes no gold', Save.me().gold === goldBefore);
+  ok('breaking a streak takes no XP', Save.me().xp === xpBefore);
+
+  /* ---------- double gold on the challenge ---------- */
+  fresh();
+  var plain = Save.awardEvent('correct').gold;
+  Save.setDailyRun(true);
+  var doubled = Save.awardEvent('correct').gold;
+  Save.setDailyRun(false);
+  var after = Save.awardEvent('correct').gold;
+  ok("today's challenge pays double", doubled === plain * Save.ECONOMY.dailyGold,
+     plain + ' -> ' + doubled);
+  ok('and the run after it pays normally again', after === plain);
+
   /* ---------- boss weaknesses ---------- */
   fresh();
   var bosses = [];

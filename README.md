@@ -17,7 +17,9 @@ spares trade at the Card Trader, and finishing a world's set is the only way
 to the top tier of each gear slot. Beaten monsters also sometimes **join you**
 for the rest of a run and fight at your side — more often if you already hold
 their card. Questions you get wrong come back later as a **Rematch**, and
-retire once you've had them right three times running. All of it persists between sessions, per kid.
+retire once you've had them right three times running. There's a **challenge
+of the day** worth double gold, and a streak that steps back by one on a missed
+day rather than starting over. All of it persists between sessions, per kid.
 
 **For parents:** Settings → Progress report shows what was played and when,
 accuracy per track, and a review list of the questions being missed with what

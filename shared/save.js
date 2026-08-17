@@ -75,6 +75,14 @@ var Save = (function () {
        it's the one reward in the game that comes only from turning up. At the
        pace the kids play this is a few days to the second form and a couple of
        weeks to the last. */
+    /* The daily challenge pays double, and is the only reason to come back
+       today rather than tomorrow. The streak is a flame and a number, nothing
+       more: it grants nothing, so a missed day can take nothing away. */
+    dailyGold: 2,
+    /* How far past their furthest stop today's challenge may be drawn from.
+       Early on this keeps it gentle; it widens as they get further. */
+    dailyReach: 3,
+
     petGrowth: [0, 60, 200],
     /* Growth scales the pet you have rather than adding a flat bonus, so
        raising a 200-gold chick can't quietly out-perform an 8,000-gold
@@ -806,6 +814,9 @@ var Save = (function () {
         var p = d.profiles[id];
         if (!p.inventory) p.inventory = {};
         if (!p.inventory.petXp) p.inventory.petXp = {};
+        if (!p.progress) p.progress = {};
+        if (p.progress.dailyDone === undefined) p.progress.dailyDone = null;
+        if (!p.progress.streak) p.progress.streak = { days: 0, last: null };
       });
     }
 
@@ -838,6 +849,13 @@ var Save = (function () {
   function me() {
     load();
     return (data.active && data.profiles[data.active]) || null;
+  }
+
+  /* The active hero's id. Profiles are keyed by it rather than carrying it, so
+     anything needing a per-hero seed has to ask for it. */
+  function activeId() {
+    load();
+    return data.active || null;
   }
 
   /* Mutate the active profile and persist. The callback gets the profile. */
@@ -922,6 +940,10 @@ var Save = (function () {
   var context = null;
   function setContext(game) { context = game; }
 
+  /* Set while a run is playing today's challenge: everything it pays doubles. */
+  var dailyRun = false;
+  function setDailyRun(on) { dailyRun = !!on; }
+
   function goldRate() {
     var p = me();
     if (!p) return 1;
@@ -930,6 +952,7 @@ var Save = (function () {
       var w = world(p.progress.world);
       if (w) mult = w.gold || 1;
     }
+    if (dailyRun) mult *= ECONOMY.dailyGold;
     return mult * (1 + loadout().goldBonus);
   }
 
@@ -1243,6 +1266,111 @@ var Save = (function () {
      What the games actually need to know at the start of a run: the numbers
      the equipped gear adds up to. */
 
+  /* ---------- The daily challenge, and a streak that can't hurt ------------
+
+     One challenge a day, the same one all day, worth double gold. It's drawn
+     from the hero's own trail so it can only ever be work they've met — no
+     new registry of tracks to keep in step with the games.
+
+     The streak is deliberately toothless: it grants nothing, so it can take
+     nothing away. A missed day steps it back by one rather than to zero. The
+     point is a reason to come back, not a debt — a child who was ill for a
+     week should not be shown the number they lost. */
+
+  /* Which trail this hero is actually walking. The hub used to work this out
+     for itself; the daily challenge needs the same answer, so it lives here. */
+  function heroTrail() {
+    return mapAt('big') > mapAt('little') ? 'big' : 'little';
+  }
+
+  /* Local calendar day, not UTC: "today" has to mean the day they're in. */
+  function dayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' +
+           ('0' + (d.getMonth() + 1)).slice(-2) + '-' +
+           ('0' + d.getDate()).slice(-2);
+  }
+
+  /* A small deterministic hash, so today's challenge is the same all day and
+     different tomorrow — and different for each hero on the same day. */
+  function daySeed(key, salt) {
+    var h = 2166136261;
+    var str = key + '|' + (salt || '');
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    return h;
+  }
+
+  /* Today's challenge for the active hero, or null if there's no hero.
+     { key, trail, i, o, node, done }
+
+     `forDay` overrides the date. Nothing in the game passes it — it exists so
+     the tests can walk a year of days and prove the challenge actually varies,
+     which is otherwise unprovable without waiting a year. */
+  function daily(forDay) {
+    var p = me();
+    if (!p) return null;
+    var trail = heroTrail();
+    var steps = mapTrail(trail);
+    if (!steps.length) return null;
+    // Draw from what they've reached, plus a little ahead of it — and only
+    // from the battle games. A Story Quest stop has no track or difficulty to
+    // name, and double gold on a fixed-payout quest means little.
+    var reach = Math.min(steps.length - 1, mapAt(trail) + ECONOMY.dailyReach);
+    var pool = [];
+    for (var i = 0; i <= reach; i++) {
+      steps[i].options.forEach(function (n) {
+        if (n.g === 'math' || n.g === 'language') pool.push(n);
+      });
+    }
+    if (!pool.length) return null;
+    var key = forDay || dayKey();
+    var seed = daySeed(key, activeId() || p.name || '');
+    var node = pool[seed % pool.length];
+    return { key: key, trail: trail, i: node.i, o: node.o, node: node,
+             done: p.progress.dailyDone === key };
+  }
+
+  /* Mark today's challenge as claimed. Returns true if this was the claim. */
+  function claimDaily() {
+    var d = daily();
+    if (!d || d.done) return false;
+    update(function (p) { p.progress.dailyDone = d.key; });
+    return true;
+  }
+
+  /* Called when a run starts. Returns the streak after today is counted. */
+  function touchDay() {
+    var p = me();
+    if (!p) return 0;
+    if (!p.progress.streak) p.progress.streak = { days: 0, last: null };
+    var st = p.progress.streak;
+    var today = dayKey();
+    if (st.last === today) return st.days;
+
+    var yesterday = dayKey(new Date(Date.now() - 86400000));
+    if (st.last === yesterday) st.days = (st.days || 0) + 1;
+    else if (!st.last) st.days = 1;
+    // A gap steps back by one and no further, and today still counts — so
+    // coming back after a fortnight away is worth more than staying away.
+    else st.days = Math.max(1, (st.days || 0) - 1);
+
+    st.last = today;
+    write();
+    return st.days;
+  }
+
+  function streak() {
+    var p = me();
+    var st = p && p.progress.streak;
+    if (!st || !st.last) return 0;
+    // a streak shown after a gap is still the stored number: nothing is taken
+    // away until they next play, and then only by one
+    return st.days || 0;
+  }
+
   /* ---------- Pets grow up -------------------------------------------------
      The one thing you own that isn't finished when you bought it. A pet counts
      the monsters it has seen fall and grows into a stronger form twice. The
@@ -1498,6 +1626,14 @@ var Save = (function () {
 
     awardCard: awardCard,
     /* Extra damage a hit does on this stop — a boss's weak road, or nothing. */
+    activeId: activeId,
+    heroTrail: heroTrail,
+    daily: daily,
+    claimDaily: claimDaily,
+    setDailyRun: setDailyRun,
+    touchDay: touchDay,
+    streak: streak,
+    dayKey: dayKey,
     petStage: petStage,
     growPet: growPet,
     weaknessBonus: function (node) {

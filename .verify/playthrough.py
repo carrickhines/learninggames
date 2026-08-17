@@ -627,6 +627,82 @@ try:
     check("map: free play arms no stop",
           d.execute_script("return Save.activeNode();") is None)
 
+    print("\nToday's challenge and the streak")
+    load("index.html")
+    fresh_hero("Daily Kid")
+    d.refresh(); time.sleep(0.9)
+    check("daily: the hub offers today's challenge",
+          d.execute_script("return getComputedStyle(document.getElementById('dailyBtn'))"
+                           ".display;") != "none")
+    check("daily: it says what it is",
+          len(d.execute_script("return document.getElementById('dailyWhat').textContent;")) > 3)
+    check("daily: it promises double gold",
+          "double" in d.execute_script(
+              "return document.getElementById('dailyMult').textContent;"))
+    check("daily: a hero who hasn't played has no streak on show",
+          d.execute_script("return getComputedStyle(document.getElementById('streakLine'))"
+                           ".display;") == "none")
+
+    want = d.execute_script("var x = Save.daily();"
+                            "return { g: x.node.g, t: x.node.t, m: x.node.m };")
+    click("#dailyBtn")
+    time.sleep(1.2)
+    check("daily: tapping it opens the right game",
+          want["g"] + "/index.html" in d.current_url, d.current_url)
+    if want["g"] == "math":
+        check("daily: on the right track and difficulty",
+              d.execute_script("return TEST.state.track;") == want["t"] and
+              d.execute_script("return TEST.state.mode;") == want["m"])
+        gold_before = gold()
+        d.execute_script("""
+            document.getElementById('answer').value = String(TEST.state.answer);
+            document.getElementById('attackBtn').click();
+        """)
+        time.sleep(0.9)
+        earned = gold() - gold_before
+        # what the same answer pays outside the challenge
+        plain = d.execute_script("Save.setDailyRun(false);"
+                                 "return Save.ECONOMY.correct.gold;")
+        check("daily: a right answer pays double", earned >= plain * 2,
+              "%d for a %d base" % (earned, plain))
+        d.execute_script("Save.setDailyRun(true);")
+
+        for _ in range(120):
+            if showing("endScreen"):
+                break
+            d.execute_script("""
+                if (TEST.state.busy) return;
+                if (TEST.state.choices) {
+                    var t = document.querySelectorAll('#tiles .tile');
+                    for (var i = 0; i < t.length; i++)
+                        if (t[i].textContent === String(TEST.state.answer)) { t[i].click(); return; }
+                } else {
+                    document.getElementById('answer').value = String(TEST.state.answer);
+                    document.getElementById('attackBtn').click();
+                }
+            """)
+            time.sleep(0.7)
+        check("daily: beating it claims it",
+              d.execute_script("return Save.daily().done;") is True)
+        check("daily: the win screen says so",
+              "challenge" in text("#endTitle").lower() or
+              "double" in text("#endText").lower(),
+              text("#endTitle") + " / " + text("#endText"))
+
+    check("streak: playing today counted",
+          d.execute_script("return Save.streak();") == 1)
+    load("index.html")
+    check("streak: the hub shows the flame",
+          "🔥" in d.execute_script(
+              "return document.getElementById('streakLine').textContent;"))
+    d.execute_script("var x = Save.daily();"
+                     "Save.update(function (p) { p.progress.dailyDone = x.key; });")
+    d.refresh(); time.sleep(0.8)
+    check("daily: once beaten it reads as done",
+          d.execute_script("return document.getElementById('dailyBtn')"
+                           ".classList.contains('done');"))
+    check("daily: no JS errors", not errs(), str(errs()))
+
     print("\nBoss weaknesses")
     # Find a maths boss on the big trail and play both of its roads, checking
     # that the weak one really does more per hit. This is the wiring the unit

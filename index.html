@@ -551,6 +551,41 @@
   }
   .danger-btn { background: linear-gradient(180deg, #ff8fa3, var(--bad)); box-shadow: 0 5px 0 #c23a55; color: #fff; }
   .rematch-btn { background: linear-gradient(180deg, #ff9bb0, var(--bad)); box-shadow: 0 5px 0 #c23a55; color: #fff; }
+
+  /* A streak grants nothing, so it is only ever a flame and a number. */
+  .streak {
+    font-family: var(--display);
+    font-size: 15px;
+    color: var(--accent);
+    margin: 2px 0 8px;
+    letter-spacing: .5px;
+  }
+
+  /* Today's challenge: the one reason to come back today rather than tomorrow */
+  .daily-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: min(420px, 92%);
+    margin: 0 0 10px;
+    padding: 12px 18px;
+    background: linear-gradient(180deg, rgba(255,210,63,.16), rgba(255,210,63,.06));
+    border: 1px solid rgba(255,210,63,.4);
+    box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 0 24px rgba(255,210,63,.14);
+    color: #fff;
+  }
+  .daily-card.done {
+    background: rgba(255,255,255,.07);
+    border-color: rgba(255,255,255,.14);
+    box-shadow: 0 5px 0 rgba(0,0,0,.3);
+    filter: saturate(.5);
+  }
+  .daily-head { font-family: var(--display); font-size: 14px; letter-spacing: 1.5px; color: var(--accent); }
+  .daily-card.done .daily-head { color: rgba(255,255,255,.6); }
+  .daily-head b { color: var(--good); }
+  .daily-what { font-family: var(--display); font-size: 21px; }
+  .daily-note { font-family: var(--body); font-size: 12px; opacity: .7; font-weight: normal; }
   #importFile { display: none; }
   .flash {
     min-height: 1.4em;
@@ -615,6 +650,14 @@
         <span class="swap">🔄</span>
       </button>
 
+      <div class="streak" id="streakLine" style="display:none"></div>
+
+      <button class="daily-card" id="dailyBtn" style="display:none">
+        <span class="daily-head">⭐ Today's Challenge <b id="dailyMult">· double gold</b></span>
+        <span class="daily-what" id="dailyWhat"></span>
+        <span class="daily-note" id="dailyNote"></span>
+      </button>
+
       <div class="btn-row" style="margin-top:4px">
         <button id="mapBtn">🗺️ The Map</button>
         <button id="rematchBtn" class="rematch-btn" style="display:none">🎯 The Rematch</button>
@@ -624,18 +667,18 @@
       <div class="games">
         <a class="game-card" href="math/index.html">
           <span class="emoji">🔢</span>Math RPG
-          <span class="sub">Counting, adding, times tables, and algebra</span>
-          <span class="who-for">7 tracks</span>
+          <span class="sub">Counting, adding, times tables, fractions, and algebra</span>
+          <span class="who-for">19 tracks</span>
         </a>
         <a class="game-card" href="language/index.html">
           <span class="emoji">🔤</span>Language RPG
           <span class="sub">Letters, spelling, grammar, and word play</span>
-          <span class="who-for">12 tracks</span>
+          <span class="who-for">15 tracks</span>
         </a>
         <a class="game-card" href="story/index.html">
           <span class="emoji">📖</span>Story Quest
           <span class="sub">Read carefully — the story tells you what to do</span>
-          <span class="who-for">8 quests</span>
+          <span class="who-for">8 quests + 2 games</span>
         </a>
       </div>
 
@@ -965,6 +1008,8 @@ function renderHome() {
   const owed = Log.dueCount('math');
   $('rematchBtn').style.display = owed >= 3 ? '' : 'none';
   $('rematchBtn').textContent = `🎯 The Rematch (${owed})`;
+
+  renderDaily();
 
   // the redeem button only exists when there's a token to spend
   const tokens = me.inventory.tokens;
@@ -1309,6 +1354,33 @@ function drawProps(steps, height) {
   });
 }
 
+/* ---------- Today's challenge, and the streak ----------
+   The challenge is drawn from the hero's own trail, so it's always work they
+   have met. The streak grants nothing and so can cost nothing — it is a flame
+   and a number, and a missed day steps it back by one rather than to zero. */
+const MODE_NAME = { easy: 'Easy', normal: 'Normal', expert: 'Expert' };
+/* The challenge is free play of a stop's content, not the stop — so it wears
+   its game's face. A boss fork's own emoji would advertise a boss it isn't
+   going to fight. */
+const DAILY_FACE = { math: '🔢', language: '🔤' };
+
+function renderDaily() {
+  const st = Save.streak();
+  $('streakLine').style.display = st > 0 ? '' : 'none';
+  $('streakLine').textContent = st === 1 ? '🔥 Playing today' : `🔥 ${st} days in a row`;
+
+  const d = Save.daily();
+  const btn = $('dailyBtn');
+  if (!d) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  btn.classList.toggle('done', d.done);
+  $('dailyWhat').textContent = `${DAILY_FACE[d.node.g] || '⭐'} ${d.node.label}`;
+  $('dailyMult').textContent = d.done ? '· done today' : '· double gold';
+  $('dailyNote').textContent = d.done
+    ? 'Come back tomorrow for a new one — you can still play this for normal gold.'
+    : `${GAME_NAME[d.node.g] || d.node.g} · ${MODE_NAME[d.node.m] || d.node.m || ''}`;
+}
+
 /* ---------- The stops ---------- */
 function drawNodes(steps, at) {
   const box = $('mapNodes');
@@ -1481,8 +1553,15 @@ function openMap(walkFrom) {
 $('mapBtn').addEventListener('click', () => {
   Sound.click();
   // start on whichever trail this hero has actually been walking
-  if (Save.mapAt('big') > Save.mapAt('little')) mapTrail = 'big';
+  mapTrail = Save.heroTrail();
   openMap(null);
+});
+$('dailyBtn').addEventListener('click', () => {
+  const d = Save.daily();
+  if (!d) return;
+  Sound.click();
+  Save.clearNode();              // free play of that stop's content, not the stop
+  location.href = `${d.node.g}/index.html?daily=1`;
 });
 $('rematchBtn').addEventListener('click', () => {
   Sound.click();
