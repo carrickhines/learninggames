@@ -569,7 +569,10 @@
     { id: "div",     row: "big", group: "Times tables",  emoji: "➗", name: "Division",         sub: "Times tables in reverse" },
     { id: "alg",     row: "big", group: "Thinking",      emoji: "🧩", name: "Algebra",          sub: "Solve for x" },
     { id: "rule",    row: "big", group: "Thinking",      emoji: "🔍", name: "Rule Hunter",      sub: "Find the pattern's rule" },
-    { id: "fract",   row: "big", group: "Fractions",     emoji: "🍕", name: "Fractions",        sub: "Halves, thirds, quarters" }
+    { id: "fract",   row: "big", group: "Fractions",     emoji: "🍕", name: "Fractions",        sub: "Halves, thirds, quarters" },
+    { id: "wordprob",row: "big", group: "Bigger numbers", emoji: "📖", name: "Word Problems",    sub: "Read it, then solve it" },
+    { id: "place",   row: "big", group: "Bigger numbers", emoji: "🔢", name: "Big Numbers",      sub: "Carrying, borrowing, rounding" },
+    { id: "applied", row: "big", group: "Everyday",      emoji: "⏱️", name: "Everyday Maths",   sub: "Change, time and measuring" }
   ];
 
   const track = (id) => TRACKS.filter((t) => t.id === id)[0];
@@ -911,9 +914,132 @@
       };
     },
 
+    /* Word problems: where the reading meets the arithmetic, and where a
+       child who can do both separately often comes unstuck. Every one
+       resolves to a positive whole number so it fits the number pad. */
+    wordprob() {
+      const who = pick(WP_NAMES);
+      const [thing, things] = pick(WP_THINGS);
+      const kind = pick(["add", "take", "times", "share", "twostep"]);
+
+      if (kind === "add") {
+        const a = rand(6, 40), b = rand(3, 30);
+        return { text: `${who} had ${a} ${things} and found ${b} more. How many now?`,
+                 answer: a + b };
+      }
+      if (kind === "take") {
+        const a = rand(10, 45), b = rand(2, a - 1);
+        return { text: `${who} had ${a} ${things} and gave ${b} away. How many are left?`,
+                 answer: a - b };
+      }
+      if (kind === "times") {
+        const bags = rand(2, 9), each = rand(2, 9);
+        return { text: `${who} has ${bags} bags with ${each} ${things} in each. How many altogether?`,
+                 answer: bags * each };
+      }
+      if (kind === "share") {
+        const each = rand(2, 9), friends = rand(2, 8);
+        return { text: `${who} shares ${each * friends} ${things} equally between ${friends} friends. How many each?`,
+                 answer: each };
+      }
+      // two-step: buy several, then give some away
+      const packs = rand(2, 6), each = rand(2, 8), gone = rand(1, packs * each - 1);
+      return {
+        text: `${who} bought ${packs} packs of ${each} ${things}, then lost ${gone}. How many are left?`,
+        answer: packs * each - gone
+      };
+    },
+
+    /* Big numbers: the mechanical arithmetic underneath everything else.
+       Place value, carrying, borrowing and rounding. */
+    place() {
+      const kind = pick(["digit", "carry", "borrow", "round"]);
+
+      if (kind === "digit") {
+        const n = rand(100, 999);
+        const spot = pick([
+          ["ones", n % 10],
+          ["tens", Math.floor(n / 10) % 10],
+          ["hundreds", Math.floor(n / 100) % 10]
+        ]);
+        return { text: `In ${n}, which digit is in the ${spot[0]} place?`, answer: spot[1] };
+      }
+      /* Carrying and borrowing are built digit by digit rather than rolled and
+         patched. Patching kept producing sums like 89 - 80, which need no
+         borrow at all and so practise nothing. */
+      if (kind === "carry") {
+        const au = rand(1, 9);
+        const bu = rand(10 - au, 9);        // units must cross ten
+        const a = rand(1, 8) * 10 + au;
+        const b = rand(1, 8) * 10 + bu;
+        return { text: `${a} + ${b}`, answer: a + b };
+      }
+      if (kind === "borrow") {
+        const au = rand(0, 8);
+        const bu = rand(au + 1, 9);         // units of a smaller, so it must borrow
+        const at = rand(2, 9);
+        const bt = rand(1, at - 1);         // and the tens keep the result positive
+        const a = at * 10 + au;
+        const b = bt * 10 + bu;
+        return { text: `${a} − ${b}`, answer: a - b };
+      }
+      const n = rand(11, 989);
+      const to = pick([10, 100]);
+      const rounded = Math.round(n / to) * to;
+      return { text: `Round ${n} to the nearest ${to}`, answer: rounded };
+    },
+
+    /* Everyday maths: change, elapsed time and units — the applied arithmetic
+       that turns up in shops and on clocks. */
+    applied() {
+      const kind = pick(["change", "elapsed", "units"]);
+
+      if (kind === "change") {
+        const paid = pick([50, 100, 200, 500]);
+        const cost = rand(10, paid - 5);
+        return { text: `A toy costs ${cost}¢. You pay ${paid}¢. How much change?`,
+                 answer: paid - cost };
+      }
+      if (kind === "elapsed") {
+        const h = rand(1, 11), m = pick([0, 10, 15, 20, 30, 40, 45]);
+        const add = pick([10, 15, 20, 25, 30, 45]);
+        const total = m + add;
+        const endH = h + Math.floor(total / 60);
+        const endM = total % 60;
+        const label = (hh, mm) => hh + ":" + String(mm).padStart(2, "0");
+        const answer = label(endH, endM);
+        return {
+          text: `It is ${label(h, m)}. What time is it ${add} minutes later?`,
+          answer: answer,
+          choices: shuffle([
+            answer,
+            label(endH, (endM + 10) % 60),
+            label(endH === 12 ? 1 : endH + 1, endM)
+          ].filter((v, i, arr) => arr.indexOf(v) === i))
+        };
+      }
+      const unit = pick([
+        ["How many centimetres in {n} metres?", 100],
+        ["How many minutes in {n} hours?", 60],
+        ["How many days in {n} weeks?", 7],
+        ["How many millimetres in {n} centimetres?", 10]
+      ]);
+      const n = rand(2, 9);
+      return { text: unit[0].replace("{n}", n), answer: n * unit[1] };
+    },
+
     // ---------- Age 8: find the rule ----------
     rule: makeRule
   };
+
+  /* Word-problem casting. Names stay short so the sentence stays readable,
+     and every object is something a child can picture a pile of. */
+  const WP_NAMES = ["Sam", "Mia", "Ben", "Ava", "Leo", "Zoe", "Max", "Ida"];
+  const WP_THINGS = [
+    ["marble", "marbles"], ["sticker", "stickers"], ["apple", "apples"],
+    ["coin", "coins"], ["card", "cards"], ["shell", "shells"],
+    ["crayon", "crayons"], ["conker", "conkers"], ["bead", "beads"]
+  ];
 
   // Sort It! content. Each group is a family of things that belong together
   // and a few that clearly don't. Authoring rule: the odd one must be odd for
@@ -1118,7 +1244,10 @@
     bonds: 1.4,                         // counting the gap in the blocks
     coins: 1.6,                         // count a handful of mixed values
     clock: 1.6,                         // read the hands, then match a time
-    fract: 1.9                          // read two bars, then compare them
+    fract: 1.9,                         // read two bars, then compare them
+    wordprob: 2.2,                      // read the whole thing, then work it out
+    place: 1.5,                         // carrying and borrowing on paper in your head
+    applied: 1.8                        // read it, then convert or count on
   };
 
   /* Rule Hunter's upper rungs are harder again — interleaved rules, and
@@ -1128,6 +1257,11 @@
   /* The most parts a fraction bar may be cut into. Past this it is neither
      countable at a glance nor drawable across the panel. */
   const MAX_PARTS = 10;
+
+  /* How many digits the answer box accepts. Rounding to the nearest hundred
+     can reach 1000, and a question whose answer cannot be typed is worse than
+     no question at all — tracks.py asserts no track can exceed this. */
+  const MAX_ANSWER_DIGITS = 4;
 
   /* The one place the clock is worked out. startTimer draws the bar from this
      and isFastAnswer judges the double-hit from it — computing them separately
@@ -1800,13 +1934,13 @@
 
   // ---------- Answer entry (on-screen pad + physical keyboard) ----------
   // The answer box is readonly so iOS never raises its keyboard; every digit
-  // comes through here instead. Answers cap at 3 digits (max is 9×9 = 81).
+  // comes through here instead. The cap is MAX_ANSWER_DIGITS.
   function pressKey(k) {
     if (state.busy) return;
     if (k === "back") {
       el.answer.value = el.answer.value.slice(0, -1);
     } else {
-      if (el.answer.value.length >= 3) return;
+      if (el.answer.value.length >= MAX_ANSWER_DIGITS) return;
       el.answer.value += k;
     }
     el.answer.classList.remove("wrong");
@@ -1860,7 +1994,7 @@
 
   // Test seam: .verify/ scripts drive the real game and need to read the
   // answer and the run state. Costs nothing in play.
-  window.TEST = { state, FOES, MODES, TRACK_TIME, timing, newProblem, playerAttack, showEarnings,
+  window.TEST = { state, FOES, MODES, TRACK_TIME, timing, MAX_ANSWER_DIGITS, newProblem, playerAttack, showEarnings,
                  makers: MAKERS, sortGroups: SORT_GROUPS, bumpRuleTier };
 })();
 </script>

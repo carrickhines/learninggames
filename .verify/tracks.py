@@ -228,6 +228,143 @@ try:
     else:
         print("  PASS  clock: o'clock and half past only, until quarters unlock")
 
+    # ---------- every typed answer must actually be typeable ----------
+    # Rounding to the nearest hundred reaches 1000, and the answer box used to
+    # stop at three digits — a question whose answer cannot be entered is
+    # worse than no question at all.
+    cap = d.execute_script("return TEST.MAX_ANSWER_DIGITS;")
+    longest = d.execute_script("""
+        var out = {};
+        Object.keys(TEST.makers).forEach(function (t) {
+            TEST.state.track = t;
+            var max = 0;
+            for (var i = 0; i < 400; i++) {
+                var q = TEST.makers[t]();
+                if (q.choices) continue;          // tapped, not typed
+                max = Math.max(max, String(q.answer).length);
+            }
+            if (max) out[t] = max;
+        });
+        return out;
+    """)
+    over = {k: v for k, v in longest.items() if v > cap}
+    if over:
+        fail("answers longer than the %d-digit input: %s" % (cap, over))
+    else:
+        print("  PASS  every typed answer fits the input (longest %d of %d digits)"
+              % (max(longest.values()), cap))
+
+    # ---------- word problems ----------
+    rows = sample("wordprob", ROUNDS)
+    bad = [q for q in rows if int(q["answer"]) < 1]
+    if bad:
+        fail("wordprob: %d answers are zero or negative, e.g. %s" % (len(bad), bad[0]["text"]))
+    else:
+        print("  PASS  wordprob: every answer is a positive whole number")
+
+    # re-derive each one from the numbers in the sentence
+    bad = []
+    for q in rows:
+        n = nums(q["text"])
+        a = int(q["answer"])
+        t = q["text"]
+        if "found" in t:
+            want = n[0] + n[1]
+        elif "gave" in t:
+            want = n[0] - n[1]
+        elif "bags" in t:
+            want = n[0] * n[1]
+        elif "shares" in t:
+            want = n[0] // n[1]
+        elif "packs" in t:
+            want = n[0] * n[1] - n[2]
+        else:
+            continue
+        if want != a:
+            bad.append(t + " -> " + str(a))
+    if bad:
+        fail("wordprob: %d don't match their own sentence, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  wordprob: the sentence resolves to the stated answer")
+
+    bad = [q for q in rows if "shares" in q["text"] and nums(q["text"])[0] % nums(q["text"])[1]]
+    if bad:
+        fail("wordprob: %d sharing problems don't divide evenly" % len(bad))
+    else:
+        print("  PASS  wordprob: sharing always divides evenly")
+    if not any("?" in q["text"] for q in rows):
+        fail("wordprob: none of them actually ask a question")
+    else:
+        print("  PASS  wordprob: every one asks a question")
+
+    # ---------- big numbers ----------
+    rows = sample("place", ROUNDS)
+    bad = []
+    for q in rows:
+        t, a = q["text"], int(q["answer"])
+        n = nums(t)
+        if "digit is in the" in t:
+            place = {"ones": 1, "tens": 10, "hundreds": 100}[t.split("the ")[1].split(" ")[0]]
+            if (n[0] // place) % 10 != a:
+                bad.append(t)
+        elif "Round" in t:
+            # half-up, the way it's taught — Python's round() is banker's
+            # rounding and would call 805 to the nearest 10 "800"
+            if int(n[0] / n[1] + 0.5) * n[1] != a:
+                bad.append(t)
+        elif "+" in t:
+            if n[0] + n[1] != a:
+                bad.append(t)
+            elif (n[0] % 10) + (n[1] % 10) < 10:
+                bad.append(t + " (no carry, so nothing is practised)")
+        elif "−" in t:
+            if n[0] - n[1] != a:
+                bad.append(t)
+            elif (n[0] % 10) >= (n[1] % 10):
+                bad.append(t + " (no borrow, so nothing is practised)")
+    if bad:
+        fail("place: %d wrong or pointless, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  place: digits, rounding, carrying and borrowing all check out")
+    if any(int(q["answer"]) < 0 for q in rows):
+        fail("place: a subtraction went negative")
+    else:
+        print("  PASS  place: nothing goes negative")
+
+    # ---------- everyday maths ----------
+    rows = sample("applied", ROUNDS)
+    bad = []
+    for q in rows:
+        t = q["text"]
+        n = nums(t)
+        if "change" in t:
+            if n[1] - n[0] != int(q["answer"]) or n[1] <= n[0]:
+                bad.append(t)
+        elif "minutes later" in t:
+            h, m, add = n[0], n[1], n[2]
+            total = m + add
+            want = "%d:%02d" % (h + total // 60, total % 60)
+            if q["answer"] != want:
+                bad.append(t + " -> " + q["answer"] + " want " + want)
+            if q["answer"] not in (q["choices"] or []):
+                bad.append(t + " (answer not offered)")
+        elif "How many" in t:
+            per = {"centimetres in": 100, "minutes in": 60, "days in": 7,
+                   "millimetres in": 10}
+            k = [v for kk, v in per.items() if kk in t]
+            if k and n[0] * k[0] != int(q["answer"]):
+                bad.append(t)
+    if bad:
+        fail("applied: %d wrong, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  applied: change, elapsed time and units all check out")
+
+    late = [q for q in rows if "minutes later" in q["text"] and int(q["answer"].split(":")[0]) > 12]
+    if late:
+        fail("applied: %d elapsed times run past 12 o'clock, e.g. %s" % (len(late), late[0]["text"]))
+    else:
+        print("  PASS  applied: elapsed time never runs past the clock face")
+
     # ---------- fractions ----------
     rows = d.execute_script("""
         TEST.state.track = 'fract';

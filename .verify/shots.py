@@ -340,6 +340,9 @@ try:
         d.execute_script(NO_ANIM)
         shot("math-fract-" + name)
 
+    battle("math/index.html", "wordprob", "normal", "math-battle-wordprob")
+    battle("math/index.html", "place", "normal", "math-battle-place")
+    battle("math/index.html", "applied", "normal", "math-battle-applied")
     battle("math/index.html", "bonds", "easy", "math-battle-bonds")
     battle("math/index.html", "coins", "easy", "math-battle-coins")
     battle("math/index.html", "clock", "easy", "math-battle-clock")
