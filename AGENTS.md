@@ -72,11 +72,25 @@ content silently repoints a saved reference at something else:
 - Adding a new track, foe, card, region or shop item is always safe. It's the
   *existing* ones that are frozen.
 
-### Before a deploy that touches the schema
+### Before every deploy
 
-1. `.verify/venv/bin/python .verify/run-save-test.py` — the fixtures must pass.
-2. Ask the parent to take a backup from **Settings → Save progress to a file**
-   on each iPad. It costs a tap and it is the only real undo that exists.
+```bash
+.verify/venv/bin/python .verify/upgrade.py
+```
+
+`.verify/upgrade.py` checks out **what is currently deployed**, plays on it
+until it has written a real save — gold, gear, cards, worlds, map progress, a
+boss stop left half-played — and then opens the **working tree** on top of that
+save. Nothing may be lost, and the half-played stop must resume into the same
+game it would have before. It exits non-zero and says *do not deploy* if not.
+
+This is the check that matters most, because it exercises a save written by the
+old code rather than one written by hand. Run it together with
+`run-save-test.py`, which covers the older versions the fixtures still hold.
+
+If the schema moved, also ask the parent to take a backup from **Settings →
+Save progress to a file** on each iPad. It costs a tap and it is the only real
+undo that exists.
 
 ---
 

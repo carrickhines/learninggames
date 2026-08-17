@@ -5,3 +5,4 @@ __pycache__/
 .verify/*.tar.gz
 .verify/shots/
 .verify/scratch/
+.verify/.deployed/

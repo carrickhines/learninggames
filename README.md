@@ -42,6 +42,7 @@ from later.
 .verify/setup.sh                                    # once
 .verify/venv/bin/python .verify/smoke.py            # after any change
 .verify/venv/bin/python .verify/playthrough.py      # plays every game to its win screen
+.verify/venv/bin/python .verify/upgrade.py          # before every deploy: no save is lost
 ```
 
 See `CLAUDE.md` for the full harness, the content authoring rules, and how the

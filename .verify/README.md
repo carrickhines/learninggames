@@ -22,10 +22,13 @@ Requires Python 3 and network access; reuses whatever `firefox` is on `PATH`.
 | `tracks.py [rounds]` | generates hundreds of problems on every math track and re-derives each answer independently | ~1 min |
 | `content.py` | the authoring rules that nothing at runtime can notice being broken — one right answer per question, no decoy that's secretly correct, unique card ids | ~30 s |
 | `playthrough.py` | plays every game all the way to its win screen and checks the gold, XP, cards and progress that resulted, then that they survive a reload | ~3 min |
+| `upgrade.py [ref]` | plays on the **deployed** build, then opens the working tree on the save it wrote — nothing lost, half-played stops still resume. Defaults to `origin/main` | ~40 s |
 | `shots.py [w h]` | screenshots every screen to `shots/` | ~2 min |
 
 Run `smoke.py` after any change. Run `content.py` after touching content and
-`tracks.py` after touching a generator. `playthrough.py` before shipping.
+`tracks.py` after touching a generator. `playthrough.py` before shipping, and
+**`upgrade.py` before every deploy** — the kids' saves exist only on their
+iPads, so a deploy that loses one cannot be undone.
 
 ```bash
 .verify/venv/bin/python .verify/smoke.py
