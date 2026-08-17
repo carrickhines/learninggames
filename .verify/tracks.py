@@ -147,6 +147,87 @@ try:
         else:
             print("  PASS  skip (%s): steps %s" % (label, sorted(seen)))
 
+    # ---------- make 10 ----------
+    bad = 0
+    for q in sample("bonds", ROUNDS):
+        n = nums(q["text"])[0]
+        if n + int(q["answer"]) != 10 or not 1 <= n <= 9:
+            bad += 1
+    print(("  PASS  " if not bad else "  FAIL  ") + "bonds: every pair makes exactly 10")
+    if bad:
+        fail("bonds: %d pairs don't make 10" % bad)
+
+    # ---------- coins ----------
+    rows = d.execute_script("""
+        TEST.state.track = 'coins';
+        var out = [];
+        for (var i = 0; i < arguments[0]; i++) {
+            var q = TEST.makers.coins();
+            out.push({ coins: TEST.state.coins.slice(), answer: q.answer });
+        }
+        return out;
+    """, ROUNDS)
+    bad = [r for r in rows if sum(r["coins"]) != r["answer"]]
+    check_ok = not bad
+    print(("  PASS  " if check_ok else "  FAIL  ") + "coins: the total matches the coins shown")
+    if bad:
+        fail("coins: %d totals don't match the coins, e.g. %s" % (len(bad), bad[0]))
+
+    bad = [r for r in rows if not r["coins"] or len(r["coins"]) > 5]
+    if bad:
+        fail("coins: %d purses are empty or too many to count" % len(bad))
+    else:
+        print("  PASS  coins: between one and five coins each time")
+    kinds = set(c for r in rows for c in r["coins"])
+    if not kinds <= {1, 5, 10, 25}:
+        fail("coins: unexpected denominations %s" % sorted(kinds - {1, 5, 10, 25}))
+    else:
+        print("  PASS  coins: only real denominations (%s)" % sorted(kinds))
+    big = [r for r in rows if r["answer"] > 60]
+    if big:
+        fail("coins: %d totals over 60c, too much for a six-year-old" % len(big))
+    else:
+        print("  PASS  coins: totals stay countable")
+    # sorted biggest-first, the way you'd actually count them
+    if any(r["coins"] != sorted(r["coins"], reverse=True) for r in rows):
+        fail("coins: not laid out biggest first")
+    else:
+        print("  PASS  coins: laid out biggest first")
+
+    # ---------- clock ----------
+    rows = d.execute_script("""
+        TEST.state.track = 'clock';
+        var out = [];
+        for (var i = 0; i < arguments[0]; i++) {
+            var q = TEST.makers.clock();
+            out.push({ time: TEST.state.time, answer: q.answer, choices: q.choices });
+        }
+        return out;
+    """, ROUNDS)
+    bad = [r for r in rows
+           if r["answer"] != "%d:%02d" % (r["time"]["h"], r["time"]["m"])]
+    if bad:
+        fail("clock: %d answers don't match the hands drawn, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  clock: the answer matches the hands drawn")
+    bad = [r for r in rows if r["answer"] not in r["choices"]]
+    if bad:
+        fail("clock: %d answers aren't among the choices" % len(bad))
+    else:
+        print("  PASS  clock: the answer is always offered")
+    bad = [r for r in rows if len(set(r["choices"])) != len(r["choices"])]
+    if bad:
+        fail("clock: %d have a duplicate choice, so two tiles are both right" % len(bad))
+    else:
+        print("  PASS  clock: no duplicate choices")
+    hours = set(r["time"]["h"] for r in rows)
+    mins = set(r["time"]["m"] for r in rows)
+    if not hours <= set(range(1, 13)) or not mins <= {0, 30}:
+        fail("clock: times outside 1-12 o'clock and half past: %s %s"
+             % (sorted(hours - set(range(1, 13))), sorted(mins - {0, 30})))
+    else:
+        print("  PASS  clock: o'clock and half past only, until quarters unlock")
+
     # ---------- patterns ----------
     bad_choice = bad_len = 0
     for q in sample("pattern", ROUNDS):

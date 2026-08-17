@@ -326,6 +326,10 @@ try:
     shot("math-battle-levelup")
 
     battle("math/index.html", "div", "normal", "math-battle-div")
+    battle("math/index.html", "bonds", "easy", "math-battle-bonds")
+    battle("math/index.html", "coins", "easy", "math-battle-coins")
+    battle("math/index.html", "clock", "easy", "math-battle-clock")
+    battle("language/index.html", "blend", "easy", "lang-battle-blend")
     battle("math/index.html", "skip", "easy", "math-battle-skip")
     battle("math/index.html", "oneless", "easy", "math-battle-oneless")
     battle("math/index.html", "pattern", "easy", "math-battle-pattern")

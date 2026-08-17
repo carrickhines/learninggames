@@ -26,6 +26,19 @@
   .float-text { font-size: 38px; }
   .problem-panel { gap: 8px; }
   .timer-track .bar { transition: width 0.1s linear; }
+  /* A quieter heading than .group-label, for the groups inside a hero row. */
+  .sub-label {
+    font-family: var(--body);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.5);
+    margin: 12px 0 6px;
+  }
+  #menu button.choice { font-size: 16px; padding: 10px 12px; min-width: 132px; }
+  #menu button.choice .emoji { font-size: 26px; margin-bottom: 2px; }
+  #menu button.choice .sub { font-size: 11px; }
+
   #game {
     justify-content: flex-start;
     padding: 12px 16px;
@@ -1199,35 +1212,37 @@ function makeDeck(pool) {
    ================================================================== */
 const TRACKS = [
   // --- little hero: the ladder toward reading ---
-  { id: 'letters',  row: 'little', emoji: '🔠', name: 'Letter Hunt',
+  { id: 'letters',  row: 'little', group: 'Letters & sounds', emoji: '🔠', name: 'Letter Hunt',
     sub: 'Hear it, find the letter',  pool: () => LETTERS, make: makeLetterQ },
-  { id: 'sounds',   row: 'little', emoji: '🔡', name: 'Beginning Sounds',
+  { id: 'sounds',   row: 'little', group: 'Letters & sounds', emoji: '🔡', name: 'Beginning Sounds',
     sub: 'Which starts the same?',    pool: () => SOUNDS,  make: makeSoundQ },
-  { id: 'builder',  row: 'little', emoji: '🧱', name: 'Word Builder',
+  { id: 'blend',    row: 'little', group: 'Letters & sounds', emoji: '🗣️', name: 'Sound It Out',
+    sub: 'c \u00b7 a \u00b7 t \u2192 cat',        pool: () => WORDS,   make: makeBlendQ },
+  { id: 'builder',  row: 'little', group: 'Reading & spelling', emoji: '🧱', name: 'Word Builder',
     sub: 'Spell it with blocks',      pool: () => WORDS,   make: makeBuilderQ },
-  { id: 'sight',    row: 'little', emoji: '⭐', name: 'Sight Words',
+  { id: 'sight',    row: 'little', group: 'Reading & spelling', emoji: '⭐', name: 'Sight Words',
     sub: 'Hear it, tap the word',     pool: () => SIGHT,   make: makeSightQ },
-  { id: 'read',     row: 'little', emoji: '🖼️', name: 'Read It!',
+  { id: 'read',     row: 'little', group: 'Reading & spelling', emoji: '🖼️', name: 'Read It!',
     sub: 'Read it, tap the picture',  pool: () => WORDS,   make: makeReadQ },
-  { id: 'rhyme',    row: 'little', emoji: '🎵', name: 'Rhyme Time',
+  { id: 'rhyme',    row: 'little', group: 'Letters & sounds', emoji: '🎵', name: 'Rhyme Time',
     sub: 'Hear it, tap the rhyme',    pool: () => RHYMES,  make: makeRhymeQ },
-  { id: 'opposites',row: 'little', emoji: '🌗', name: 'Opposites',
+  { id: 'opposites',row: 'little', group: 'Words & meanings', emoji: '🌗', name: 'Opposites',
     sub: 'Hot and cold, big and small', pool: () => OPPOS, make: makeOppositeQ },
-  { id: 'past',     row: 'little', emoji: '🕰️', name: 'Time Machine',
+  { id: 'past',     row: 'little', group: 'Words & meanings', emoji: '🕰️', name: 'Time Machine',
     sub: 'Today I… yesterday I…',     pool: () => PAST,    make: makePastQ },
 
   // --- big hero: spelling, grammar, vocabulary ---
-  { id: 'fixit',    row: 'big', emoji: '🔍', name: 'Fix It!',
+  { id: 'fixit',    row: 'big', group: 'Spotting mistakes', emoji: '🔍', name: 'Fix It!',
     sub: 'Find and fix the mistake',  pool: () => FIXIT,   make: makeFixitQ },
-  { id: 'forge',    row: 'big', emoji: '⚒️', name: 'Word Forge',
+  { id: 'forge',    row: 'big', group: 'Building words', emoji: '⚒️', name: 'Word Forge',
     sub: 'Build words from parts',    pool: () => FORGE,   make: makeForgeQ },
-  { id: 'grammar',  row: 'big', emoji: '🏷️', name: 'Grammar Hunt',
+  { id: 'grammar',  row: 'big', group: 'Spotting mistakes', emoji: '🏷️', name: 'Grammar Hunt',
     sub: 'Tap the noun or verb',      pool: () => GRAMMAR, make: makeGrammarQ },
-  { id: 'syllable', row: 'big', emoji: '🔨', name: 'Syllable Smith',
+  { id: 'syllable', row: 'big', group: 'Building words', emoji: '🔨', name: 'Syllable Smith',
     sub: 'Spell it chunk by chunk',   pool: () => SYLLB,   make: makeSyllableQ },
-  { id: 'twins',    row: 'big', emoji: '🎭', name: 'Word Twins',
+  { id: 'twins',    row: 'big', group: 'Words & meanings', emoji: '🎭', name: 'Word Twins',
     sub: 'Same or opposite?',         pool: () => TWINS,   make: makeTwinsQ },
-  { id: 'marks',    row: 'big', emoji: '✏️', name: 'Mark It!',
+  { id: 'marks',    row: 'big', group: 'Spotting mistakes', emoji: '✏️', name: 'Mark It!',
     sub: 'Commas and end marks',      pool: () => MARKS,   make: makeMarksQ },
 ];
 
@@ -1264,22 +1279,42 @@ function showScreen(id) {
 /* ==================================================================
    Menu wiring
    ================================================================== */
-// The quest cards, built from TRACKS. Both rows are one selection.
-TRACKS.forEach(t => {
-  const btn = document.createElement('button');
-  btn.className = 'choice';
-  btn.dataset.track = t.id;
-  btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}` +
-    `<span class="sub">${t.sub}</span>`;
-  btn.addEventListener('click', () => {
-    Sound.unlock(); Sound.click();
-    document.querySelectorAll('#menu .choice[data-track]').forEach(b => b.classList.remove('sel'));
-    btn.classList.add('sel');
-    state.track = t.id;
-    Save.remember('language', state.track, null);
-    updateStart();
+/* The quest cards, built from TRACKS and grouped inside each hero row —
+   fourteen cards in one strip is a wall to a child scanning for the one he
+   wants. Both rows remain a single selection. */
+['little', 'big'].forEach(row => {
+  const host = $(row === 'little' ? 'trackGrid' : 'trackGrid2');
+  const groups = [];
+  TRACKS.filter(t => t.row === row).forEach(t => {
+    let g = groups.filter(x => x.name === t.group)[0];
+    if (!g) { g = { name: t.group, items: [] }; groups.push(g); }
+    g.items.push(t);
   });
-  $(t.row === 'little' ? 'trackGrid' : 'trackGrid2').appendChild(btn);
+  groups.forEach(g => {
+    const head = document.createElement('div');
+    head.className = 'sub-label';
+    head.textContent = g.name;
+    host.appendChild(head);
+    const strip = document.createElement('div');
+    strip.className = 'btn-row';
+    g.items.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.dataset.track = t.id;
+      btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}` +
+        `<span class="sub">${t.sub}</span>`;
+      btn.addEventListener('click', () => {
+        Sound.unlock(); Sound.click();
+        document.querySelectorAll('#menu .choice[data-track]').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        state.track = t.id;
+        Save.remember('language', state.track, null);
+        updateStart();
+      });
+      strip.appendChild(btn);
+    });
+    host.appendChild(strip);
+  });
 });
 document.querySelectorAll('#menu .choice[data-mode]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1507,6 +1542,27 @@ function makeOppositeQ() {
     isPics: true,
     sayIt: () => Voice.play(['P_opposite', wordClip(t[0])],
                             `What is the opposite of... ${t[0]}?`),
+  };
+}
+
+/* Sound It Out. The letters are shown apart — c · a · t — and the child
+   blends them into a word, then taps the picture. This is the actual act of
+   reading, and the rung the ladder was missing between knowing letter sounds
+   and recognising whole words. */
+function makeBlendQ() {
+  const [word, emoji] = state.draw();
+  const decoys = shuffle(WORDS.filter(w => w[0] !== word)).slice(0, 2);
+  return {
+    prompt: 'Sound it out, then tap the picture!',
+    big: word.split('').join(' \u00b7 '),
+    bigClass: 'sentence',
+    choices: shuffle([emoji, decoys[0][1], decoys[1][1]]),
+    answer: emoji,
+    word: word,
+    revealMsg: `It was ${word}`,
+    isPics: true,
+    // the word is only spoken after answering, so it can't give the game away
+    sayIt: () => Voice.play(['P_spell'], 'Sound it out!'),
   };
 }
 
@@ -2071,6 +2127,7 @@ function nextFoeOrWin() {
    sentence, or to make several taps in the right order, scales above it. */
 const TRACK_TIME = {
   letters: 1.0, sounds: 1.0, sight: 1.0, rhyme: 1.0, opposites: 1.0,
+  blend: 1.5,                         // sound each letter, then blend them
   read: 1.2, past: 1.2, twins: 1.2,
   builder: 1.4,                       // spell it out, one letter at a time
   grammar: 1.5, marks: 1.5,           // read the sentence, then find the word

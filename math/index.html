@@ -14,6 +14,20 @@
 <style>
   /* Math RPG only. The frame, buttons, pips, arena, and timer bar come from
      the shared stylesheets above. */
+  /* A quieter heading than .group-label, for the groups inside a hero row. */
+  .sub-label {
+    font-family: var(--body);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.5);
+    margin: 12px 0 6px;
+  }
+  /* nineteen cards need to be smaller than seven did */
+  #menu button.choice { font-size: 16px; padding: 10px 12px; min-width: 132px; }
+  #menu button.choice .emoji { font-size: 26px; margin-bottom: 2px; }
+  #menu button.choice .sub { font-size: 11px; }
+
   /* ---------- Battle screen ---------- */
   #battle { justify-content: flex-start; padding: 12px 16px; }
   #battle.with-blocks .arena::before, #battle.with-blocks .arena::after { display: none; }
@@ -93,6 +107,43 @@
     35% { transform: scale(1.3); opacity: 1; }
     100% { transform: scale(0) translateY(-26px); opacity: 0; }
   }
+
+  /* Make 10: the gap drawn as empty slots, so the child counts the space */
+  .tower.gap { background: transparent; }
+  .block.hole {
+    background: transparent;
+    border: 3px dashed rgba(255,255,255,.55);
+    box-shadow: none;
+  }
+
+  /* ---------- Coins ---------- */
+  .coin-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 4px 0; }
+  .coin-row.hidden, .clock-box.hidden, .blocks-row.hidden, .push-btn.hidden { display: none; }
+  .coin {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    padding: 0;
+    font-family: var(--display);
+    font-size: 20px;
+    color: #4a3410;
+    border: 3px solid rgba(255,255,255,.45);
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), 0 3px 4px rgba(0,0,0,.4);
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 1px;
+  }
+  .coin small { font-size: 12px; }
+  /* each denomination its own metal, so they're told apart by sight */
+  .coin.c1  { background: linear-gradient(180deg, #e8a87c, #c8763f); }
+  .coin.c5  { background: linear-gradient(180deg, #d8dde3, #9aa4b0); width: 60px; height: 60px; }
+  .coin.c10 { background: linear-gradient(180deg, #e6ebf0, #aab4c0); width: 48px; height: 48px; }
+  .coin.c25 { background: linear-gradient(180deg, #dfe5ec, #98a3b1); width: 66px; height: 66px; font-size: 22px; }
+  .coin.pop { animation: blockPop 0.3s ease; }
+
+  /* ---------- Clock ---------- */
+  .clock-box { display: flex; justify-content: center; margin: 2px 0; }
 
   .blocks-plus { font-size: 34px; font-weight: bold; color: var(--accent); align-self: center; }
   .push-btn { align-self: center; font-size: 18px; padding: 10px 16px; }
@@ -220,61 +271,13 @@
     <h1>Math RPG</h1>
     <div class="subtitle">Defeat the monster with your math powers!</div>
 
+    <!-- Both rows are rendered from the TRACKS registry in the script below,
+         grouped so nineteen cards stay findable. -->
     <div class="group-label">Little hero powers</div>
-    <div class="btn-row" id="trackRow">
-      <button class="choice" data-track="next">
-        <span class="emoji">🔢</span>Next Number
-        <span class="sub">What comes after?</span>
-      </button>
-      <button class="choice" data-track="oneless">
-        <span class="emoji">↕️</span>One More, One Less
-        <span class="sub">Both directions</span>
-      </button>
-      <button class="choice" data-track="count">
-        <span class="emoji">👣</span>Count On
-        <span class="sub">Add 1, 2 or 3</span>
-      </button>
-      <button class="choice" data-track="skip">
-        <span class="emoji">🦘</span>Skip Counting
-        <span class="sub">5, 10, 15…</span>
-      </button>
-      <button class="choice" data-track="add">
-        <span class="emoji">➕</span>Addition
-        <span class="sub">Push blocks together</span>
-      </button>
-      <button class="choice" data-track="sub">
-        <span class="emoji">➖</span>Subtraction
-        <span class="sub">Take blocks away</span>
-      </button>
-      <button class="choice" data-track="pattern">
-        <span class="emoji">🎨</span>Pattern Blocks
-        <span class="sub">What comes next?</span>
-      </button>
-      <button class="choice" data-track="sort">
-        <span class="emoji">🧺</span>Sort It!
-        <span class="sub">Which doesn't belong?</span>
-      </button>
-    </div>
+    <div id="trackRow"></div>
 
     <div class="group-label">Big hero powers</div>
-    <div class="btn-row" id="trackRow2">
-      <button class="choice" data-track="mul">
-        <span class="emoji">✖️</span>Multiplication
-        <span class="sub">Times tables</span>
-      </button>
-      <button class="choice" data-track="div">
-        <span class="emoji">➗</span>Division
-        <span class="sub">Times tables in reverse</span>
-      </button>
-      <button class="choice" data-track="alg">
-        <span class="emoji">🧩</span>Algebra
-        <span class="sub">Solve for x</span>
-      </button>
-      <button class="choice" data-track="rule">
-        <span class="emoji">🔍</span>Rule Hunter
-        <span class="sub">Find the pattern's rule</span>
-      </button>
-    </div>
+    <div id="trackRow2"></div>
 
     <div class="group-label">Choose your difficulty</div>
     <div class="btn-row" id="modeRow">
@@ -331,7 +334,9 @@
       <div class="question" id="question">2 + 3</div>
 
       <div class="blocks-area hidden" id="blocksArea">
-        <div class="blocks-row">
+        <div class="coin-row hidden" id="coinRow"></div>
+        <div class="clock-box hidden" id="clockBox"></div>
+        <div class="blocks-row" id="blocksRow">
           <div class="tower" id="towerA"></div>
           <div class="blocks-plus" id="plusSign">+</div>
           <div class="tower" id="towerB"></div>
@@ -415,7 +420,7 @@
   // solid circle and a sprawling dragon read as similar-sized foes (with the
   // boss nudged a touch larger). Tuned by screenshot.
   // the tracks that show the number-blocks counting aid
-  const BLOCK_TRACKS = ["add", "count", "sub"];
+  const BLOCK_TRACKS = ["add", "count", "sub", "bonds", "coins", "clock"];
 
   const PLAYER_DAMAGE = 1;
   const FOE_DAMAGE = 1;
@@ -473,6 +478,7 @@
     answerRow: $("answerRow"), tiles: $("tiles"), nodeBar: $("nodeBar"),
     flashOverlay: $("flashOverlay"),
     blocksArea: $("blocksArea"), towerA: $("towerA"), towerB: $("towerB"),
+    blocksRow: $("blocksRow"), coinRow: $("coinRow"), clockBox: $("clockBox"),
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
     endEmoji: $("endEmoji"), endTitle: $("endTitle"), endText: $("endText"),
     playAgainBtn: $("playAgainBtn"), muteBtn: $("muteBtn"),
@@ -487,6 +493,66 @@
     el.muteBtn.classList.toggle("muted", Sound.isMuted());
   }
   renderMute();
+
+  /* ==================================================================
+     The tracks — one place that knows everything about each power.
+
+     Nineteen cards in two flat rows is a wall to a six-year-old, so each
+     track names the group it belongs to and the menu renders them under
+     headings. Adding a track is one entry here and nothing else.
+     ================================================================== */
+  const TRACKS = [
+    // --- little hero ---
+    { id: "next",    row: "little", group: "Counting",   emoji: "🔢", name: "Next Number",      sub: "What comes after?" },
+    { id: "oneless", row: "little", group: "Counting",   emoji: "↕️", name: "One More, One Less", sub: "Both directions" },
+    { id: "skip",    row: "little", group: "Counting",   emoji: "🦘", name: "Skip Counting",    sub: "5, 10, 15…" },
+    { id: "count",   row: "little", group: "Adding & taking away", emoji: "👣", name: "Count On", sub: "Add 1, 2 or 3" },
+    { id: "add",     row: "little", group: "Adding & taking away", emoji: "➕", name: "Addition", sub: "Push blocks together" },
+    { id: "sub",     row: "little", group: "Adding & taking away", emoji: "➖", name: "Subtraction", sub: "Take blocks away" },
+    { id: "bonds",   row: "little", group: "Adding & taking away", emoji: "🔟", name: "Make 10", sub: "7 and how many more?" },
+    { id: "pattern", row: "little", group: "Thinking",   emoji: "🎨", name: "Pattern Blocks",   sub: "What comes next?" },
+    { id: "sort",    row: "little", group: "Thinking",   emoji: "🧺", name: "Sort It!",         sub: "Which doesn't belong?" },
+    { id: "coins",   row: "little", group: "Everyday",   emoji: "🪙", name: "Coins",            sub: "How much money?" },
+    { id: "clock",   row: "little", group: "Everyday",   emoji: "🕐", name: "Clock",            sub: "What time is it?" },
+
+    // --- big hero ---
+    { id: "mul",     row: "big", group: "Times tables",  emoji: "✖️", name: "Multiplication",   sub: "Times tables" },
+    { id: "div",     row: "big", group: "Times tables",  emoji: "➗", name: "Division",         sub: "Times tables in reverse" },
+    { id: "alg",     row: "big", group: "Thinking",      emoji: "🧩", name: "Algebra",          sub: "Solve for x" },
+    { id: "rule",    row: "big", group: "Thinking",      emoji: "🔍", name: "Rule Hunter",      sub: "Find the pattern's rule" }
+  ];
+
+  const track = (id) => TRACKS.filter((t) => t.id === id)[0];
+
+  /* Build both menu rows, grouped. */
+  (function buildMenu() {
+    ["little", "big"].forEach((row) => {
+      const host = row === "little" ? el.trackRow : el.trackRow2;
+      const groups = [];
+      TRACKS.filter((t) => t.row === row).forEach((t) => {
+        let g = groups.filter((x) => x.name === t.group)[0];
+        if (!g) { g = { name: t.group, items: [] }; groups.push(g); }
+        g.items.push(t);
+      });
+      groups.forEach((g) => {
+        const head = document.createElement("div");
+        head.className = "sub-label";
+        head.textContent = g.name;
+        host.appendChild(head);
+        const strip = document.createElement("div");
+        strip.className = "btn-row";
+        g.items.forEach((t) => {
+          const b = document.createElement("button");
+          b.className = "choice";
+          b.dataset.track = t.id;
+          b.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}` +
+                        `<span class="sub">${t.sub}</span>`;
+          strip.appendChild(b);
+        });
+        host.appendChild(strip);
+      });
+    });
+  })();
 
   // ---------- Menu selection ----------
   function wireChoices(row, key) {
@@ -658,6 +724,66 @@
         text: g.q,
         answer: odd,
         choices: shuffle(three.concat([odd]))
+      };
+    },
+
+    // ---------- Age 6: everyday numbers ----------
+
+    /* Make 10. The single most useful fact family at this age — knowing
+       7 + 3 by heart is what makes every later mental sum possible. The
+       blocks show the tower and the gap, so the child counts the space
+       rather than being told the answer. */
+    bonds() {
+      state.a = rand(1, 9);
+      state.b = 10 - state.a;
+      return { text: `${state.a} + ?  = 10`, answer: state.b };
+    },
+
+    /* Counting coins: skip counting with mixed values, and a real-world
+       skill. Kept to 1s, 5s and 10s so the totals stay countable, with a
+       quarter only once he's past the easy ones. */
+    coins() {
+      const kinds = Save.me() && Save.me().progress.coinsMastered
+        ? [1, 5, 10, 25] : [1, 5, 10];
+      const purse = [];
+      let total = 0;
+      const n = rand(2, 5);
+      for (let i = 0; i < n; i++) {
+        const c = pick(kinds);
+        // keep it countable for a six-year-old
+        if (total + c > 60) break;
+        purse.push(c);
+        total += c;
+      }
+      if (!purse.length) { purse.push(1); total = 1; }
+      // biggest first, the way you'd actually count them
+      purse.sort((x, y) => y - x);
+      state.coins = purse;
+      return { text: "How much money?", answer: total };
+    },
+
+    /* Telling the time. O'clock and half past to begin with; quarters
+       unlock the same way the harder skip-counting steps do. */
+    clock() {
+      const me = Save.me();
+      const mins = (me && me.progress.clockMastered) ? [0, 30, 15, 45] : [0, 30];
+      const h = rand(1, 12);
+      const m = pick(mins);
+      state.time = { h: h, m: m };
+
+      const label = (hh, mm) => hh + ":" + String(mm).padStart(2, "0");
+      const answer = label(h, m);
+
+      // decoys: the same time on the wrong hour, and the wrong half of the
+      // hour — both wrong for a reason the child can see on the face
+      const otherH = h === 12 ? 1 : h + 1;
+      const otherM = mins.filter((x) => x !== m);
+      const decoys = [label(otherH, m), label(h, pick(otherM))];
+
+      return {
+        text: "What time is it?",
+        answer: answer,
+        choices: shuffle([answer].concat(decoys.filter((d) => d !== answer)))
       };
     },
 
@@ -864,7 +990,10 @@
     skip: 1.5, pattern: 1.5,            // sequencing: spot the step, then apply it
     sort: 1.5,                          // read the question, then compare four things
     alg: 1.8,                           // two-step algebra is pencil-and-paper work
-    rule: 2.2                           // find the rule, not the answer
+    rule: 2.2,                          // find the rule, not the answer
+    bonds: 1.4,                         // counting the gap in the blocks
+    coins: 1.6,                         // count a handful of mixed values
+    clock: 1.6                          // read the hands, then match a time
   };
 
   /* Rule Hunter's upper rungs are harder again — interleaved rules, and
@@ -969,9 +1098,67 @@
     for (let i = 1; i <= count; i++) tower.appendChild(makeBlock(color));
   }
 
+  /* The visual aid under the question. Which one appears depends on the
+     track; every one of them follows the same rule as the number blocks —
+     it helps the child work the answer out, and never shows it. */
   function renderBlocks() {
     state.merged = false;
     state.taken = false;
+    el.coinRow.classList.add("hidden");
+    el.clockBox.classList.add("hidden");
+    el.blocksRow.classList.remove("hidden");
+    el.pushBtn.classList.remove("hidden");
+
+    if (state.track === "bonds") {
+      // the tower he has, then the gap to ten drawn as empty slots to count
+      el.blocksArea.classList.remove("hidden");
+      el.pushBtn.classList.add("hidden");
+      el.plusSign.style.display = "";
+      el.plusSign.style.visibility = "visible";
+      el.plusSign.textContent = "+";
+      el.towerB.style.display = "";
+      el.towerA.className = "tower";
+      el.towerB.className = "tower gap";
+      el.towerA.style.cssText = "";
+      el.towerB.style.cssText = "";
+      fillTower(el.towerA, state.a, blockColor(state.a));
+      fillTower(el.towerB, state.b, "transparent");
+      [...el.towerB.children].forEach((b) => b.classList.add("hole"));
+      return;
+    }
+
+    if (state.track === "coins") {
+      el.blocksArea.classList.remove("hidden");
+      el.blocksRow.classList.add("hidden");
+      el.pushBtn.classList.add("hidden");
+      el.coinRow.classList.remove("hidden");
+      el.coinRow.innerHTML = "";
+      state.coins.forEach((c) => {
+        const d = document.createElement("button");
+        d.className = "coin c" + c;
+        d.innerHTML = `<span>${c}</span><small>¢</small>`;
+        // tapping one pops it, the same way tapping a block does
+        d.addEventListener("click", () => {
+          Sound.blockTap();
+          d.classList.remove("pop");
+          void d.offsetWidth;
+          d.classList.add("pop");
+        });
+        el.coinRow.appendChild(d);
+      });
+      return;
+    }
+
+    if (state.track === "clock") {
+      el.blocksArea.classList.remove("hidden");
+      el.blocksRow.classList.add("hidden");
+      el.pushBtn.classList.add("hidden");
+      el.clockBox.classList.remove("hidden");
+      drawClock(state.time.h, state.time.m);
+      return;
+    }
+
+    el.plusSign.textContent = "+";
     if (state.track === "add" || state.track === "count") {
       el.blocksArea.classList.remove("hidden");
       el.pushBtn.disabled = false;
@@ -1126,6 +1313,36 @@
       if ((state.track === "add" || state.track === "count") && rectsOverlap(el.towerA, el.towerB)) mergeTowers();
       else tower.style.transform = ""; // snap back
     });
+  }
+
+  /* A clock face. Drawn rather than written, because reading the hands is
+     the whole skill — a digital time in the question would give it away. */
+  function drawClock(h, m) {
+    const R = 90, C = 100;
+    const hand = (angleDeg, len, width, color) => {
+      const a = (angleDeg - 90) * Math.PI / 180;
+      return `<line x1="${C}" y1="${C}" x2="${C + Math.cos(a) * len}" ` +
+             `y2="${C + Math.sin(a) * len}" stroke="${color}" ` +
+             `stroke-width="${width}" stroke-linecap="round"/>`;
+    };
+    const ticks = [];
+    for (let i = 1; i <= 12; i++) {
+      const a = (i * 30 - 90) * Math.PI / 180;
+      ticks.push(
+        `<text x="${C + Math.cos(a) * (R - 20)}" y="${C + Math.sin(a) * (R - 20) + 6}" ` +
+        `text-anchor="middle" font-size="18" font-family="var(--display)" ` +
+        `fill="rgba(255,255,255,.85)">${i}</text>`);
+    }
+    el.clockBox.innerHTML =
+      `<svg viewBox="0 0 200 200" width="150" height="150">` +
+      `<circle cx="${C}" cy="${C}" r="${R}" fill="rgba(0,0,0,.3)" ` +
+      `stroke="rgba(255,255,255,.5)" stroke-width="4"/>` +
+      ticks.join("") +
+      // the hour hand moves on through the hour, as a real one does
+      hand((h % 12) * 30 + (m / 60) * 30, 46, 8, "#fff") +
+      hand(m * 6, 68, 5, "var(--accent)") +
+      `<circle cx="${C}" cy="${C}" r="6" fill="var(--accent)"/>` +
+      `</svg>`;
   }
 
   // ---------- Animations ----------
