@@ -14,7 +14,10 @@ kid. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
 new worlds to fight in, and iPad game time, priced so the best gear takes
 months. Beaten monsters rarely drop a collectible card, sometimes shiny;
 spares trade at the Card Trader, and finishing a world's set is the only way
-to the top tier of each gear slot. All of it persists between sessions, per kid.
+to the top tier of each gear slot. Beaten monsters also sometimes **join you**
+for the rest of a run and fight at your side — more often if you already hold
+their card. Questions you get wrong come back later as a **Rematch**, and
+retire once you've had them right three times running. All of it persists between sessions, per kid.
 
 **For parents:** Settings → Progress report shows what was played and when,
 accuracy per track, and a review list of the questions being missed with what

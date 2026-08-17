@@ -62,6 +62,19 @@ var Save = (function () {
     bossGold: 250,
     chestCardChance: 0.35,    // an ordinary chest; a boss chest always holds one
 
+    /* ---- Wild allies ----
+       A beaten monster sometimes decides it likes you and fights at your side
+       for the rest of the run. It's more likely if you already hold its card —
+       collecting a monster is befriending it, which quietly makes the
+       collection worth something in the moment as well as in the shop.
+
+       Allies last the run and no longer. Nothing permanent means no power
+       creep, and every run gets its own shape. */
+    allyJoinChance: 0.18,
+    allyKnownBonus: 0.22,     // added when its card is already in the book
+    allyStrikeChance: 0.25,   // each ally, on each of your hits
+    maxAllies: 3,
+
     baseXpToLevel: 100,   // XP for level 1 -> 2
     xpStepPerLevel: 50    // each level costs this much more than the last
   };
@@ -922,6 +935,25 @@ var Save = (function () {
              pity: forced && !guaranteed };
   }
 
+  /* Does the monster you just beat join you? Returns the ally or null.
+     Knowing it — holding its card — makes it likelier. */
+  function rollAlly(foe, current) {
+    if (!foe || (current || 0) >= ECONOMY.maxAllies) return null;
+    var chance = ECONOMY.allyJoinChance +
+                 (held(foe.id) ? ECONOMY.allyKnownBonus : 0);
+    if (Math.random() >= chance) return null;
+    return { id: foe.id, name: foe.name, emoji: foe.emoji, known: held(foe.id) > 0 };
+  }
+
+  /* Does an ally land a blow alongside yours? */
+  function allyStrikes(allies) {
+    var n = 0;
+    (allies || []).forEach(function () {
+      if (Math.random() < ECONOMY.allyStrikeChance) n++;
+    });
+    return n;
+  }
+
   /* ---------- The Card Trader ---------------------------------------------
      Spares are the point of a rare drop you already own. They sell for gold
      by rarity, and enough of them buy a card you're missing outright — so a
@@ -1312,6 +1344,8 @@ var Save = (function () {
     recordAnswer: recordAnswer,
 
     awardCard: awardCard,
+    rollAlly: rollAlly,
+    allyStrikes: allyStrikes,
     allCards: allCards,
     card: card,
     held: held,

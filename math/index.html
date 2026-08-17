@@ -372,7 +372,9 @@
 
     <div class="arena" id="arena">
       <div class="sprite player" id="playerSprite">🦸</div>
-      <div class="pet" id="pet" style="display:none"></div>
+      <div class="party" id="allies">
+        <div class="pet" id="pet" style="display:none"></div>
+      </div>
       <div class="slash" id="slash">💥</div>
       <div class="sprite foe" id="foeSprite">👾</div>
     </div>
@@ -447,6 +449,7 @@
 <script src="../shared/save.js"></script>
 <script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
+  <script src="../shared/allies.js"></script>
 <script>
 (() => {
   "use strict";
@@ -1797,9 +1800,15 @@
       if (isSuper) el.playerSprite.classList.add("super");
       animateAttack("player", "foe",
         () => {
-          state.foeHp = Math.max(0, state.foeHp - dmg);
+          // the monsters fighting beside you each take their own swing
+          const help = Allies.strike();
+          state.foeHp = Math.max(0, state.foeHp - dmg - help);
           renderHp();
           if (isSuper) Sound.super(); else Sound.hit();
+          if (help) setTimeout(() => {
+            Sound.hit();
+            floatText("+" + help + " from your friends!", "#7dd3fc", true);
+          }, 240);
           if (isSuper) {
             floatText("DOUBLE! -" + dmg, "#ffd23f", true);
             setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
@@ -1872,6 +1881,8 @@
     // the monster you just beat may leave its collectible card behind
     const foe = FOES[state.foeIndex];
     Hud.cardDrop(Save.awardCard(foe.id));
+    // ...and may decide it would rather fight beside you than against you
+    state.joining = Save.rollAlly(foe, Allies.count());
     el.foeSprite.style.transition = "transform .6s, opacity .6s";
     el.foeSprite.style.transform = "scaleX(-1) scale(0) rotate(360deg)";
     el.foeSprite.style.opacity = "0";
@@ -1886,6 +1897,13 @@
   }
 
   function nextFoe() {
+    if (state.joining) {
+      const pal = state.joining;
+      state.joining = null;
+      Allies.add(pal);
+      Sound.levelUp();
+      floatText(pal.emoji + " " + pal.name + " joined you!", "#7dd3fc", false);
+    }
     setupFoe();
     el.foeSprite.style.transition = "transform .5s, opacity .5s";
     el.foeSprite.style.transform = "scaleX(-1) scale(1)";
@@ -1925,6 +1943,8 @@
     renderPet();
     state.playerHp = GEAR.maxHp;
     state.shield = GEAR.shield;
+    state.joining = null;
+    Allies.reset();          // allies last the run, not forever
     state.foeIndex = 0;
     state.busy = false;
     state.goldAtStart = (Save.me() || { gold: 0 }).gold;

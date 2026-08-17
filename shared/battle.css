@@ -76,11 +76,26 @@
 @keyframes idlePlayer { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes idleFoe { 0%,100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-12px); } }
 
+/* The party strip at the hero's feet: the shop pet first, then any wild
+   allies picked up this run. One flex row, so nothing has to be positioned
+   around anything else — members just line up as they arrive. */
+.party {
+  position: absolute;
+  bottom: 4%;
+  /* Starts clear of the hero and grows towards the foe, into the empty middle
+     of the arena — a party of four would walk straight over him if it grew
+     the other way, since he's already against the left padding. */
+  left: 25%;
+  right: 26%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* The pet companion bought in the shop: trails the hero, purely decorative. */
 .pet {
-  position: absolute;
-  bottom: 6%;
-  left: 4%;
   font-size: clamp(26px, 5vw, 46px);
   filter: drop-shadow(0 6px 6px rgba(0,0,0,.45));
   animation: idlePet 3.1s ease-in-out infinite;
@@ -88,6 +103,31 @@
   pointer-events: none;
 }
 @keyframes idlePet { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-7px) rotate(4deg); } }
+
+/* Wild allies: monsters you beat that decided to fight on your side for the
+   rest of the run. Each bobs out of step with the others so a row of three
+   doesn't pulse like one object. */
+.ally {
+  font-size: clamp(22px, 3.8vw, 34px);
+  filter: drop-shadow(0 6px 6px rgba(0,0,0,.45));
+  animation: joinPop .5s ease backwards, idlePet 2.7s ease-in-out .5s infinite;
+}
+.ally:nth-child(3) { animation-duration: .5s, 3.3s; }
+.ally:nth-child(4) { animation-duration: .5s, 2.3s; }
+.ally.strike { animation: allyStrike .45s ease; }
+
+@keyframes joinPop {
+  0% { transform: scale(0) translateY(14px); opacity: 0; }
+  65% { transform: scale(1.35) translateY(-6px); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes allyStrike {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(90px) scale(1.2) rotate(-14deg); }
+  60% { transform: translateX(90px) scale(1.2) rotate(-14deg); }
+  100% { transform: translateX(0); }
+}
+
 
 /* ---------- Attacks ---------- */
 

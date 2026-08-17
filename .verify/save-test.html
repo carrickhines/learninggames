@@ -618,6 +618,61 @@ try {
   ok('the last track is remembered', Save.me().settings.lastTrack.math === 'mul');
   ok('the mode is remembered per game', Save.me().settings.modeByGame.math === 'expert');
 
+  /* ---------- wild allies ---------- */
+  fresh();
+  var realRandom = Math.random;
+  function withRandom(v, fn) {           // v: a number, or a queue of them
+    var q = Array.isArray(v) ? v.slice() : null;
+    Math.random = function () { return q ? (q.length ? q.shift() : 1) : v; };
+    try { return fn(); } finally { Math.random = realRandom; }
+  }
+  var anyCard = Save.allCards()[0];
+  var mob = { id: anyCard.id, name: anyCard.name, emoji: anyCard.emoji };
+  var stranger = { id: Save.allCards()[1].id, name: 'Stranger', emoji: '👾' };
+
+  ok('nothing joins you if there was no monster',
+     withRandom(0, function () { return Save.rollAlly(null, 0); }) === null);
+  ok('an unknown monster joins on a low roll',
+     !!withRandom(0, function () { return Save.rollAlly(stranger, 0); }));
+  ok('...and not on a high roll',
+     withRandom(0.99, function () { return Save.rollAlly(stranger, 0); }) === null);
+  ok('the ally carries the monster it came from',
+     withRandom(0, function () { return Save.rollAlly(mob, 0).emoji; }) === mob.emoji);
+  ok('a full party takes no one else',
+     withRandom(0, function () { return Save.rollAlly(mob, Save.ECONOMY.maxAllies); }) === null);
+  ok('...and the cap is the only thing stopping it',
+     !!withRandom(0, function () { return Save.rollAlly(mob, Save.ECONOMY.maxAllies - 1); }));
+
+  // A roll that lands between the two chances joins only if you know it —
+  // this is the whole point of the feature, so pin the boundary exactly.
+  var between = Save.ECONOMY.allyJoinChance + 0.01;
+  ok('a stranger declines a middling roll',
+     withRandom(between, function () { return Save.rollAlly(mob, 0); }) === null);
+  Save.awardCard(mob.id, true);
+  ok('a monster whose card you hold accepts the same roll',
+     !!withRandom(between, function () { return Save.rollAlly(mob, 0); }));
+  ok('...and knows that you know it',
+     withRandom(0, function () { return Save.rollAlly(mob, 0).known; }) === true);
+
+  ok('no allies means no extra damage', Save.allyStrikes([]) === 0);
+  ok('an undefined party means no extra damage', Save.allyStrikes() === 0);
+  ok('every ally can land a blow at once',
+     withRandom(0, function () { return Save.allyStrikes([1, 2, 3]); }) === 3);
+  ok('and none of them on a bad roll',
+     withRandom(0.99, function () { return Save.allyStrikes([1, 2, 3]); }) === 0);
+  ok('extra damage never exceeds the party size',
+     withRandom([0, 0.99, 0], function () { return Save.allyStrikes([1, 2, 3]); }) === 2);
+
+  // Three allies at the tuned rate must not trivialise a fight: the expected
+  // bonus is checked against the tuning rather than a number baked in here.
+  var total = 0, ROLLS = 4000;
+  for (var ai = 0; ai < ROLLS; ai++) total += Save.allyStrikes([1, 2, 3]);
+  var mean = total / ROLLS;
+  ok('a full party adds about the damage the tuning promises',
+     Math.abs(mean - 3 * Save.ECONOMY.allyStrikeChance) < 0.08, 'mean ' + mean.toFixed(3));
+  ok('...which is under one point a hit, so it helps rather than wins',
+     3 * Save.ECONOMY.allyStrikeChance < 1);
+
   /* ---------- persistence across a reload ---------- */
   fresh();
   Save.award(77, 33);

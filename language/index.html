@@ -274,7 +274,9 @@
 
     <div class="arena" id="arena">
       <div class="sprite player" id="playerSprite">🦸</div>
-      <div class="pet" id="pet" style="display:none"></div>
+      <div class="party" id="allies">
+        <div class="pet" id="pet" style="display:none"></div>
+      </div>
       <div class="slash" id="slash">💥</div>
       <div class="sprite foe" id="foeSprite">👾</div>
     </div>
@@ -331,6 +333,7 @@
 <script src="../shared/save.js"></script>
 <script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
+<script src="../shared/allies.js"></script>
 <script>
 'use strict';
 
@@ -1382,6 +1385,8 @@ function startGame() {
   renderPet();
   state.playerHp = GEAR.maxHp;
   state.shield = GEAR.shield;
+  state.joining = null;
+  Allies.reset();          // allies last the run, not forever
   state.goldAtStart = (Save.me() || { gold: 0 }).gold;
   state.draw = makeDeck(track(state.track).pool());
   $('nodeBar').classList.toggle('hidden', !state.node);
@@ -2054,9 +2059,15 @@ function playerAttack(double) {
 
   animateAttack('player', 'foe',
     () => {
-      state.foeHp -= dmg;
+      // the monsters fighting beside you each take their own swing
+      const help = Allies.strike();
+      state.foeHp -= dmg + help;
       renderHp();
       double ? Sound.superHit() : Sound.hit();
+      if (help) setTimeout(() => {
+        Sound.hit();
+        floatText('+' + help + ' from your friends!', '#7dd3fc', true);
+      }, 240);
       if (double) {
         floatText('DOUBLE! -' + dmg, '#ffd23f', true);
         setTimeout(() => { playSlash(true); screenFlash(); }, 160); // second hit
@@ -2074,6 +2085,8 @@ function playerAttack(double) {
         Hud.applied(Save.awardEvent('foeDefeated'));
         // the monster you just beat may leave its collectible card behind
         Hud.cardDrop(Save.awardCard(FOES[state.foeIdx].id));
+        // ...and may decide it would rather fight beside you than against you
+        state.joining = Save.rollAlly(FOES[state.foeIdx], Allies.count());
         setTimeout(nextFoeOrWin, 900);
       } else {
         setTimeout(newQuestion, 600);
@@ -2110,6 +2123,13 @@ function nextFoeOrWin() {
   // question on screen for it to cover. The next monster waits for it.
   Hud.flush(() => {
     $('feedback').textContent = '';
+    if (state.joining) {
+      const pal = state.joining;
+      state.joining = null;
+      Allies.add(pal);
+      Sound.levelUp();
+      floatText(pal.emoji + ' ' + pal.name + ' joined you!', '#7dd3fc', false);
+    }
     spawnFoe();
     floatText('New foe!', '#fff', true);
   });

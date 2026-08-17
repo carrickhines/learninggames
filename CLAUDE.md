@@ -208,6 +208,31 @@ tweak can't quietly make it a week again.
 Card ids must be unique across the entire site — `.verify/content.py` checks
 this, because a collision would silently merge two monsters into one card.
 
+## Wild allies
+
+A monster you beat sometimes decides it likes you and fights at your side for
+the rest of the run, standing beside the hero and swinging alongside your hits.
+
+- **Knowing it makes it likelier.** Base 18%, plus 22% if you already hold that
+  monster's card. Collecting a monster is befriending it — which is the point,
+  and gives the card collection a payoff *during* a fight rather than only at
+  the trader.
+- **Up to three**, each with a 25% chance to add a point of damage on every hit
+  of yours. A full party averages +0.75 a hit: it helps, it never wins the
+  fight for you. `save-test.html` checks that expected value against the
+  tuning, so a tweak can't quietly make allies do the work.
+- **They last the run and no longer.** Nothing permanent means no power creep,
+  and every run gets its own shape.
+
+Odds and damage live in `ECONOMY` in `shared/save.js` (`rollAlly`,
+`allyStrikes`) so both battle games tune from one place; `shared/allies.js` is
+only the arena UI. An ally arrives **between monsters**, never over a live
+question, for the same reason reward banners queue.
+
+The party is one flex row (`.party`) with the shop pet as its permanent first
+member, positioned in the empty middle of the arena rather than at the hero's
+feet — a party of four grows into the hero if it starts against the left edge.
+
 ## The record, for grown-ups
 
 `shared/log.js` records every session and every question: what was asked, what

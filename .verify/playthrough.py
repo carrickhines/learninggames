@@ -627,6 +627,75 @@ try:
     check("map: free play arms no stop",
           d.execute_script("return Save.activeNode();") is None)
 
+    print("\nWild allies")
+    # The odds are unit-tested in save-test.html; what needs proving here is
+    # the wiring — that a beaten monster ends up standing beside the hero and
+    # that its swing really comes off the next foe's HP. So force the roll.
+    load("math/index.html")
+    d.execute_script(
+        "Save.rollAlly = function (foe, n) {"
+        "  return n >= 3 ? null"
+        "               : { id: foe.id, name: foe.name, emoji: foe.emoji, known: true };"
+        "};"
+        "Save.allyStrikes = function (l) { return (l || []).length; };")
+    click('[data-track="add"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.0)
+    check("allies: you start a run alone",
+          d.execute_script("return document.querySelectorAll('#allies .ally').length;") == 0)
+
+    def answer_math():
+        d.execute_script("""
+            if (TEST.state.busy) return;
+            document.getElementById('answer').value = String(TEST.state.answer);
+            document.getElementById('attackBtn').click();
+        """)
+        time.sleep(0.75)
+
+    # beat the first monster; it should join before the second one arrives
+    for _ in range(30):
+        if d.execute_script("return TEST.state.foeIndex;") > 0:
+            break
+        answer_math()
+    time.sleep(1.6)
+    check("allies: the monster you beat joins the fight",
+          d.execute_script("return document.querySelectorAll('#allies .ally').length;") == 1)
+    check("allies: it fights as the monster it was",
+          d.execute_script(
+              "var f = TEST.FOES[0];"
+              "var a = document.querySelector('#allies .ally');"
+              "return !!a && a.textContent === f.emoji;"))
+    check("allies: the shop pet keeps its place in the row",
+          d.execute_script("return document.querySelector('#allies').firstElementChild.id;")
+          == "pet")
+
+    # one ally, striking every time: a hit must now take two HP, not one
+    hp_before = d.execute_script("return TEST.state.foeHp;")
+    answer_math()
+    time.sleep(0.6)
+    dealt = hp_before - d.execute_script("return TEST.state.foeHp;")
+    check("allies: your friend's blow lands on top of yours", dealt >= 2,
+          "took %d HP" % dealt)
+
+    # the party is capped, and the cap holds however many monsters fall
+    for _ in range(90):
+        if showing("endScreen"):
+            break
+        answer_math()
+    n = d.execute_script("return document.querySelectorAll('#allies .ally').length;")
+    check("allies: the party stops at three", n <= 3, "%d joined" % n)
+    check("allies: no JS errors", not errs(), str(errs()))
+
+    # and they are not kept: a new run starts alone again
+    load("math/index.html")
+    click('[data-track="add"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(0.8)
+    check("allies: a new run starts alone again",
+          d.execute_script("return document.querySelectorAll('#allies .ally').length;") == 0)
+
     print("\nProgress survives")
     before = gold()
     load("index.html")
