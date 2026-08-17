@@ -340,6 +340,42 @@ try:
         document.getElementById('attackBtn').click();
     """)
 
+    print("\nFraction bars")
+    # Two fractions can only be compared if their wholes are the same length.
+    # Sizing each bar to its segment count drew 3/8 wider than 1/2, which tells
+    # the child the opposite of the truth.
+    load("math/index.html")
+    click('[data-track="fract"]')
+    click('[data-mode="normal"]')
+    click("#startBtn")
+    time.sleep(1.2)
+    d.execute_script("""
+        for (var i = 0; i < 60; i++) {
+            if (document.getElementById('question').textContent.indexOf('bigger') !== -1) break;
+            TEST.newProblem();
+        }
+    """)
+    time.sleep(0.4)
+    widths = d.execute_script("""
+        return [].slice.call(document.querySelectorAll('.frac-bar')).map(
+            function (b) { return Math.round(b.getBoundingClientRect().width); });
+    """)
+    check("fractions: a comparison draws two bars", len(widths) == 2, str(widths))
+    check("fractions: both bars are the same whole", len(set(widths)) == 1, str(widths))
+    filled = d.execute_script("""
+        return [].slice.call(document.querySelectorAll('.frac-bar')).map(function (b) {
+            var on = b.querySelectorAll('.seg.on');
+            if (!on.length) return 0;
+            var a = on[0].getBoundingClientRect(), z = on[on.length - 1].getBoundingClientRect();
+            return Math.round(z.right - a.left);
+        });
+    """)
+    vals = d.execute_script("return TEST.state.bars.map(function (f) { return f.n / f.d; });")
+    check("fractions: the longer filled bar really is the bigger fraction",
+          (filled[0] > filled[1]) == (vals[0] > vals[1]),
+          "widths %s for values %s" % (filled, [round(v, 3) for v in vals]))
+    check("fractions: no JS errors", errs() == [], str(errs()))
+
     print("\nLanguage RPG")
     battle_smoke("language/index.html", "letters", "easy", "lang/letters")
     check("lang: armor adds a heart",

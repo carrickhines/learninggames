@@ -228,6 +228,98 @@ try:
     else:
         print("  PASS  clock: o'clock and half past only, until quarters unlock")
 
+    # ---------- fractions ----------
+    rows = d.execute_script("""
+        TEST.state.track = 'fract';
+        var out = [];
+        for (var i = 0; i < arguments[0]; i++) {
+            var q = TEST.makers.fract();
+            out.push({ text: q.text, answer: String(q.answer),
+                       choices: q.choices, bars: TEST.state.bars.slice() });
+        }
+        return out;
+    """, ROUNDS)
+
+    def val(f):
+        n, dd = f.split("/")
+        return int(n) / int(dd)
+
+    bad = [r for r in rows if r["answer"] not in r["choices"]]
+    if bad:
+        fail("fractions: %d answers aren't among the choices" % len(bad))
+    else:
+        print("  PASS  fractions: the answer is always offered")
+
+    bad = [r for r in rows if len(set(r["choices"])) != len(r["choices"])]
+    if bad:
+        fail("fractions: %d have a duplicate choice" % len(bad))
+    else:
+        print("  PASS  fractions: no duplicate choices")
+
+    # the bars drawn must be the fractions being asked about
+    comp = [r for r in rows if r["text"] == "Which is bigger?"]
+    bad = [r for r in comp
+           if sorted(r["choices"]) != sorted("%d/%d" % (b["n"], b["d"]) for b in r["bars"])]
+    if bad:
+        fail("fractions: %d comparisons draw bars that aren't the choices" % len(bad))
+    else:
+        print("  PASS  fractions: the bars drawn are the fractions offered")
+
+    # "which is bigger" must have a bigger one
+    bad = [r for r in comp if val(r["choices"][0]) == val(r["choices"][1])]
+    if bad:
+        fail("fractions: %d comparisons are between two equal fractions" % len(bad))
+    else:
+        print("  PASS  fractions: never asks which is bigger of two equals")
+    bad = [r for r in comp
+           if val(r["answer"]) != max(val(c) for c in r["choices"])]
+    if bad:
+        fail("fractions: %d comparisons name the smaller one, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  fractions: the bigger fraction is the answer")
+
+    # equivalents really are equivalent, and the decoys really aren't
+    eq = [r for r in rows if "same as" in r["text"]]
+    bad = []
+    for r in eq:
+        shown = r["text"].split(" is")[0]
+        if abs(val(shown) - val(r["answer"])) > 1e-9:
+            bad.append(r["text"])
+        if any(abs(val(c) - val(shown)) < 1e-9 for c in r["choices"] if c != r["answer"]):
+            bad.append(r["text"] + " (a decoy is also equal)")
+    if bad:
+        fail("fractions: %d equivalents are wrong, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  fractions: equivalents are equal and decoys are not")
+
+    # adding: same denominator, under a whole, and never adding the bottoms
+    add = [r for r in rows if " + " in r["text"]]
+    bad = []
+    for r in add:
+        left, right = r["text"].split(" + ")
+        ln, ld = [int(x) for x in left.split("/")]
+        rn, rd = [int(x) for x in right.split("/")]
+        an, ad = [int(x) for x in r["answer"].split("/")]
+        if ld != rd or ad != ld or an != ln + rn:
+            bad.append(r["text"] + " -> " + r["answer"])
+        if an >= ad:
+            bad.append(r["text"] + " makes a whole or more")
+    if bad:
+        fail("fractions: %d additions are wrong, e.g. %s" % (len(bad), bad[0]))
+    else:
+        print("  PASS  fractions: additions share a denominator and stay under a whole")
+
+    dens = set(b["d"] for r in rows for b in r["bars"])
+    if max(dens) > 12:
+        fail("fractions: denominators up to %d, too many parts to see" % max(dens))
+    else:
+        print("  PASS  fractions: bars stay countable (up to %d parts)" % max(dens))
+    bad = [r for r in rows for b in r["bars"] if b["n"] > b["d"] or b["n"] < 1]
+    if bad:
+        fail("fractions: %d bars fill more parts than they have" % len(bad))
+    else:
+        print("  PASS  fractions: no bar fills more than it has")
+
     # ---------- patterns ----------
     bad_choice = bad_len = 0
     for q in sample("pattern", ROUNDS):

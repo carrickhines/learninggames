@@ -326,6 +326,20 @@ try:
     shot("math-battle-levelup")
 
     battle("math/index.html", "div", "normal", "math-battle-div")
+    # fractions: force each of the three question shapes into its own shot
+    for kind, name in (("Which is bigger", "compare"), ("same as", "equiv"), (" + ", "add")):
+        battle("math/index.html", "fract", "normal", "math-fract-" + name, settle=1.2)
+        d.execute_script("""
+            var want = arguments[0];
+            for (var i = 0; i < 60; i++) {
+                if (document.getElementById('question').textContent.indexOf(want) !== -1) break;
+                TEST.newProblem();
+            }
+        """, kind)
+        time.sleep(0.4)
+        d.execute_script(NO_ANIM)
+        shot("math-fract-" + name)
+
     battle("math/index.html", "bonds", "easy", "math-battle-bonds")
     battle("math/index.html", "coins", "easy", "math-battle-coins")
     battle("math/index.html", "clock", "easy", "math-battle-clock")

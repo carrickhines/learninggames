@@ -145,6 +145,53 @@
   /* ---------- Clock ---------- */
   .clock-box { display: flex; justify-content: center; margin: 2px 0; }
 
+  /* ---------- Fraction bars ---------- */
+  .bar-box { display: flex; flex-direction: column; gap: 8px; align-items: center; margin: 2px 0; }
+  .bar-box.hidden { display: none; }
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+  .bar-label {
+    font-family: var(--display);
+    font-size: 20px;
+    line-height: 1;
+    text-align: center;
+    min-width: 34px;
+  }
+  /* a real fraction bar, not a slash */
+  .bar-label b { display: block; font-weight: bold; }
+  .bar-label i {
+    display: block;
+    height: 2px;
+    background: #fff;
+    margin: 2px auto;
+    width: 20px;
+  }
+  /* Every bar is the same total width, whatever it's cut into. This is the
+     whole point: a half and three-eighths can only be compared if the wholes
+     match. Sizing each bar to its segment count drew 3/8 wider than 1/2,
+     which says the opposite of the truth. */
+  .frac-bar {
+    display: flex;
+    gap: 3px;
+    width: 300px;
+    background: rgba(0,0,0,.25);
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .frac-bar .seg {
+    flex: 1;
+    height: 34px;
+    border-radius: 6px;
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.18);
+    cursor: pointer;
+  }
+  .frac-bar .seg.on {
+    background: linear-gradient(180deg, #ffe27a, var(--accent));
+    border-color: transparent;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.2);
+  }
+  .frac-bar .seg.pop { animation: blockPop 0.3s ease; }
+
   .blocks-plus { font-size: 34px; font-weight: bold; color: var(--accent); align-self: center; }
   .push-btn { align-self: center; font-size: 18px; padding: 10px 16px; }
   .push-btn:disabled { filter: grayscale(0.6) brightness(0.9); cursor: default; box-shadow: 0 5px 0 #777; }
@@ -336,6 +383,7 @@
       <div class="blocks-area hidden" id="blocksArea">
         <div class="coin-row hidden" id="coinRow"></div>
         <div class="clock-box hidden" id="clockBox"></div>
+        <div class="bar-box hidden" id="barBox"></div>
         <div class="blocks-row" id="blocksRow">
           <div class="tower" id="towerA"></div>
           <div class="blocks-plus" id="plusSign">+</div>
@@ -420,7 +468,7 @@
   // solid circle and a sprawling dragon read as similar-sized foes (with the
   // boss nudged a touch larger). Tuned by screenshot.
   // the tracks that show the number-blocks counting aid
-  const BLOCK_TRACKS = ["add", "count", "sub", "bonds", "coins", "clock"];
+  const BLOCK_TRACKS = ["add", "count", "sub", "bonds", "coins", "clock", "fract"];
 
   const PLAYER_DAMAGE = 1;
   const FOE_DAMAGE = 1;
@@ -479,6 +527,7 @@
     flashOverlay: $("flashOverlay"),
     blocksArea: $("blocksArea"), towerA: $("towerA"), towerB: $("towerB"),
     blocksRow: $("blocksRow"), coinRow: $("coinRow"), clockBox: $("clockBox"),
+    barBox: $("barBox"),
     plusSign: $("plusSign"), pushBtn: $("pushBtn"),
     endEmoji: $("endEmoji"), endTitle: $("endTitle"), endText: $("endText"),
     playAgainBtn: $("playAgainBtn"), muteBtn: $("muteBtn"),
@@ -519,7 +568,8 @@
     { id: "mul",     row: "big", group: "Times tables",  emoji: "✖️", name: "Multiplication",   sub: "Times tables" },
     { id: "div",     row: "big", group: "Times tables",  emoji: "➗", name: "Division",         sub: "Times tables in reverse" },
     { id: "alg",     row: "big", group: "Thinking",      emoji: "🧩", name: "Algebra",          sub: "Solve for x" },
-    { id: "rule",    row: "big", group: "Thinking",      emoji: "🔍", name: "Rule Hunter",      sub: "Find the pattern's rule" }
+    { id: "rule",    row: "big", group: "Thinking",      emoji: "🔍", name: "Rule Hunter",      sub: "Find the pattern's rule" },
+    { id: "fract",   row: "big", group: "Fractions",     emoji: "🍕", name: "Fractions",        sub: "Halves, thirds, quarters" }
   ];
 
   const track = (id) => TRACKS.filter((t) => t.id === id)[0];
@@ -787,6 +837,80 @@
       };
     },
 
+    // ---------- Age 9: fractions ----------
+
+    /* Fractions, the biggest thing a third-grader is taught and the one thing
+       this site had nothing for. Three shapes of question, all of them read
+       off bars he can see:
+
+         compare      which is bigger, 3/4 or 2/5?
+         equivalent   3/6 is the same as which?
+         add          1/4 + 2/4, same denominator only
+
+       The bars are the point. A fraction written down is an abstraction; a
+       bar with three of four parts filled is a thing. As with the number
+       blocks, the bars never show the answer — they show the question. */
+    fract() {
+      const kind = pick(["compare", "compare", "equiv", "add"]);
+      // more parts than this and the bar stops being countable at a glance
+
+      if (kind === "compare") {
+        // halves through eighths, the denominators he actually meets
+        const dens = [2, 3, 4, 5, 6, 8];
+        let a, b;
+        do {
+          a = { n: 0, d: pick(dens) };
+          b = { n: 0, d: pick(dens) };
+          a.n = rand(1, a.d - 1);
+          b.n = rand(1, b.d - 1);
+        } while (a.n / a.d === b.n / b.d);   // never two that are equal
+        state.bars = [a, b];
+        const bigger = a.n / a.d > b.n / b.d ? a : b;
+        return {
+          text: "Which is bigger?",
+          answer: `${bigger.n}/${bigger.d}`,
+          choices: shuffle([`${a.n}/${a.d}`, `${b.n}/${b.d}`])
+        };
+      }
+
+      if (kind === "equiv") {
+        // A fraction and the same amount cut into smaller pieces. The scaled
+        // bar has to stay countable — 1/5 tripled is 3/15, which is neither
+        // readable nor drawable at this size — so only multiples that keep it
+        // to ten parts or fewer are allowed.
+        const base = pick([{ n: 1, d: 2 }, { n: 1, d: 3 }, { n: 1, d: 4 },
+                           { n: 2, d: 3 }, { n: 3, d: 4 }, { n: 1, d: 5 }]);
+        const ks = [2, 3, 4].filter((x) => base.d * x <= MAX_PARTS);
+        const k = pick(ks);
+        const shown = { n: base.n * k, d: base.d * k };
+        state.bars = [shown];
+        const answer = `${base.n}/${base.d}`;
+        // decoys: right pieces wrong count, and right count wrong pieces
+        const decoys = [`${base.n + 1}/${base.d}`, `${base.n}/${base.d + 1}`]
+          .filter((x) => x !== answer);
+        return {
+          text: `${shown.n}/${shown.d} is the same as…`,
+          answer: answer,
+          choices: shuffle([answer].concat(decoys.slice(0, 2)))
+        };
+      }
+
+      // adding with the same denominator, kept under a whole
+      const d = pick([3, 4, 5, 6, 8]);
+      const n1 = rand(1, d - 2);
+      const n2 = rand(1, d - n1 - 1);
+      state.bars = [{ n: n1, d: d }, { n: n2, d: d }];
+      return {
+        text: `${n1}/${d} + ${n2}/${d}`,
+        answer: `${n1 + n2}/${d}`,
+        choices: shuffle([
+          `${n1 + n2}/${d}`,
+          `${n1 + n2}/${d + d}`,          // the classic mistake: adding the bottoms
+          `${Math.max(1, n1 + n2 - 1)}/${d}`
+        ].filter((v, i, arr) => arr.indexOf(v) === i))
+      };
+    },
+
     // ---------- Age 8: find the rule ----------
     rule: makeRule
   };
@@ -993,12 +1117,17 @@
     rule: 2.2,                          // find the rule, not the answer
     bonds: 1.4,                         // counting the gap in the blocks
     coins: 1.6,                         // count a handful of mixed values
-    clock: 1.6                          // read the hands, then match a time
+    clock: 1.6,                         // read the hands, then match a time
+    fract: 1.9                          // read two bars, then compare them
   };
 
   /* Rule Hunter's upper rungs are harder again — interleaved rules, and
      "what is the 10th number?" is arithmetic you have to plan. */
   const RULE_TIER_TIME = { 1: 1, 2: 1, 3: 1.1, 4: 1.3, 5: 1.6 };
+
+  /* The most parts a fraction bar may be cut into. Past this it is neither
+     countable at a glance nor drawable across the panel. */
+  const MAX_PARTS = 10;
 
   /* The one place the clock is worked out. startTimer draws the bar from this
      and isFastAnswer judges the double-hit from it — computing them separately
@@ -1106,6 +1235,7 @@
     state.taken = false;
     el.coinRow.classList.add("hidden");
     el.clockBox.classList.add("hidden");
+    el.barBox.classList.add("hidden");
     el.blocksRow.classList.remove("hidden");
     el.pushBtn.classList.remove("hidden");
 
@@ -1146,6 +1276,15 @@
         });
         el.coinRow.appendChild(d);
       });
+      return;
+    }
+
+    if (state.track === "fract") {
+      el.blocksArea.classList.remove("hidden");
+      el.blocksRow.classList.add("hidden");
+      el.pushBtn.classList.add("hidden");
+      el.barBox.classList.remove("hidden");
+      drawBars(state.bars);
       return;
     }
 
@@ -1312,6 +1451,40 @@
       }
       if ((state.track === "add" || state.track === "count") && rectsOverlap(el.towerA, el.towerB)) mergeTowers();
       else tower.style.transform = ""; // snap back
+    });
+  }
+
+  /* Fraction bars. A fraction written down is an abstraction; a bar with
+     three of its four parts filled is a thing you can see is bigger than
+     another. Each bar is labelled, and the parts are drawn as separate
+     segments so the denominator is countable rather than implied. */
+  function drawBars(bars) {
+    el.barBox.innerHTML = "";
+    bars.forEach((f) => {
+      const row = document.createElement("div");
+      row.className = "bar-row";
+
+      const label = document.createElement("div");
+      label.className = "bar-label";
+      label.innerHTML = `<b>${f.n}</b><i></i><b>${f.d}</b>`;
+      row.appendChild(label);
+
+      const bar = document.createElement("div");
+      bar.className = "frac-bar";
+      for (let i = 0; i < f.d; i++) {
+        const seg = document.createElement("span");
+        seg.className = "seg" + (i < f.n ? " on" : "");
+        // tapping a part pops it, so it can be counted like a block
+        seg.addEventListener("click", () => {
+          Sound.blockTap();
+          seg.classList.remove("pop");
+          void seg.offsetWidth;
+          seg.classList.add("pop");
+        });
+        bar.appendChild(seg);
+      }
+      row.appendChild(bar);
+      el.barBox.appendChild(row);
     });
   }
 
