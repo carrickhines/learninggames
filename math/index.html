@@ -15,6 +15,13 @@
   /* Math RPG only. The frame, buttons, pips, arena, and timer bar come from
      the shared stylesheets above. */
   /* A quieter heading than .group-label, for the groups inside a hero row. */
+  .rematch-head { color: #ffc9d4; }
+  #menu button.choice.rematch-card {
+    border-color: rgba(255,94,126,.6);
+    background: linear-gradient(180deg, rgba(255,94,126,.24), rgba(255,94,126,.10));
+    min-width: 190px;
+  }
+
   .sub-label {
     font-family: var(--body);
     font-size: 12px;
@@ -504,6 +511,8 @@
     timerId: null,
     timerStart: 0,
     busy: false,
+    queue: null,         // The Rematch: the questions owed another go
+    rematchOf: null,     // the one currently being re-asked
     node: null,          // the map stop being played, if any
     mapReturn: null,     // set on winning one, so the end screen sends you back
     shield: 0,           // one free hit, if a pet is equipped
@@ -607,11 +616,34 @@
     });
   })();
 
+  /* The Rematch card, pinned above everything when questions are owed. */
+  (function buildRematch() {
+    const owed = Log.dueCount("math");
+    if (!owed) return;
+    const head = document.createElement("div");
+    head.className = "sub-label rematch-head";
+    head.textContent = "They beat you once";
+    const strip = document.createElement("div");
+    strip.className = "btn-row";
+    const b = document.createElement("button");
+    b.className = "choice rematch-card";
+    b.dataset.track = "rematch";
+    b.innerHTML = `<span class="emoji">🎯</span>The Rematch` +
+      `<span class="sub">${owed} question${owed === 1 ? "" : "s"} want another go</span>`;
+    strip.appendChild(b);
+    el.trackRow.parentNode.insertBefore(strip, el.trackRow);
+    el.trackRow.parentNode.insertBefore(head, strip);
+  })();
+
   // ---------- Menu selection ----------
+  /* One delegated handler per kind of choice. The whole menu is the
+     container now, because the Rematch card is pinned outside both track
+     rows — so a click has to be ignored unless the card carries this kind
+     of choice, or picking a difficulty would set the track to undefined. */
   function wireChoices(row, key) {
     row.addEventListener("click", (e) => {
       const btn = e.target.closest("button.choice");
-      if (!btn) return;
+      if (!btn || btn.dataset[key] === undefined) return;
       // both track rows are one choice, so clear every card of this kind
       document.querySelectorAll(`#menu .choice[data-${key}]`)
         .forEach((c) => c.classList.remove("sel"));
@@ -621,8 +653,7 @@
       Sound.click();
     });
   }
-  wireChoices(el.trackRow, "track");
-  wireChoices(el.trackRow2, "track");
+  wireChoices(el.menu, "track");
   wireChoices(el.modeRow, "mode");
   // Start on whatever this hero played last, falling back to the defaults —
   // a kid who always plays one track shouldn't have to re-pick it every time.
@@ -1028,6 +1059,27 @@
       return { text: unit[0].replace("{n}", n), answer: n * unit[1] };
     },
 
+    /* The Rematch. Not a generator at all — it deals back the questions that
+       have beaten him, newest sting first, and retires one once he has had it
+       right three times running.
+
+       The queue is dealt at the start of a run and cycles if it is shorter
+       than the fight, which is the point: these are the ones worth drilling.
+       Every answer here goes into the same log, so a question retires itself
+       just by being answered right. */
+    rematch() {
+      if (!state.queue || !state.queue.length) {
+        state.queue = shuffle(Log.due("math", 40));
+      }
+      const item = state.queue.shift();
+      if (!item) {
+        // nothing owed: a friendly no-op rather than an empty screen
+        return { text: "Nothing to beat! 🎉", answer: 0 };
+      }
+      state.rematchOf = item;
+      return { text: item.q, answer: item.r };
+    },
+
     // ---------- Age 8: find the rule ----------
     rule: makeRule
   };
@@ -1188,6 +1240,7 @@
   }
 
   function newProblem() {
+    if (state.track !== "rematch") state.rematchOf = null;
     const q = MAKERS[state.track]();
     state.answer = q.answer;
     state.choices = q.choices || null;
@@ -1241,6 +1294,7 @@
     sort: 1.5,                          // read the question, then compare four things
     alg: 1.8,                           // two-step algebra is pencil-and-paper work
     rule: 2.2,                          // find the rule, not the answer
+    rematch: 1.8,                       // whatever it was, he found it hard once
     bonds: 1.4,                         // counting the gap in the blocks
     coins: 1.6,                         // count a handful of mixed values
     clock: 1.6,                         // read the hands, then match a time
@@ -1722,7 +1776,13 @@
     stopTimer();
     const right = String(given) === String(state.answer);
     // for the grown-ups: what was asked, what came back, and how long it took
-    Log.answer({ q: el.question.textContent, given: given, ok: right, ms: took });
+    Log.answer({
+      q: el.question.textContent, given: given, ok: right, ms: took,
+      track: state.rematchOf ? state.rematchOf.track : null,
+      // Only a typed question can be re-asked exactly as it was, so only
+      // those carry their answer into the log for The Rematch to use.
+      right: state.choices ? null : state.answer
+    });
 
     if (right) {
       const isSuper = isFastAnswer();
@@ -1855,6 +1915,7 @@
     Sound.click();
     Save.setContext("math");     // the world's gold multiplier applies here
     Log.startSession({ game: "math", track: state.track, mode: state.mode });
+    state.queue = state.track === "rematch" ? shuffle(Log.due("math", 40)) : null;
     state.mapReturn = null;
     // a boss stop is one named monster with a lot of hearts, not the lineup
     FOES = (state.node && state.node.boss && state.node.foe)
@@ -1984,6 +2045,12 @@
 
   // Arrived from a map stop? Play exactly that, and skip the menu.
   (function fromMap() {
+    // ...or straight from the hub's Rematch button
+    if (/[?&]rematch=1/.test(location.search) && Log.dueCount("math")) {
+      state.track = "rematch";
+      startGame();
+      return;
+    }
     const node = Save.activeNode();
     if (!node || node.g !== "math") return showScreen("menu");
     state.track = node.t;

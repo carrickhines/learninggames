@@ -137,6 +137,95 @@ try {
   ok('the miss is still counted once', m2.misses === 1);
   ok('the review list can be limited', Log.missed(null, 1).length === 1);
 
+  /* ---------- The Rematch ---------- */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '54', ok: false, ms: 1, right: '56' });
+  Log.endSession({ won: true, gold: 1 });
+
+  var owed = Log.due('math');
+  ok('a missed question is owed another go', owed.length === 1, String(owed.length));
+  ok('the owed question carries its right answer', owed[0].r === '56');
+  ok('the owed question remembers its track', owed[0].track === 'mul');
+  ok('the count agrees with the list', Log.dueCount('math') === 1);
+
+  /* It retires only after RETIRE corrects in a row. */
+  var need = Log.RETIRE;
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  for (var i = 0; i < need - 1; i++) {
+    Log.answer({ q: '7 x 8', given: '56', ok: true, ms: 1, right: '56' });
+  }
+  Log.endSession({ won: true, gold: 1 });
+  ok('still owed one short of the streak', Log.dueCount('math') === 1,
+     String(Log.dueCount('math')));
+
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '56', ok: true, ms: 1, right: '56' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('retired once the streak is complete', Log.dueCount('math') === 0);
+
+  /* And a further correct doesn't bring it back. */
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '56', ok: true, ms: 1, right: '56' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('a fourth correct does not resurrect it', Log.dueCount('math') === 0);
+
+  /* Missing it again puts it back. */
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '49', ok: false, ms: 1, right: '56' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('missing it again owes it again', Log.dueCount('math') === 1);
+
+  /* A question with no right answer on record can't be served — that's the
+     tap-a-picture case, and the older records from before the field existed. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'pattern', mode: 'easy' });
+  Log.answer({ q: 'red blue red blue', given: 'green', ok: false, ms: 1 });
+  Log.endSession({ won: true, gold: 1 });
+  ok('a question with no recorded answer is never served',
+     Log.dueCount('math') === 0);
+  ok('...but it still shows in the parent report', Log.missed().length === 1);
+
+  /* Games don't borrow each other's questions. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '3 x 3', given: '6', ok: false, ms: 1, right: '9' });
+  Log.endSession({ won: true, gold: 1 });
+  Log.startSession({ game: 'language', track: 'fixit', mode: 'easy' });
+  Log.answer({ q: 'the hole class', given: 'hole', ok: false, ms: 1, right: 'whole' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('the maths rematch only offers maths', Log.dueCount('math') === 1);
+  ok('each game has its own queue', Log.dueCount('language') === 1);
+  ok('and everything owed is listed when no game is named',
+     Log.due().length === 2);
+
+  /* Most-missed first, so the worst offenders come back soonest. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: 'a', given: 'x', ok: false, ms: 1, right: '1' });
+  Log.answer({ q: 'b', given: 'x', ok: false, ms: 1, right: '2' });
+  Log.answer({ q: 'b', given: 'x', ok: false, ms: 1, right: '2' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('the most-missed question comes back first', Log.due('math')[0].q === 'b');
+
+  /* A re-asked question is filed under the track it came from. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'rematch', mode: 'easy' });
+  Log.answer({ q: '7 x 8', given: '56', ok: true, ms: 1, right: '56', track: 'mul' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('a re-asked question is filed under its original track',
+     Log.byTrack()[0].track === 'mul', Log.byTrack()[0].track);
+
+  /* The CSV carries the right answer too. */
+  fresh();
+  Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+  Log.answer({ q: '2 x 2', given: '5', ok: false, ms: 1, right: '4' });
+  Log.endSession({ won: true, gold: 1 });
+  ok('the CSV header names the right answer',
+     Log.csv().split('\n')[0].indexOf('right answer') !== -1);
+  ok('the CSV row carries it', Log.csv().split('\n')[1].indexOf('"4"') !== -1,
+     Log.csv().split('\n')[1]);
+
   /* ---------- the headline numbers ----------
      Its own setup, so an assertion above can't quietly change what this
      measures. */

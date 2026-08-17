@@ -390,6 +390,84 @@ try:
           d.execute_script("return Save.levelOf(Save.me()).level;") >= 2)
     check("rewards: no JS errors", errs() == [], str(errs()))
 
+    print("\nThe Rematch")
+    fresh_hero("RematchRunner")
+    load("math/index.html")
+    click('[data-track="mul"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.0)
+
+    # miss two questions on purpose, remembering exactly what they were
+    missed_qs = []
+    for _ in range(2):
+        missed_qs.append(d.execute_script("""
+            var q = document.getElementById('question').textContent;
+            document.getElementById('answer').value = String(TEST.state.answer + 1);
+            document.getElementById('attackBtn').click();
+            return q;
+        """))
+        time.sleep(2.4)
+    d.execute_script("Log.flush();")
+
+    owed = d.execute_script("return Log.due('math');")
+    check("rematch: the missed questions are owed another go", len(owed) == 2,
+          "%d owed" % len(owed))
+    check("rematch: it knows their right answers",
+          all(o["r"] for o in owed), str(owed))
+    check("rematch: it remembers which track they came from",
+          all(o["track"] == "mul" for o in owed))
+
+    # the hub offers it once enough are owed
+    load("index.html")
+    shown = d.execute_script(
+        "return getComputedStyle(document.getElementById('rematchBtn')).display;")
+    check("rematch: the hub stays quiet below the threshold", shown == "none", shown)
+    d.execute_script("""
+        Log.startSession({ game: 'math', track: 'mul', mode: 'easy' });
+        Log.answer({ q: '11 x 11', given: '0', ok: false, ms: 1, right: '121' });
+        Log.endSession({ won: false, gold: 0 });
+        renderHome();
+    """)
+    time.sleep(0.3)
+    check("rematch: the hub offers it once three are owed",
+          d.find_element(By.ID, "rematchBtn").is_displayed())
+
+    # play it, and check it serves back a question that actually beat him
+    load("math/index.html")
+    check("rematch: the menu pins it to the top when owed",
+          len(d.find_elements(By.CSS_SELECTOR, ".rematch-card")) == 1)
+    click('[data-track="rematch"]')
+    click('[data-mode="easy"]')
+    click("#startBtn")
+    time.sleep(1.2)
+    served = d.execute_script("return document.getElementById('question').textContent;")
+    all_owed = d.execute_script("return Log.due('math').map(function (o) { return o.q; });")
+    check("rematch: it serves back a question he missed", served in all_owed,
+          "served %r, owed %s" % (served, all_owed))
+
+    # answering it right must count towards retiring it
+    # hoist the argument: inside the filter callback, arguments[0] is the row
+    before = d.execute_script(
+        "var q = arguments[0];"
+        "var row = Log.due('math').filter(function (o) { return o.q === q; })[0];"
+        "return row ? row.streak : 'retired';", served)
+    d.execute_script("""
+        document.getElementById('answer').value = String(TEST.state.answer);
+        document.getElementById('attackBtn').click();
+    """)
+    time.sleep(2.0)
+    d.execute_script("Log.flush();")
+    after = d.execute_script("""
+        var q = arguments[0];
+        var row = Log.due('math').filter(function (o) { return o.q === q; })[0];
+        return row ? row.streak : 'retired';
+    """, served)
+    check("rematch: getting it right moves it towards retirement",
+          after == "retired" or after > before,
+          "streak %s -> %s" % (before, after))
+    check("rematch: no JS errors", errs() == [], str(errs()))
+
     print("\nThe map")
     fresh_hero("MapRunner")
     load("index.html")

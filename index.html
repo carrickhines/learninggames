@@ -542,6 +542,7 @@
     margin: -4px auto 14px;
   }
   .danger-btn { background: linear-gradient(180deg, #ff8fa3, var(--bad)); box-shadow: 0 5px 0 #c23a55; color: #fff; }
+  .rematch-btn { background: linear-gradient(180deg, #ff9bb0, var(--bad)); box-shadow: 0 5px 0 #c23a55; color: #fff; }
   #importFile { display: none; }
   .flash {
     min-height: 1.4em;
@@ -608,6 +609,7 @@
 
       <div class="btn-row" style="margin-top:4px">
         <button id="mapBtn">🗺️ The Map</button>
+        <button id="rematchBtn" class="rematch-btn" style="display:none">🎯 The Rematch</button>
       </div>
 
       <div class="group-label">Or just play</div>
@@ -950,6 +952,12 @@ function renderHome() {
   $('hcLevel').textContent = `Level ${lv.level} · ${lv.into} / ${lv.need} XP`;
   $('hcXp').style.width = Math.round((lv.into / lv.need) * 100) + '%';
   $('hcGold').textContent = '🪙 ' + me.gold;
+  /* The Rematch offers itself once a few questions are owed, so it turns up
+     on the way past rather than having to be gone looking for. */
+  const owed = Log.dueCount('math');
+  $('rematchBtn').style.display = owed >= 3 ? '' : 'none';
+  $('rematchBtn').textContent = `🎯 The Rematch (${owed})`;
+
   // the redeem button only exists when there's a token to spend
   const tokens = me.inventory.tokens;
   $('redeemBtn').style.display = tokens > 0 ? '' : 'none';
@@ -1448,6 +1456,12 @@ $('mapBtn').addEventListener('click', () => {
   if (Save.mapAt('big') > Save.mapAt('little')) mapTrail = 'big';
   openMap(null);
 });
+$('rematchBtn').addEventListener('click', () => {
+  Sound.click();
+  Save.clearNode();              // this is free play, not a map stop
+  location.href = 'math/index.html?rematch=1';
+});
+
 $('mapBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 document.querySelectorAll('.trail-pick').forEach(b => {
   b.addEventListener('click', () => {

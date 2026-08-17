@@ -36,7 +36,12 @@ var Log = (function () {
 
   /* Records are stored with short keys because there are thousands of them:
        answers   { t: when, g: game, k: track, q: question, a: given,
-                   c: correct(1/0), ms: time taken }
+                   r: the right answer, c: correct(1/0), ms: time taken }
+
+     `r` is what makes The Rematch possible: without the right answer on
+     record, a missed question can be shown again but not marked. It is only
+     set for questions that can be re-asked as they were — typed answers.
+     Records written before this existed simply aren't replayable.
        sessions  { t: started, e: ended, g: game, k: track, m: mode,
                    r: right, w: wrong, gold: earned, won: 1/0 } */
 
@@ -119,9 +124,12 @@ var Log = (function () {
     buffer.push({
       t: Date.now(),
       g: (session && session.g) || (rec.game || '?'),
-      k: (session && session.k) || (rec.track || ''),
+      // a re-asked question is recorded against the track it came from, so
+      // the parent report doesn't fill with a track called "rematch"
+      k: rec.track || (session && session.k) || '',
       q: String(rec.q == null ? '' : rec.q).slice(0, 80),
       a: String(rec.given == null ? '' : rec.given).slice(0, 40),
+      r: rec.right == null ? '' : String(rec.right).slice(0, 40),
       c: ok,
       ms: Math.max(0, Math.round(rec.ms || 0))
     });
@@ -264,15 +272,62 @@ var Log = (function () {
     };
   }
 
+  /* ---------- The Rematch ----------------------------------------------
+     Which questions are owed another go.
+
+     A question is due once it has been missed and hasn't yet been answered
+     correctly `RETIRE` times in a row since. The streak is read straight back
+     out of the answer log, so a Rematch answer counts towards retiring the
+     question simply by being recorded — there is no second store to keep in
+     step with the first.
+
+     Only questions with a right answer on record can be served. A question
+     answered by tapping a picture can't be reconstructed from a log line, and
+     serving it with a guessed answer would ask the wrong question. */
+
+  var RETIRE = 3;
+
+  function due(game, limit) {
+    var rows = {};
+    forProfile().answers.forEach(function (a) {
+      if (game && a.g !== game) return;
+      if (!a.r) return;                    // not replayable
+      var key = a.g + '|' + a.q;
+      if (!rows[key]) {
+        rows[key] = { game: a.g, track: a.k, q: a.q, r: a.r,
+                      misses: 0, streak: 0, last: 0 };
+      }
+      var row = rows[key];
+      row.r = a.r;                         // the answer as most recently known
+      row.track = a.k;
+      if (a.c) {
+        row.streak++;
+      } else {
+        row.streak = 0;
+        row.misses++;
+        row.last = a.t;
+      }
+    });
+
+    return Object.keys(rows)
+      .map(function (k) { return rows[k]; })
+      .filter(function (r) { return r.misses > 0 && r.streak < RETIRE; })
+      .sort(function (a, b) { return b.misses - a.misses || b.last - a.last; })
+      .slice(0, limit || 40);
+  }
+
+  function dueCount(game) { return due(game, 999).length; }
+
   /* Everything, as CSV, for anyone who wants a spreadsheet. */
   function csv(id) {
-    var out = ['when,game,track,question,answered,correct,seconds'];
+    var out = ['when,game,track,question,answered,right answer,correct,seconds'];
     forProfile(id).answers.forEach(function (a) {
       out.push([
         new Date(a.t).toISOString(),
         a.g, a.k,
         '"' + String(a.q).replace(/"/g, '""') + '"',
         '"' + String(a.a).replace(/"/g, '""') + '"',
+        '"' + String(a.r || '').replace(/"/g, '""') + '"',
         a.c ? 'yes' : 'no',
         (a.ms / 1000).toFixed(1)
       ].join(','));
@@ -299,6 +354,9 @@ var Log = (function () {
     sessions: sessions,
     byTrack: byTrack,
     missed: missed,
+    due: due,
+    dueCount: dueCount,
+    RETIRE: RETIRE,
     summary: summary,
     csv: csv,
     clear: clear,
