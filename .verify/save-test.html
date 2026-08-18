@@ -530,9 +530,16 @@ try {
     ok(tr + ' trail: every step belongs to a region',
        Save.mapTrail(tr).every(function (s2) { return !!s2.region; }));
   });
-  ok('the regions cover the whole trail',
-     Save.REGIONS.reduce(function (n, r) { return n + r.steps; }, 0) >=
-     Math.max(Save.mapLength('little'), Save.mapLength('big')));
+  /* Exactly, not merely enough. This read `>=` and so was happy with bands
+     that ran one step long: Ember Peak claimed four steps when the trail gave
+     it three, and every boundary after it slid down by one. Market Town's
+     first stop was painted — and looted — as Ember Peak, and the name board
+     for each late region appeared a stop after the ground had changed. */
+  ok('the regions cover the whole trail exactly',
+     Save.REGIONS.reduce(function (n, r) { return n + r.steps; }, 0) ===
+     Math.max(Save.mapLength('little'), Save.mapLength('big')),
+     Save.REGIONS.reduce(function (n, r) { return n + r.steps; }, 0) + ' banded vs ' +
+     Math.max(Save.mapLength('little'), Save.mapLength('big')) + ' steps');
 
   /* ---------- forks ---------- */
   fresh();
@@ -1009,7 +1016,14 @@ try {
       'math:sort:easy', 'language:read:easy', 'math:add:normal',
       'language:past:easy', 'math:count:normal', 'math:sub:normal',
       'math:skip:normal', 'language:sounds:normal', 'math:next:normal',
-      'math:add:normal'
+      'math:add:normal',
+      /* Market Town and The Observatory. These shipped before this list was
+         extended to cover them — a hero has been standing past index 21 since
+         that release, so they are every bit as frozen as the ones above. */
+      'math:bonds:easy', 'language:blend:easy', 'math:coins:easy',
+      'math:clock:easy', 'math:bonds:normal', 'math:coins:normal',
+      'math:clock:normal', 'story:mini-finish:-', 'language:past:normal',
+      'math:clock:normal'
     ],
     big: [
       'math:mul:normal', 'story:q0:-', 'math:div:normal',
@@ -1019,7 +1033,12 @@ try {
       'story:q3:-', 'math:rule:normal', 'math:alg:expert',
       'story:q4:-', 'language:fixit:expert', 'language:forge:expert',
       'math:rule:expert', 'story:q6:-', 'language:syllable:expert',
-      'math:alg:expert'
+      'math:alg:expert',
+      /* Market Town and The Observatory — see the note on the little trail. */
+      'math:fract:normal', 'story:q7:-', 'math:wordprob:normal',
+      'math:applied:normal', 'math:applied:normal', 'math:fract:expert',
+      'math:place:expert', 'math:wordprob:expert', 'math:applied:expert',
+      'math:fract:expert'
     ]
   };
 

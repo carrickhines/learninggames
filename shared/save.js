@@ -608,7 +608,13 @@ var Save = (function () {
     { id: 'reef',   name: 'Sunken Reef',  emoji: '🌊', steps: 4,
       sky: ['#0b3a5e', '#1b8fae'], hills: ['#1f8f9c', '#17727f', '#115a66'],
       props: ['🐠', '🪸', '🐚', '🫧', '🦀', '🐟'] },
-    { id: 'ember',  name: 'Ember Peak',   emoji: '🌋', steps: 4,
+    /* Three, not four. The `---- Market Town ----` comment in MAP sits before
+       step 22, but the region bands used to run one step long, so step 22 was
+       authored as Market Town and then painted — and looted — as Ember Peak.
+       Regions are computed, never stored, so correcting the band moves nobody:
+       it only puts the scenery and the chest's card pool where the trail was
+       always meant to change. */
+    { id: 'ember',  name: 'Ember Peak',   emoji: '🌋', steps: 3,
       sky: ['#4a1020', '#c04a1c'], hills: ['#7a2a18', '#5f2013', '#45170e'],
       props: ['🌋', '🔥', '🪨', '💀', '🗻', '🌑'] },
 
