@@ -14,7 +14,7 @@ are holding. Run both.
     .verify/venv/bin/python .verify/upgrade.py            # vs origin/main
     .verify/venv/bin/python .verify/upgrade.py <commit>   # vs anything else
 
-See AGENTS.md for the rules this exists to enforce.
+See CLAUDE.md ("Never lose a child's progress") for the rules this enforces.
 """
 import json
 import os
@@ -74,7 +74,7 @@ def main():
         print("deployed schema version: %s" % d.execute_script("return Save._version;"))
         d.execute_script("""
             Save.reset();
-            Save.createProfile('Real Kid', '🦖');
+            Save.createProfile('Real Kid', '🦖', 'big');
             Save.award(60000, 2400);
             Save.buy('world-cave'); Save.buy('world-sky');
             Save.buy('sword'); Save.buy('tunic'); Save.buy('chick'); Save.buy('coin');
@@ -173,16 +173,20 @@ def main():
         check("the save is stamped with the new schema",
               d.execute_script("return JSON.parse(localStorage.getItem(Save._key)).v;")
               == d.execute_script("return Save._version;"))
-        # v4 gave heroes a row. This save was written before that existed, so
-        # it has to come out with one read off the road behind them — and the
-        # challenge of the day has to follow it.
+        # v4 gave heroes a row of their own. This hero was made as the big kid
+        # and walked the big trail, so both eras have to land on "big": a v4+
+        # build stored it and must keep it, an older one never recorded it and
+        # has to read it off the road behind them. Either way the challenge of
+        # the day follows.
         row = d.execute_script("return Save.rowOf();")
         walked = kid["progress"]["map"]
+        stored = kid.get("row")
         check("the hero comes out knowing which kid they are",
               row in ("little", "big"), str(row))
-        check("...and it matches the trail they had been walking",
-              row == ("big" if walked["big"] > walked["little"] else "little"),
-              "%s with map %s" % (row, walked))
+        check("...and it is still the big kid, %s" %
+              ("as stored" if stored else "inferred from the trail walked"),
+              row == "big",
+              "got %s (stored %r, map %s)" % (row, stored, walked))
         check("the challenge of the day is set on their own trail",
               d.execute_script(
                   "var x = Save.daily();"

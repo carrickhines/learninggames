@@ -11,9 +11,109 @@ between sessions. They're now one site with a hub, a shared design system,
 and a persistent hero who carries gold, levels, gear, and a monster-card
 collection across all three games.
 
-> **Read [`AGENTS.md`](AGENTS.md) before changing anything.** It holds the rules
-> that outrank every design note here — chiefly that a deploy must never cost
-> the kids their progress, since their saves live only on their iPads.
+---
+
+# Never lose a child's progress
+
+**This rule outranks every design note in this file.**
+
+Everything the kids have — gold, gear, cards, map position, the pet they
+raised, months of it — lives in that iPad's `localStorage` and **nowhere
+else**. There is no server, no account, no backup we control. Pushing to `main`
+replaces the code underneath a save that already exists. A save destroyed is a
+destroyed month, and to a seven-year-old it is not recoverable by explaining
+what a schema is.
+
+## The storage keys are permanent
+
+`lg_save_v1` (the hero) and `lg_log_v1` (the parent record). **Never rename
+them, never namespace them, never "clean them up".** The `v1` in the key is
+historical; the real schema version is the `v` field *inside* the blob.
+Renaming a key is indistinguishable from wiping the save.
+
+## Schema changes go through `migrate()`, and only ever add
+
+Bump `VERSION` in `shared/save.js` (currently **4**) and add an `if (v < N)`
+block. Inside it:
+
+- **Add missing fields; never remove, rename or re-key an existing one.** Old
+  data you no longer read costs a few bytes and is free insurance.
+- **Never reset a value to a default** because it looks stale. If a field's
+  meaning changed, write a new field and leave the old one alone.
+- **Migrations must be idempotent.** They run on load, and a load can happen
+  twice. Running one twice must produce the same save as running it once —
+  there's a test for exactly this.
+- **Every earlier block still runs.** A save that has been on an iPad since v1
+  must climb all the way to the current version in one load.
+- **Nothing in `save.js` or `log.js` may throw.** A parent losing a record is a
+  shame; a child losing a battle to a storage error is not acceptable.
+
+## Every shipped version keeps a fixture
+
+`.verify/save-test.html` holds a `FIXTURES` map: one realistic save blob per
+schema version that has ever been deployed (currently v2 and v3). Each is
+loaded and checked for gold, XP, gear, owned items, tokens, cards, foils,
+worlds, map position, roads already taken, quests, stats, pity counter,
+remembered track and mode, and that a half-played stop still resumes into the
+road that was there.
+
+- **When you bump `VERSION`, add a fixture for the version you are leaving.**
+- **Never edit an old fixture.** Its value is that it is what really shipped.
+  If a fixture fails, the migration is wrong — not the fixture.
+
+## Content data is load-bearing too
+
+`localStorage` stores *ids and indices*, not objects. Renaming or reordering
+content silently repoints a saved reference at something else:
+
+- **Never change a shop item's `id`, a card's `id`, or a world's id.** They live
+  in `inventory.owned`, `inventory.weapon`, `cards`, `unlockedWorlds`.
+- **Never remove or reorder a step in `MAP`.** `progress.map` is an index into
+  that array — deleting step 4 teleports every hero past it backwards. Append
+  to the end, or add a whole new trail. `save-test.html` freezes the first road
+  of all 22 steps that shipped before this rule existed and fails if one moves.
+- **When a `MAP` step gains a fork, the road that was already there must stay
+  option 0.** `activeNode` stores `{ trail, i, o }`, so a stop half-played at
+  deploy time resumes as `o: 0` and must land in the same game, track and mode.
+  This is why every boss fork's first option is its original stop.
+- **A region must have card monsters to draw from.** `rollLoot()` uses
+  `cardsOfWorld(region.cards || region.id)`. A region whose id isn't a world
+  must name one in `cards`, or a boss chest promises a card and hands over
+  nothing — a bug this project has already had once.
+- **Anything that picks content *for* a child reads `profile.row`**, never their
+  progress. Both trails start at 0, so "which trail are they further along"
+  answers `little` for every new hero — which is how the nine-year-old came to
+  be set counting practice as his challenge of the day.
+- Adding a new track, foe, card, region or shop item is always safe. It's the
+  *existing* ones that are frozen.
+
+## Before every deploy
+
+```bash
+.verify/venv/bin/python .verify/upgrade.py
+```
+
+It checks out **what is currently deployed** into a worktree, plays on it until
+it has written a real save — gold, gear, cards, worlds, map progress, a boss
+stop left half-played — then opens the **working tree** on top of that save.
+Nothing may be lost, and the half-played stop must resume into the same game it
+would have before. It exits non-zero and says *do not deploy* if not.
+
+This is the check that matters most: it exercises a save written by the old
+code rather than one written by hand. Run it with `run-save-test.py`, which
+covers the older versions the fixtures still hold.
+
+It takes a ref, so an older era can be checked too — `upgrade.py 266e2b2` walks
+a v2 save all the way up. Worth doing after a migration lands, since the
+default (`origin/main`) only ever tests one step.
+
+If the schema moved, also ask the parent to take a backup from **Settings →
+Save progress to a file** on each iPad. It costs a tap and it is the only real
+undo that exists.
+
+---
+
+# The game
 
 ## Who it's for
 
@@ -41,6 +141,7 @@ shared/
   log.js            the play record: sessions, questions, what was missed
   reward.js         the iPad-time countdown
   hud.js            the hero chip each game wears, and the gold/level-up feedback
+  allies.js         the wild-ally arena UI (odds live in save.js)
 math/index.html
 language/index.html + record.html (Voice Studio) + voice.js (generated clips)
 story/index.html
@@ -64,7 +165,7 @@ independent progress per profile.
 **New ground is appended, never inserted.** `progress.map` is an *index* into
 the trail, so removing or reordering a step teleports every hero standing past
 it. `save-test.html` freezes the first road of every step that has shipped and
-fails if one moves; see `AGENTS.md`. The last two regions — Market Town and The
+fails if one moves. The last two regions — Market Town and The
 Observatory — were added this way, to give the everyday-maths, fractions and
 blending tracks somewhere to live on the journey.
 
@@ -296,7 +397,7 @@ boss for the same chest, so it's "on its terms or on mine", never a wrong turn.
 - **Option 0 of every boss fork is the stop as it was before forking.** Saves
   store `activeNode` as `{ trail, i, o }`, so a boss half-played at deploy time
   resumes as `o: 0` and has to land in the same game. `save-test.html` enforces
-  this; see `AGENTS.md`.
+  this.
 
 ## Pets grow up
 
@@ -687,12 +788,26 @@ scrolls when it doesn't.
 - **Readable code.** This is a hackable family project — favor clarity over
   cleverness so problem ranges, timers, prices, and visuals stay easy to
   adjust.
+- **Nothing is ever taken away.** No gold lost for a miss, no streak reset to
+  zero, no content locked as punishment. Difficulty comes from the questions,
+  never from spite.
+- **The parent is a real second user.** Settings → Progress report exists for
+  them; keep it honest and readable.
+- **Ship deliberately.** The audience is two children who will be playing
+  within the hour of a push.
 
 # Technical approach
 
 Plain HTML, CSS, and JavaScript. No build step, no server, no frameworks, no
 external dependencies. Everything runs by opening a file or serving the folder
 statically. Keep it that way.
+
+Concretely, that means: no bundler, no CDN, no `fetch` of anything. Shared code
+loads through plain `<script src>` and `<link>`; every sound is synthesized at
+runtime; recorded voice ships as base64 data URIs inside `voice.js`; emoji are
+the art. Opening `index.html` from `file://` must behave exactly as the
+deployed site does — that's the fallback for when the network or Pages is
+having a day.
 
 ---
 
@@ -702,32 +817,79 @@ No test framework — the harness drives the real pages in headless Firefox.
 Set it up once with `.verify/setup.sh` (creates the venv, downloads
 geckodriver), then:
 
-| Command | What it checks |
-|---|---|
-| `.verify/venv/bin/python .verify/smoke.py` | every page loads, styles resolve, each game starts and pays for one answer, the shop and cards and token flows work |
-| `.verify/venv/bin/python .verify/run-save-test.py` | 230 assertions over `save.js` and `log.js` — profiles, level rollover, buying, set gating, card rarity and pity as *statistics* over thousands of rolls, the trader's arithmetic, the map trails, the log's buffering and cap, import round-trip, corrupt saves, storage-throws |
-| `.verify/venv/bin/python .verify/tracks.py` | generates hundreds of problems per math track and re-derives every answer |
-| `.verify/venv/bin/python .verify/content.py` | the authoring rules above, across all three games |
-| `.verify/venv/bin/python .verify/playthrough.py` | plays every game to its win screen and checks the gold, cards, and progress that resulted |
-| `.verify/venv/bin/python .verify/shots.py` | screenshots every screen to `.verify/shots/` |
+| Script | Run it when | ~ |
+|---|---|---|
+| `smoke.py` | after any change | 1 min |
+| `run-save-test.py` | after touching `save.js` / `log.js` (397 + 65 assertions) | 10 s |
+| `tracks.py` | after touching a question generator | 1 min |
+| `content.py` | after touching content, prices, card odds, or the hub's claims | 30 s |
+| `playthrough.py` | before shipping | 3 min |
+| `upgrade.py` | **before every deploy** — see "Never lose a child's progress" | 40 s |
+| `shots.py [w h]` | when something new is drawn | 2 min |
 
-Run `smoke.py` after any change. Run `content.py` after touching content,
-prices, or card odds — it simulates the economy and the drop rates and fails
-if either drifts out of the intended range. Run `tracks.py` after touching a
-generator.
+`content.py` simulates the economy and the drop rates and fails if either
+drifts out of the intended range — it's what stops the best gear quietly
+becoming a week's work again. It also holds the hub to its own claims: the
+"19 tracks" on the game cards is checked against the registries, because that
+number silently drifted to being wrong by twelve once already.
 
-**Two traps worth knowing about**, both already handled:
+New drawing code gets a **screenshot looked at**, not just a passing assertion.
+The clock face, fraction bars, number blocks and the map landscape all needed
+real review at iPad size, and two of them shipped looking wrong despite green
+tests.
 
-- A script that throws *during parse* leaves no error for a `window.onerror`
-  trap installed afterwards. Each game assigns `window.TEST` on its last line,
-  and `smoke.py` checks that it exists — which is only true if the script ran
-  all the way down.
+## A test that can't fail isn't a test
+
+When you add one, **make it fail first** — break the thing on purpose, watch the
+assertion fire with the wrong value in its message, then put it back. Several
+checks here have caught real regressions precisely because they were proved to
+bite: reverting `heroTrail()` reports the actual wrong answer it used to give
+("Find the letter"), and a migration that resets map progress fails
+`upgrade.py` with *do not deploy*.
+
+Prefer asserting against **the tuning, or against the old build**, rather than a
+number typed into the test. `Save.ECONOMY.weaknessDamage`, not `1`. What the
+deployed build said the armed stop was, not a hardcoded `math/rule/normal`.
+
+## How the harness sees inside the games
+
+Each game assigns `window.TEST` on the last line of its script (state, the
+current answer, the foe lineup, the track registry). It costs nothing in play,
+and doubles as a **boot check**: if `window.TEST` is missing, the script threw
+on its way down. A throw *during parse* leaves no error for a `window.onerror`
+trap installed after load, so "no JS errors" alone would report a completely
+broken page as fine.
+
+## The trap that has bitten five times
+
+`arguments[0]` inside a callback passed to `execute_script` refers to **the
+callback's own arguments**, not the outer value. This is wrong, and fails
+silently rather than erroring:
+
+```js
+d.execute_script("Save.update(function (p) { p.progress.seqTier = arguments[0]; });", 3)
+d.execute_script("return Log.due('math').filter(function (o) { return o.q === arguments[0]; })[0];", q)
+```
+
+Hoist it first, every time:
+
+```js
+d.execute_script("var tier = arguments[0];"
+                 "Save.update(function (p) { p.progress.seqTier = tier; });", 3)
+```
+
+## Other harness notes
+
 - Headless Firefox stops advancing the CSS animation clock after a window
   resize, which pins pop-in animations at their first frame. `shots.py`
   disables animations, which is what a screenshot suite wants anyway.
-
-`window.TEST` in each game exposes the state and data the harness needs. It
-costs nothing in play.
+- Firefox's driver refuses to click an element inside a scrolling container it
+  can't scroll into view by its own rules; the `click()` helpers scroll the
+  container themselves and fall back to a scripted click.
+- Selenium's `.text` returns `""` for an element mid-fade — read `textContent`
+  via JS instead.
+- Python's `round()` is banker's rounding and the game's JS is half-up. A test
+  once called the game wrong over 805 → 800.
 
 # Hosting
 
@@ -738,7 +900,84 @@ step — the same files that run from `file://` are what get served.
 - Repo: https://github.com/carrickhines/learninggames
 - Live: https://carrickhines.github.io/learninggames/
 
+**Pushing to `main` is the deploy.** There is no staging environment and the
+audience is two children who will be playing within the hour. Run
+`.verify/upgrade.py` first, push, then `gh run list` to confirm the build went
+green — and then curl the live URL, because a green Action is not proof the
+page loads.
+
 The three original repos (`mathrpg`, `languagerpg`, `storyquest`) hold the
 history of how each game was built. They're still live and unchanged; once
 this site is confirmed working on the kids' iPads, each gets a one-line
-meta-refresh redirect here so the old bookmarks keep working.
+meta-refresh redirect here so the old bookmarks keep working. **Ask before
+doing that** — a kid with an old bookmark and progress saved under the old
+origin would lose it.
+
+## Commit messages
+
+Prose, not a bullet list of file changes: what changed, **why**, what was
+considered and rejected, and what was verified. If a test caught something
+during the work, say so — that's the part worth keeping.
+
+Backticks in a commit message written inline get shell-expanded and silently
+eat words. Use `git commit -F -` with a quoted heredoc.
+
+---
+
+# Deliberate limitations — don't "fix" these
+
+- **The iPad reward timer only runs in the foreground.** iOS freezes JS timers
+  and Web Audio in backgrounded tabs, and a page cannot bring itself forward —
+  there is no API for it, and no Vibration API on iOS. The reward screen tells
+  the kid to ask Siri instead. Notifications/PWA push do not solve it and would
+  break the single-file `file://` design.
+- **The Rematch is maths-only.** A question answered by tapping one of three
+  pictures can't be reconstructed from a log line, so those record no answer
+  and never come back. Language RPG is almost entirely tap-based; a language
+  Rematch needs its answer UI rebuilt from the record, which is a bigger job
+  than it looks.
+- **No speech-to-text, ever.** The game never listens to the child. Reading
+  aloud stays a parent-at-bedtime activity by design.
+- **Market Town and The Observatory borrow card pools** from the Reef and the
+  Peak. They have their own look but no monsters of their own yet.
+- **The streak grants nothing**, so it can take nothing away. Don't attach a
+  reward to it — the daily's double gold is the reason to come back.
+- **`profile.row` is not a content gate.** Both menus stay fully open to both
+  kids and free play is never restricted; it only decides what the site picks
+  *for* them.
+
+---
+
+# Where the project stands
+
+Round 4 shipped and is live (schema **v4**, `57a1acc`). It added seven tracks
+(Make 10, Coins, Clock, Sound It Out, Fractions, Word Problems, Big Numbers,
+Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
+daily challenge and streak, two new map regions, and `profile.row`.
+
+Current shape: **19 maths tracks, 15 language tracks, 8 quests + 2 mini games,
+32 map steps per trail through 7 regions, 5 worlds, 55 cards.** Suite: 397 save
+checks, 65 log checks, plus smoke / tracks / content / playthrough / upgrade.
+
+**Outstanding, in rough priority order:**
+
+1. **The three old repos are still live and unredirected** —
+   `carrickhines.github.io/{mathrpg,languagerpg,storyquest}` all return 200.
+   Waiting on confirmation that the new site works on the kids' iPads. See
+   "Hosting" above; ask before doing it.
+2. **Two language tracks still fall back to robot TTS.** `P_startsound` and
+   `P_opposite` (plus their word clips) are not in `voice.js` and need
+   recording in `record.html`, on the device the kids play on. mp4/AAC records
+   and plays everywhere; Chrome-recorded webm may not play on iPads.
+3. **New worlds for Market Town and The Observatory** — their own monsters and
+   cards, so the last two regions drop something new rather than Reef and Peak
+   duplicates.
+4. **Watch the maths menu.** Nineteen tracks is a lot for a six-year-old even
+   grouped; worth checking with the kids before adding more.
+
+**Tuning knobs**, all in `ECONOMY` in `shared/save.js`: `dailyGold`,
+`dailyReach`, `weaknessDamage`, `allyJoinChance` / `allyKnownBonus` /
+`allyStrikeChance` / `maxAllies`, `petGrowth` / `petStageTimeScale` /
+`petStageShield`, the card odds and the pity counter, and the whole gear ladder.
+`RETIRE` (3, how many corrects retire a Rematch question) lives in
+`shared/log.js`.

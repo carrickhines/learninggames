@@ -73,7 +73,7 @@ while measuring nothing.
 that has ever been deployed — and checks each still loads with its gold, gear,
 cards, map position and half-played stop intact. **Bumping `VERSION` means
 adding a fixture for the version you're leaving, and never editing an old one.**
-The kids' saves exist only on their iPads; see `AGENTS.md`.
+The kids' saves exist only on their iPads; see `CLAUDE.md`.
 
 ## Notes
 
