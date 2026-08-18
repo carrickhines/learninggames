@@ -347,7 +347,7 @@ try:
                 rate = mult
         return days
 
-    SLOTS = ("weapon", "armor", "pet", "trinket")
+    SLOTS = ("weapon", "armor", "pet", "trinket", "helm", "boots")
 
     # Tier 4 is the ceiling gold alone can reach — tier 5 also needs a card
     # set. So tier 4 is the honest measure of "how long does grinding take".
@@ -405,10 +405,16 @@ try:
     check("cards: every world's set is worth something",
           all(w["id"] in perks and perks[w["id"]].get("label") for w in worlds))
 
+    # Every wearable slot's dearest item is gated on a finished card set, so
+    # "the best gear" stays a collection problem rather than only a big
+    # number. Checked per slot rather than against a fixed list of four, so
+    # adding a slot can't quietly leave its top tier buyable with gold alone.
     gated = [i for i in shop if i.get("set")]
-    check("economy: the top tier of each slot is set-gated",
-          sorted(i["kind"] for i in gated) == ["armor", "pet", "trinket", "weapon"],
-          str(sorted(i["kind"] for i in gated)))
+    ungated_top = [k for k in SLOTS
+                   if max((i for i in shop if i["kind"] == k),
+                          key=lambda i: i["cost"]).get("set") is None]
+    check("economy: the top tier of every slot is set-gated",
+          not ungated_top, "gold alone buys the best " + str(ungated_top))
     check("economy: every gated item points at a real world",
           all(any(w["id"] == i["set"] for w in worlds) for i in gated))
 

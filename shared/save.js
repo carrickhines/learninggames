@@ -305,6 +305,46 @@ var Save = (function () {
       set: 'cave', sub: '+50% gold, wide DOUBLE window',
       goldBonus: 0.50, fastBonus: 2000, cardBonus: 0.5 },
 
+    /* ---- Helms: the DOUBLE window, and a little padding ----
+       The helm's identity is *focus*: it widens the gold fast zone, so it
+       pays a child who is quick rather than one who is lucky. Hearts are the
+       armor's job and only appear here in ones, late, so a full set of both
+       tops out at twelve pips rather than running away with the row. */
+    { id: 'cap', kind: 'helm', name: 'Cloth Cap', emoji: '🧢', cost: 0,
+      sub: 'Keeps the sun off' },
+    { id: 'hood', kind: 'helm', name: "Scholar's Hood", emoji: '🎓', cost: 300,
+      sub: 'A slightly wider DOUBLE window', fastBonus: 500 },
+    { id: 'ironhelm', kind: 'helm', name: 'Iron Helm', emoji: '⛑️', cost: 1000,
+      sub: 'A wider DOUBLE window', fastBonus: 900 },
+    { id: 'warhelm', kind: 'helm', name: 'War Helm', emoji: '🪖', cost: 2800,
+      sub: 'Wider DOUBLE, +1 heart', fastBonus: 1200, bonusHp: 1 },
+    { id: 'owlvisor', kind: 'helm', name: 'Owl Visor', emoji: '🥽', cost: 6500,
+      sub: 'Much wider DOUBLE, +1 heart', fastBonus: 1600, bonusHp: 1 },
+    { id: 'onimask', kind: 'helm', name: 'Oni Mask', emoji: '👺', cost: 15000,
+      sub: 'Much wider DOUBLE, +2 hearts', fastBonus: 2000, bonusHp: 2 },
+    { id: 'circlet', kind: 'helm', name: 'Star Circlet', emoji: '💫', cost: 34000,
+      set: 'meadow', sub: 'The widest DOUBLE, +2 hearts', fastBonus: 2600, bonusHp: 2 },
+
+    /* ---- Boots: thinking time, and a little more gold ----
+       Boots are the "you get around" slot: a few more seconds on the clock
+       and a small cut of the takings. Deliberately the gentlest ladder of the
+       six — it is the slot a child fills when they have already bought the
+       thing they actually wanted. */
+    { id: 'sandals', kind: 'boots', name: 'Straw Sandals', emoji: '🩴', cost: 0,
+      sub: 'Better than bare feet' },
+    { id: 'shoes', kind: 'boots', name: 'Sturdy Shoes', emoji: '👟', cost: 300,
+      sub: '+1 second to think', bonusTime: 1000 },
+    { id: 'hideboots', kind: 'boots', name: 'Hide Boots', emoji: '🥾', cost: 1000,
+      sub: '+1.5 seconds, +5% gold', bonusTime: 1500, goldBonus: 0.05 },
+    { id: 'greaves', kind: 'boots', name: 'Iron Greaves', emoji: '🦿', cost: 2800,
+      sub: '+2 seconds, +8% gold', bonusTime: 2000, goldBonus: 0.08 },
+    { id: 'striders', kind: 'boots', name: 'Swift Striders', emoji: '🛼', cost: 6500,
+      sub: '+2.5 seconds, +12% gold', bonusTime: 2500, goldBonus: 0.12 },
+    { id: 'stormstep', kind: 'boots', name: 'Stormstep', emoji: '⛸️', cost: 15000,
+      sub: '+3 seconds, +18% gold', bonusTime: 3000, goldBonus: 0.18 },
+    { id: 'sevenleague', kind: 'boots', name: 'Seven-League Boots', emoji: '👢', cost: 34000,
+      set: 'cave', sub: '+3.5 seconds, +25% gold', bonusTime: 3500, goldBonus: 0.25 },
+
     // ---- Worlds: new monsters, new cards, and better pay ----
     { id: 'world-cave', kind: 'world', world: 'cave', name: 'Crystal Cave',
       emoji: '💎', cost: 1200, sub: 'New monsters · 1.4× gold' },
@@ -841,6 +881,8 @@ var Save = (function () {
         // away keeps what it grew, so swapping isn't punished
         petXp: {},
         trinket: null,
+        helm: null,
+        boots: null,
         tokens: 0
       },
       cards: {},                     // card id -> copies held (foils included)
@@ -1373,7 +1415,7 @@ var Save = (function () {
     return 'ok';
   }
 
-  var SLOTS = ['weapon', 'armor', 'pet', 'trinket'];
+  var SLOTS = ['weapon', 'armor', 'pet', 'trinket', 'helm', 'boots'];
 
   function equip(id) {
     var it = item(id);
@@ -1610,6 +1652,23 @@ var Save = (function () {
       base.cardBonus = tr.cardBonus || 0;
       base.fastBonus = tr.fastBonus || 0;
       base.bonusTime += tr.bonusTime || 0;
+    }
+    /* The two later slots add to what the four originals set rather than
+       replacing it, so a helm and a trinket that both widen the DOUBLE window
+       stack. A save written before these slots existed simply has nothing in
+       them — `item(undefined)` is null and the whole block is skipped, which
+       is why adding them needs no migration. */
+    var hm = item(p.inventory.helm);
+    var bt = item(p.inventory.boots);
+    if (hm) {
+      base.fastBonus += hm.fastBonus || 0;
+      base.maxHp += hm.bonusHp || 0;
+      base.bonusTime += hm.bonusTime || 0;
+    }
+    if (bt) {
+      base.bonusTime += bt.bonusTime || 0;
+      base.goldBonus += bt.goldBonus || 0;
+      base.fastBonus += bt.fastBonus || 0;
     }
     // completing a world's card set is permanent, and stacks
     setPerks(p, base);

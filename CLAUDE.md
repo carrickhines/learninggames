@@ -276,7 +276,7 @@ wall on top of the collection.
 
 ## The shop
 
-Five tiers per slot, each roughly 3× the last, so something is always
+Five to seven tiers per slot, each roughly 3× the last, so something is always
 affordable soon and something is always a long way off. Bought on the hub,
 applied at the start of the next run via `Save.loadout()`:
 
@@ -287,13 +287,26 @@ applied at the start of the next run via `Save.loadout()`:
   blocked hits per run).
 - **Trinkets** — the fourth slot, with effects that never touch damage: gold
   bonus, card luck, a wider DOUBLE window.
+- **Helms** — the DOUBLE window is the helm's identity, so it pays a child who
+  is quick rather than one who is lucky. A heart or two at the top, in ones, so
+  helm and armor together top out at twelve pips rather than running away.
+- **Boots** — the gentlest ladder of the six: thinking time and a small cut of
+  the gold. It's the slot you fill once you've bought the thing you wanted.
 - **Worlds** — five in total, each a new foe lineup, a new card set, and a
   better gold multiplier.
 - **🎟️ iPad Time Token** — see below.
 
+**The two later slots add, they don't replace.** `loadout()` reads helm and
+boots *after* the original four and `+=` their contributions, so a helm and a
+trinket that both widen the DOUBLE window stack. `save-test.html` asserts this
+against the item table rather than a typed number — making the helm assign
+instead of add fails with `got 900`, the helm's value alone.
+
 **The top tier of every slot needs a completed card set** (`set: '<world>'` in
 `SHOP`), so the best gear is a collection problem rather than just a big
-number. `buy()` returns `'noset'` for those until the set is held.
+number. `buy()` returns `'noset'` for those until the set is held. `content.py`
+checks this **per slot**, not against a fixed list of four — adding a slot whose
+dearest item is gold-only fails with `gold alone buys the best ['helm']`.
 
 **Keep the buffs mild.** Owning something that grows is the point; making the
 math easy is not.

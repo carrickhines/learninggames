@@ -135,6 +135,55 @@ try {
   Save.buy('flame');
   ok('the flame blade upgrades double hits', Save.loadout().superDamage === 3);
 
+  /* ---------- the two later slots ----------
+     Helms and boots were added after four slots had been shipping for
+     months, so the thing worth proving is that they ADD to what the
+     originals set rather than replacing it — a helm and a trinket that both
+     widen the DOUBLE window have to stack, or the dearer one silently does
+     nothing. */
+  var beforeHelm = Save.loadout();
+  Save.buy('ironhelm');
+  ok('a helm is equipped when bought', Save.me().inventory.helm === 'ironhelm');
+  ok('a helm widens the DOUBLE window',
+     Save.loadout().fastBonus === beforeHelm.fastBonus + Save.item('ironhelm').fastBonus,
+     beforeHelm.fastBonus + ' -> ' + Save.loadout().fastBonus);
+
+  var beforeBoots = Save.loadout();
+  Save.buy('hideboots');
+  ok('boots are equipped when bought', Save.me().inventory.boots === 'hideboots');
+  ok('boots add thinking time on top of the pet',
+     Save.loadout().bonusTime === beforeBoots.bonusTime + Save.item('hideboots').bonusTime,
+     beforeBoots.bonusTime + ' -> ' + Save.loadout().bonusTime);
+  ok('boots add gold on top of the trinket',
+     Math.abs(Save.loadout().goldBonus -
+              (beforeBoots.goldBonus + Save.item('hideboots').goldBonus)) < 1e-9);
+
+  // a trinket that also widens the window must stack with the helm, not
+  // overwrite it — this is the bug the slot ordering in loadout() invites
+  Save.update(function (p) { p.gold = 99999; });
+  Save.buy('hourglass');
+  ok('helm and trinket both widen the window',
+     Save.loadout().fastBonus ===
+       Save.item('ironhelm').fastBonus + Save.item('hourglass').fastBonus,
+     'got ' + Save.loadout().fastBonus);
+
+  /* Adding these slots deliberately did NOT bump the schema: a save written
+     before they existed has no `helm` or `boots` key at all, and must load
+     and play exactly as it did. If this ever fails, the slots need a
+     migration after all. */
+  Save.update(function (p) {
+    delete p.inventory.helm;
+    delete p.inventory.boots;
+  });
+  var oldShape = Save.loadout();
+  ok('a save from before these slots still loads', !!oldShape);
+  ok('...and simply wears nothing in them',
+     oldShape.fastBonus === Save.item('hourglass').fastBonus,
+     'got ' + oldShape.fastBonus);
+  Save.buy('shoes');
+  ok('...and can still be given boots afterwards',
+     Save.me().inventory.boots === 'shoes');
+
   Save.equip('sword');
   ok('equipping an owned weapon works', Save.me().inventory.weapon === 'sword');
   ok('equipping an unowned item is refused', Save.equip('axe') === false);
