@@ -627,6 +627,58 @@ try:
     check("map: free play arms no stop",
           d.execute_script("return Save.activeNode();") is None)
 
+    print("\nWhich kid is this?")
+    # Both boys start with both trails at zero, so the trail can't be guessed
+    # from progress — it has to come from the hero. Check it end to end for
+    # each of them, on a hub that has just been opened.
+    for want, other in (("big", "little"), ("little", "big")):
+        load("index.html")
+        d.execute_script("Save.reset();"
+                         "Save.createProfile(arguments[0], '🦖', arguments[0]);",
+                         want)
+        d.refresh(); time.sleep(0.9)
+        check("row: a %s hero is on the %s trail" % (want, want),
+              d.execute_script("return Save.heroTrail();") == want)
+        on_own = d.execute_script(
+            "var t = arguments[0];"
+            "var x = Save.daily();"
+            "return Save.mapTrail(t).some(function (st) {"
+            "  return st.options.some(function (o) {"
+            "    return o.g === x.node.g && o.t === x.node.t && o.m === x.node.m;"
+            "  });"
+            "});", want)
+        on_other = d.execute_script(
+            "var t = arguments[0];"
+            "var x = Save.daily();"
+            "return Save.mapTrail(t).some(function (st) {"
+            "  return st.options.some(function (o) {"
+            "    return o.g === x.node.g && o.t === x.node.t && o.m === x.node.m;"
+            "  });"
+            "});", other)
+        label = d.execute_script(
+            "return document.getElementById('dailyWhat').textContent;")
+        check("row: the %s hero's challenge is %s-hero work" % (want, want),
+              on_own, label)
+        check("row: ...and not the other kid's" ,
+              not on_other or on_own, label)
+
+    # and it can be put right from Settings if an old save guessed wrong
+    click("#settingsBtn")
+    time.sleep(0.5)
+    click('[data-settings-row="big"]')
+    time.sleep(0.4)
+    check("row: Settings can change which kid a hero is",
+          d.execute_script("return Save.rowOf();") == "big")
+    check("row: changing it moves the challenge with it",
+          d.execute_script(
+              "var x = Save.daily();"
+              "return Save.mapTrail('big').some(function (st) {"
+              "  return st.options.some(function (o) {"
+              "    return o.g === x.node.g && o.t === x.node.t && o.m === x.node.m;"
+              "  });"
+              "});"))
+    check("row: no JS errors", not errs(), str(errs()))
+
     print("\nToday's challenge and the streak")
     load("index.html")
     fresh_hero("Daily Kid")

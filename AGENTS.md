@@ -71,6 +71,10 @@ content silently repoints a saved reference at something else:
   This is why every boss fork's first option is its original stop.
 - Adding a new track, foe, card, region or shop item is always safe. It's the
   *existing* ones that are frozen.
+- **Anything that has to pick content for a child reads `profile.row`**, never
+  their progress. Both trails start at 0, so "which trail are they further
+  along" answers `little` for every new hero — which is how the nine-year-old
+  came to be set counting practice as his challenge of the day.
 
 ### Before every deploy
 

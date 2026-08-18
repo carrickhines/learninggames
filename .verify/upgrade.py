@@ -173,6 +173,25 @@ def main():
         check("the save is stamped with the new schema",
               d.execute_script("return JSON.parse(localStorage.getItem(Save._key)).v;")
               == d.execute_script("return Save._version;"))
+        # v4 gave heroes a row. This save was written before that existed, so
+        # it has to come out with one read off the road behind them — and the
+        # challenge of the day has to follow it.
+        row = d.execute_script("return Save.rowOf();")
+        walked = kid["progress"]["map"]
+        check("the hero comes out knowing which kid they are",
+              row in ("little", "big"), str(row))
+        check("...and it matches the trail they had been walking",
+              row == ("big" if walked["big"] > walked["little"] else "little"),
+              "%s with map %s" % (row, walked))
+        check("the challenge of the day is set on their own trail",
+              d.execute_script(
+                  "var x = Save.daily();"
+                  "return Save.mapTrail(Save.heroTrail()).some(function (st) {"
+                  "  return st.options.some(function (o) {"
+                  "    return o.g === x.node.g && o.t === x.node.t && o.m === x.node.m;"
+                  "  });"
+                  "});"))
+
         check("anything new is present and empty rather than broken",
               d.execute_script("return Save.petStage() !== null"
                                " && Save.streak() === 0"

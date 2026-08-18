@@ -622,6 +622,89 @@ try {
   ok('the last track is remembered', Save.me().settings.lastTrack.math === 'mul');
   ok('the mode is remembered per game', Save.me().settings.modeByGame.math === 'expert');
 
+  /* ---------- which kid is this? ---------- */
+  fresh();
+  ok('a hero says which of the two kids they are',
+     Save.rowOf() === 'little' || Save.rowOf() === 'big');
+  Save.reset();
+  Save.createProfile('Big Brother', '🦸', 'big');
+  ok('a hero created as the big kid stays the big kid', Save.rowOf() === 'big');
+  ok('...and their map trail follows them, not their progress',
+     Save.heroTrail() === 'big');
+  Save.reset();
+  Save.createProfile('Little Brother', '🐣', 'little');
+  ok('a hero created as the little kid stays the little kid', Save.rowOf() === 'little');
+  ok('...and gets the little trail', Save.heroTrail() === 'little');
+  Save.reset();
+  Save.createProfile('No Answer', '🦖');
+  ok('a hero created without an answer is the little one',
+     Save.rowOf() === 'little');
+  ok('nonsense is refused', Save.setRow('middling') === false);
+  ok('...and leaves them as they were', Save.rowOf() === 'little');
+  ok('switching works', Save.setRow('big') === true && Save.rowOf() === 'big');
+
+  // switching must cost nothing — the two trails have always been separate
+  Save.award(500, 200);
+  Save.update(function (p) { p.progress.map.little = 4; p.progress.map.big = 2; });
+  var goldWas = Save.me().gold, mapWas = JSON.stringify(Save.me().progress.map);
+  Save.setRow('little'); Save.setRow('big');
+  ok('changing which kid they are takes no gold', Save.me().gold === goldWas);
+  ok('...and moves neither trail',
+     JSON.stringify(Save.me().progress.map) === mapWas);
+
+  /* THE BUG THIS FIXES. Both boys start with both trails at zero. Before a
+     hero could say which they were, the trail was guessed by comparing the
+     two — 0 is not greater than 0, so every new hero was "little" and the
+     nine-year-old was handed counting to 30 as his challenge of the day. */
+  Save.reset();
+  var bigId = Save.createProfile('Older', '🦸', 'big');
+  var littleId = Save.createProfile('Younger', '🐣', 'little');
+
+  function trailHas(trail, node) {
+    return Save.mapTrail(trail).some(function (st) {
+      return st.options.some(function (o) {
+        return o.g === node.g && o.t === node.t && o.m === node.m;
+      });
+    });
+  }
+
+  Save.setActive(bigId);
+  ok('the big kid is on the big trail with nothing walked yet',
+     Save.mapAt('big') === 0 && Save.mapAt('little') === 0 &&
+     Save.heroTrail() === 'big');
+  var bigDaily = Save.daily();
+  ok("the big kid's challenge comes off the big trail",
+     trailHas('big', bigDaily.node), JSON.stringify(bigDaily.node.label));
+  ok("...and is not something off the little trail",
+     !trailHas('little', bigDaily.node), JSON.stringify(bigDaily.node.label));
+
+  Save.setActive(littleId);
+  var littleDaily = Save.daily();
+  ok("the little kid's challenge comes off the little trail",
+     trailHas('little', littleDaily.node), JSON.stringify(littleDaily.node.label));
+  ok('the two brothers are set different work on the same day',
+     bigDaily.node.label !== littleDaily.node.label,
+     bigDaily.node.label + ' vs ' + littleDaily.node.label);
+
+  /* Saves written before v4 have no answer, so it is read off the road behind
+     them rather than stopping a child on the way to a game. */
+  ok('an older save that walked the big trail reads as the big kid',
+     Save._guessRow({ progress: { map: { little: 1, big: 9 } } }) === 'big');
+  ok('an older save that walked the little trail reads as the little kid',
+     Save._guessRow({ progress: { map: { little: 7, big: 0 } } }) === 'little');
+  ok('a tie falls back to the last track they chose',
+     Save._guessRow({ progress: { map: { little: 0, big: 0 } },
+                      settings: { lastTrack: { math: 'alg' } } }) === 'big');
+  ok('...in both directions',
+     Save._guessRow({ progress: { map: { little: 0, big: 0 } },
+                      settings: { lastTrack: { math: 'next' } } }) === 'little');
+  // Wrong in the safe direction: easy work handed to a big kid is a shrug,
+  // hard work handed to a five-year-old is a wall.
+  ok('with nothing at all to go on it guesses little',
+     Save._guessRow({ progress: { map: {} }, settings: {} }) === 'little');
+  ok('and it never throws on a broken profile',
+     Save._guessRow({}) === 'little' && Save._guessRow(null) === 'little');
+
   /* ---------- today's challenge ---------- */
   fresh();
   var d1 = Save.daily();
@@ -912,6 +995,40 @@ try {
   ok('the written blob holds the gold',
      reparsed.profiles[reparsed.active].gold === 77);
 
+  /* The map is an array and saves store an index into it. Removing or
+     reordering a step teleports every hero who was standing past it. So the
+     first road of every step that has ever shipped is frozen here: new ground
+     is appended, never inserted. Extend this list when steps are appended;
+     never change a line already in it. */
+  var TRAIL_PREFIX = {
+    little: [
+      'math:next:easy', 'story:mini-order:-', 'math:oneless:easy',
+      'math:count:easy', 'language:sounds:easy', 'math:add:easy',
+      'language:sight:easy', 'math:pattern:easy', 'math:sub:easy',
+      'language:rhyme:easy', 'math:skip:easy', 'language:opposites:easy',
+      'math:sort:easy', 'language:read:easy', 'math:add:normal',
+      'language:past:easy', 'math:count:normal', 'math:sub:normal',
+      'math:skip:normal', 'language:sounds:normal', 'math:next:normal',
+      'math:add:normal'
+    ],
+    big: [
+      'math:mul:normal', 'story:q0:-', 'math:div:normal',
+      'math:rule:normal', 'language:forge:normal', 'math:mul:expert',
+      'story:q1:-', 'language:grammar:normal', 'language:syllable:normal',
+      'story:q2:-', 'math:div:expert', 'language:twins:normal',
+      'story:q3:-', 'math:rule:normal', 'math:alg:expert',
+      'story:q4:-', 'language:fixit:expert', 'language:forge:expert',
+      'math:rule:expert', 'story:q6:-', 'language:syllable:expert',
+      'math:alg:expert'
+    ]
+  };
+
+  function stepSig(o) {
+    return [o.g,
+            o.t != null ? o.t : (o.quest != null ? 'q' + o.quest : 'mini-' + o.mini),
+            o.m || '-'].join(':');
+  }
+
   /* ---------- an older save must never lose a thing ----------
 
      The kids play the deployed site. Every push replaces the code under a
@@ -938,6 +1055,27 @@ try {
                     activeNode: { trail: 'big', i: 5, o: 0 } },
         settings: { modeByGame: { math: 'expert' }, lastTrack: { math: 'mul' } },
         stats: { correct: 900, wrong: 120, streak: 4, bestStreak: 31 }
+      } }
+    },
+    3: {
+      v: 3, active: 'kid',
+      profiles: { kid: {
+        name: 'Alex', avatar: '🦸', xp: 3100, gold: 21000, level: 8,
+        inventory: { owned: ['blade', 'mail', 'drake', 'hourglass'], weapon: 'blade',
+                     armor: 'mail', pet: 'drake', trinket: 'hourglass', tokens: 1,
+                     petXp: { drake: 74 } },
+        cards: { 'm-crab': 2, 'l-troll': 1 }, foils: { 'l-troll': 1 },
+        progress: { world: 'sky', unlockedWorlds: ['meadow', 'cave', 'sky'],
+                    runsWon: { math: 40, language: 18 }, questsDone: [0, 1, 2, 3],
+                    seqTier: 4, koSinceCard: 3, skipMastered: true,
+                    map: { little: 2, big: 14 },
+                    mapPicks: { little: { 0: 0 }, big: { 2: 1, 7: 0, 12: 1 } },
+                    mapWalk: null,
+                    activeNode: { trail: 'big', i: 14, o: 0 },
+                    dailyDone: '2026-08-15',
+                    streak: { days: 5, last: '2026-08-16' } },
+        settings: { modeByGame: { math: 'expert' }, lastTrack: { math: 'alg' } },
+        stats: { correct: 3400, wrong: 410, streak: 9, bestStreak: 52 }
       } }
     }
   };
@@ -982,13 +1120,23 @@ try {
        p.settings.modeByGame.math === was.settings.modeByGame.math);
 
     // A stop half-played when the deploy landed must still resume, and must
-    // resume into the same game — this is what broke when bosses became forks,
-    // if option 0 hadn't been kept as the original road.
+    // resume into the road that was there — this is what broke when bosses
+    // became forks, if option 0 hadn't been kept as the original.
     var live = Save.activeNode();
+    var wanted = TRAIL_PREFIX[was.progress.activeNode.trail][was.progress.activeNode.i];
     ok(tag + 'a stop left half-played still resumes', !!live);
-    ok(tag + 'it resumes into the same game it was',
-       live && live.g === 'math' && live.t === 'mul' && live.m === 'expert',
-       live && [live.g, live.t, live.m].join('/'));
+    ok(tag + 'it resumes into the road that was there',
+       live && stepSig(live) === wanted,
+       live && stepSig(live) + ' vs ' + wanted);
+
+    // v4 gave heroes a row. An older save has to come out of the migration
+    // with one, read off the road behind them.
+    ok(tag + 'the hero comes out knowing which kid they are',
+       Save.rowOf() === 'little' || Save.rowOf() === 'big');
+    ok(tag + 'and it matches the trail they had been walking',
+       Save.rowOf() === (was.progress.map.big > was.progress.map.little
+                         ? 'big' : 'little'),
+       Save.rowOf() + ' with map ' + JSON.stringify(was.progress.map));
 
     ok(tag + 'it is stamped with the current schema afterwards',
        JSON.parse(localStorage.getItem(Save._key)).v === Save._version);
@@ -998,40 +1146,6 @@ try {
     ok(tag + 'loading it again changes nothing',
        localStorage.getItem(Save._key) === afterOnce);
   });
-
-  /* The map is an array and saves store an index into it. Removing or
-     reordering a step teleports every hero who was standing past it. So the
-     first road of every step that has ever shipped is frozen here: new ground
-     is appended, never inserted. Extend this list when steps are appended;
-     never change a line already in it. */
-  var TRAIL_PREFIX = {
-    little: [
-      'math:next:easy', 'story:mini-order:-', 'math:oneless:easy',
-      'math:count:easy', 'language:sounds:easy', 'math:add:easy',
-      'language:sight:easy', 'math:pattern:easy', 'math:sub:easy',
-      'language:rhyme:easy', 'math:skip:easy', 'language:opposites:easy',
-      'math:sort:easy', 'language:read:easy', 'math:add:normal',
-      'language:past:easy', 'math:count:normal', 'math:sub:normal',
-      'math:skip:normal', 'language:sounds:normal', 'math:next:normal',
-      'math:add:normal'
-    ],
-    big: [
-      'math:mul:normal', 'story:q0:-', 'math:div:normal',
-      'math:rule:normal', 'language:forge:normal', 'math:mul:expert',
-      'story:q1:-', 'language:grammar:normal', 'language:syllable:normal',
-      'story:q2:-', 'math:div:expert', 'language:twins:normal',
-      'story:q3:-', 'math:rule:normal', 'math:alg:expert',
-      'story:q4:-', 'language:fixit:expert', 'language:forge:expert',
-      'math:rule:expert', 'story:q6:-', 'language:syllable:expert',
-      'math:alg:expert'
-    ]
-  };
-
-  function stepSig(o) {
-    return [o.g,
-            o.t != null ? o.t : (o.quest != null ? 'q' + o.quest : 'mini-' + o.mini),
-            o.m || '-'].join(':');
-  }
 
   Object.keys(TRAIL_PREFIX).forEach(function (tr) {
     var want = TRAIL_PREFIX[tr];

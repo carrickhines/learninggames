@@ -228,12 +228,42 @@ tweak can't quietly make it a week again.
 Card ids must be unique across the entire site — `.verify/content.py` checks
 this, because a collision would silently merge two monsters into one card.
 
+## Which kid is this? (`profile.row`)
+
+The two boys play genuinely different content, and this is the one thing the
+site cannot work out for itself. A hero carries `row: 'little' | 'big'`, asked
+on the New Hero screen and changeable in **Settings → This hero**.
+
+It decides **which map trail they land on** and **which trail their challenge
+of the day is drawn from** (`Save.heroTrail()`).
+
+**Why it can't be inferred.** It used to be: `mapAt('big') > mapAt('little')`.
+Both trails start at 0, and 0 is not greater than 0 — so *every new hero* read
+as "little", and the nine-year-old was handed counting to 30 as his challenge
+of the day. A save-test reproduces this exactly if `heroTrail()` is reverted.
+
+**Saves written before v4** are read off the road behind them by `guessRow()`:
+whichever trail they are further along, else whichever menu their last chosen
+track belongs to (the two menus share no track ids), else `little` — easy work
+handed to a big kid is a shrug, hard work handed to a five-year-old is a wall.
+Nobody is stopped on the way to a game to answer a question, and the answer is
+shown on the hero picker and in Settings so a wrong guess is one tap to fix.
+
+**Switching costs nothing.** The two trails have always kept separate progress,
+so a hero can move between them and lose neither.
+
+Note this is *not* a content gate: both menus stay fully open to both kids, and
+free play is never restricted. A five-year-old who wants to poke at fractions
+still can.
+
 ## Today's challenge, and a streak that can't hurt
 
 One challenge a day, the same one all day, worth **double gold**
-(`ECONOMY.dailyGold`). It's drawn from the hero's own trail — deterministically,
-from the date and the hero's id — so it can only ever be work they've already
-met, and there's no second registry of tracks to keep in step with the games.
+(`ECONOMY.dailyGold`). It's drawn from **that hero's own trail** (see
+`profile.row` above) — deterministically, from the date and the hero's id — so
+it can only ever be work they've already met, and there's no second registry of
+tracks to keep in step with the games. The two brothers are set different work
+on the same day.
 
 - **It's free play of a stop's content, not the stop.** The map stays the map;
   the challenge just picks the track and difficulty and doubles the payout.

@@ -622,12 +622,15 @@
   <section class="screen scrolls" id="newHero">
     <div class="screen-inner">
       <h1>New Hero</h1>
-      <div class="subtitle">Pick a name and a face.</div>
+      <div class="subtitle">Pick a name, a face, and which hero you are.</div>
 
       <input id="nameInput" type="text" maxlength="12" placeholder="Your name"
              autocomplete="off" autocorrect="off" spellcheck="false">
 
       <div class="avatar-grid" id="avatarGrid"></div>
+
+      <div class="group-label">Which hero are you?</div>
+      <div class="btn-row" id="rowPick" style="margin-bottom:18px"></div>
 
       <div class="btn-row">
         <button id="createBtn">Start adventuring!</button>
@@ -864,7 +867,12 @@
       </div>
 
       <div class="group-label">This hero</div>
-      <div class="btn-row">
+      <!-- Which kid this is decides their map trail and their challenge of the
+           day, so it is shown plainly: a wrong guess on an older save is one
+           tap to put right rather than a mystery. -->
+      <div class="btn-row" id="settingsRow"></div>
+      <div class="hint" id="rowHint"></div>
+      <div class="btn-row" style="margin-top:10px">
         <button id="renameBtn" class="ghost-btn">✏️ Rename</button>
         <button id="deleteBtn" class="ghost-btn danger-btn">🗑️ Delete hero</button>
       </div>
@@ -916,8 +924,9 @@ function renderHeroList() {
   heroes.forEach(h => {
     const b = document.createElement('button');
     b.className = 'choice hero-pick';
+    const row = Save.ROWS.filter(r => r.id === h.row)[0] || Save.ROWS[0];
     b.innerHTML = `<span class="emoji">${h.avatar}</span>${escapeHtml(h.name)}` +
-      `<span class="sub">Level ${h.level} · 🪙 ${h.gold}</span>`;
+      `<span class="sub">${row.emoji} ${row.label} · Level ${h.level} · 🪙 ${h.gold}</span>`;
     b.addEventListener('click', () => {
       Sound.unlock(); Sound.click();
       Save.setActive(h.id);
@@ -934,9 +943,60 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+/* Which kid the active hero is, in Settings. Switching costs nothing: the two
+   trails have always kept separate progress, so nothing is lost either way. */
+function renderSettingsRow() {
+  const box = $('settingsRow');
+  if (!box) return;
+  const me = Save.me();
+  box.innerHTML = '';
+  if (!me) return;
+  const current = Save.rowOf(me);
+  Save.ROWS.forEach(r => {
+    const b = document.createElement('button');
+    b.className = 'choice' + (r.id === current ? ' sel' : '');
+    b.dataset.settingsRow = r.id;
+    b.innerHTML = `<span class="emoji">${r.emoji}</span>${r.label}` +
+      `<span class="sub">${escapeHtml(r.sub)}</span>`;
+    b.addEventListener('click', () => {
+      Sound.click();
+      if (Save.rowOf(me) === r.id) return;
+      Save.setRow(r.id);
+      renderSettingsRow();
+      flash(`${escapeHtml(Save.me().name)} is a ${r.label.toLowerCase()} now.`);
+    });
+    box.appendChild(b);
+  });
+  $('rowHint').textContent =
+    'This picks their map trail and their challenge of the day. Nothing is lost by changing it.';
+}
+
 /* ---------- New hero ---------- */
 let pickedAvatar = Save.AVATARS[0];
+let pickedRow = 'little';
 let renaming = false;      // the same screen doubles as the rename screen
+
+/* Which of the two kids this hero is. It decides the map trail they land on
+   and the challenge of the day they're given, so it is asked rather than
+   guessed — a new hero has walked neither trail, and guessing from that hands
+   the nine-year-old counting practice. */
+function renderRowPick() {
+  const box = $('rowPick');
+  box.innerHTML = '';
+  Save.ROWS.forEach(r => {
+    const b = document.createElement('button');
+    b.className = 'choice' + (r.id === pickedRow ? ' sel' : '');
+    b.dataset.row = r.id;
+    b.innerHTML = `<span class="emoji">${r.emoji}</span>${r.label}` +
+      `<span class="sub">${escapeHtml(r.sub)}</span>`;
+    b.addEventListener('click', () => {
+      Sound.unlock(); Sound.tap();
+      pickedRow = r.id;
+      renderRowPick();
+    });
+    box.appendChild(b);
+  });
+}
 
 function renderAvatars() {
   const g = $('avatarGrid');
@@ -958,10 +1018,12 @@ function openNewHero(forRename) {
   renaming = !!forRename;
   const me = Save.me();
   pickedAvatar = renaming && me ? me.avatar : Save.AVATARS[0];
+  pickedRow = (renaming && me && Save.rowOf(me)) || 'little';
   $('nameInput').value = renaming && me ? me.name : '';
   $('newHero').querySelector('h1').textContent = renaming ? 'Rename Hero' : 'New Hero';
   $('createBtn').textContent = renaming ? 'Save' : 'Start adventuring!';
   renderAvatars();
+  renderRowPick();
   showScreen('newHero');
   $('nameInput').focus();
 }
@@ -975,9 +1037,9 @@ $('createBtn').addEventListener('click', () => {
   const name = ($('nameInput').value || '').trim() || 'Hero';
   Sound.unlock(); Sound.click();
   if (renaming) {
-    Save.renameProfile(Save.load().active, name, pickedAvatar);
+    Save.renameProfile(Save.load().active, name, pickedAvatar, pickedRow);
   } else {
-    Save.createProfile(name, pickedAvatar);
+    Save.createProfile(name, pickedAvatar, pickedRow);
   }
   goHome();
 });
@@ -988,7 +1050,7 @@ $('nameInput').addEventListener('keydown', (e) => {
 
 $('cancelNewBtn').addEventListener('click', () => {
   Sound.click();
-  if (renaming) showScreen('settings');
+  if (renaming) { renderSettingsRow(); showScreen('settings'); }
   else if (Save.me()) goHome();
   else { renderHeroList(); showScreen('who'); }
 });
@@ -1898,7 +1960,9 @@ $('clearLogBtn').addEventListener('click', () => {
   $('parentFlash').textContent = 'Record cleared.';
 });
 
-$('settingsBtn').addEventListener('click', () => { Sound.click(); flash(''); showScreen('settings'); });
+$('settingsBtn').addEventListener('click', () => {
+  Sound.click(); flash(''); renderSettingsRow(); showScreen('settings');
+});
 $('settingsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 
 /* ---------- Settings ---------- */

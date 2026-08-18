@@ -804,10 +804,25 @@ var Save = (function () {
 
   /* ---------- Storage ---------------------------------------------------- */
 
-  function blankProfile(name, avatar) {
+  /* Which of the two kids a hero belongs to. This is the one thing the site
+     cannot work out for itself: the two boys play genuinely different content,
+     and guessing from how far along each trail they happen to be gets a brand
+     new hero wrong every time — both trails sit at 0, so the guess says
+     "little", and the nine-year-old is handed counting to 30 as his challenge
+     of the day. So a hero says which they are, and everything that has to pick
+     for them reads it. */
+  var ROWS = [
+    { id: 'little', label: 'Little hero', emoji: '🐣',
+      sub: 'Counting, adding, letters and sounds' },
+    { id: 'big', label: 'Big hero', emoji: '🦸',
+      sub: 'Times tables, fractions, spelling and grammar' }
+  ];
+
+  function blankProfile(name, avatar, row) {
     return {
       name: name || 'Hero',
       avatar: avatar || '🦸',
+      row: row === 'big' ? 'big' : 'little',
       created: Date.now(),
       xp: 0,
       gold: 0,
@@ -843,7 +858,7 @@ var Save = (function () {
     };
   }
 
-  var VERSION = 3;
+  var VERSION = 4;
   var V2_GOLD_SCALE = 20;   // see migrate(): the v2 price rebalance factor
 
   function blankSave() {
@@ -905,6 +920,17 @@ var Save = (function () {
       });
     }
 
+    if (v < 4) {
+      // v4 gave a hero a row of their own. Existing heroes are read off the
+      // road behind them rather than being asked, so nobody is stopped on the
+      // way to a game — and Settings shows it, so a wrong guess is one tap to
+      // fix rather than a mystery.
+      Object.keys(d.profiles).forEach(function (id) {
+        var p = d.profiles[id];
+        if (p.row !== 'little' && p.row !== 'big') p.row = guessRow(p);
+      });
+    }
+
     d.v = VERSION;
     return d;
   }
@@ -958,14 +984,15 @@ var Save = (function () {
     load();
     return Object.keys(data.profiles).map(function (id) {
       var p = data.profiles[id];
-      return { id: id, name: p.name, avatar: p.avatar, level: levelOf(p).level, gold: p.gold };
+      return { id: id, name: p.name, avatar: p.avatar, row: rowOf(p),
+               level: levelOf(p).level, gold: p.gold };
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
 
-  function createProfile(name, avatar) {
+  function createProfile(name, avatar, row) {
     load();
     var id = 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
-    data.profiles[id] = blankProfile(name, avatar);
+    data.profiles[id] = blankProfile(name, avatar, row);
     data.active = id;
     write();
     return id;
@@ -986,14 +1013,29 @@ var Save = (function () {
     write();
   }
 
-  function renameProfile(id, name, avatar) {
+  function renameProfile(id, name, avatar, row) {
     load();
     var p = data.profiles[id];
     if (!p) return false;
     if (name) p.name = name;
     if (avatar) p.avatar = avatar;
+    if (row === 'little' || row === 'big') p.row = row;
     write();
     return true;
+  }
+
+  /* Change which kid the active hero is. Nothing they own or have walked is
+     touched — the two trails have always had separate progress, so switching
+     back and forth costs nothing. */
+  function setRow(row) {
+    if (row !== 'little' && row !== 'big') return false;
+    update(function (p) { p.row = row; });
+    return true;
+  }
+
+  function rowOf(p) {
+    p = p || me();
+    return (p && (p.row === 'big' ? 'big' : p.row === 'little' ? 'little' : null));
   }
 
   /* ---------- Levels ------------------------------------------------------
@@ -1365,7 +1407,33 @@ var Save = (function () {
   /* Which trail this hero is actually walking. The hub used to work this out
      for itself; the daily challenge needs the same answer, so it lives here. */
   function heroTrail() {
-    return mapAt('big') > mapAt('little') ? 'big' : 'little';
+    // what the hero says they are, and only then a guess from the road walked
+    return rowOf() || guessRow(me());
+  }
+
+  /* For saves written before a hero could say which kid they were: read it off
+     the road behind them. Whichever trail they are further along is the one
+     they have been playing; failing that, the last track they chose tells us,
+     because the two menus share no track ids. */
+  function guessRow(p) {
+    if (!p) return 'little';
+    var mp = (p.progress && p.progress.map) || {};
+    if ((mp.big || 0) !== (mp.little || 0)) {
+      return (mp.big || 0) > (mp.little || 0) ? 'big' : 'little';
+    }
+    var last = (p.settings && p.settings.lastTrack) || {};
+    var seen = { little: 0, big: 0 };
+    ['little', 'big'].forEach(function (tr) {
+      (MAP[tr] || []).forEach(function (step) {
+        (step instanceof Array ? step : [step]).forEach(function (n) {
+          if (n.t && last[n.g] === n.t) seen[tr]++;
+        });
+      });
+    });
+    if (seen.big !== seen.little) return seen.big > seen.little ? 'big' : 'little';
+    // Nothing to go on. "little" is the safer wrong answer: easy work handed
+    // to a big kid is a shrug, hard work handed to a five-year-old is a wall.
+    return 'little';
   }
 
   /* Local calendar day, not UTC: "today" has to mean the day they're in. */
@@ -1718,6 +1786,9 @@ var Save = (function () {
     awardCard: awardCard,
     /* Extra damage a hit does on this stop — a boss's weak road, or nothing. */
     activeId: activeId,
+    ROWS: ROWS,
+    rowOf: rowOf,
+    setRow: setRow,
     heroTrail: heroTrail,
     daily: daily,
     claimDaily: claimDaily,
@@ -1791,6 +1862,7 @@ var Save = (function () {
        re-migrates) from storage, the way a fresh page load would. */
     _reload: function () { data = null; load(); },
     _key: KEY,
+    _guessRow: guessRow,   // exposed for the migration tests
     _version: VERSION,
     _goldScale: V2_GOLD_SCALE
   };

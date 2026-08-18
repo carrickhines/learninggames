@@ -8,7 +8,9 @@ Three browser games for two kids, sharing one hero.
 - **🔤 Language RPG** — letters, spelling, grammar, word play
 - **📖 Story Quest** — reading comprehension as an adventure
 
-Pick a hero on the hub and every game feeds the same character. There's a
+Pick a hero on the hub — each one says which of the two kids they are, which
+sets their map trail and their daily challenge — and every game feeds the same
+character. There's a
 **map** — a 32-stop winding trail through seven regions that opens as you beat
 it, one trail for each kid, with boss fights that tell you what they fear. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
 new worlds to fight in, and iPad game time, priced so the best gear takes
