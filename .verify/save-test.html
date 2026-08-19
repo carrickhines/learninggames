@@ -1238,6 +1238,17 @@ try {
     ok('region "' + rg.id + '" has cards for its chests',
        Save.cardsOfWorld(rg.cards || rg.id).length > 0);
   });
+
+  /* Having *a* pool isn't enough. Market Town and The Observatory shipped
+     as regions that borrowed the Reef's and the Peak's monsters through the
+     `cards` fallback, so their boss chests promised a card and handed over
+     one the hero had almost certainly already held for weeks. A region whose
+     id is a world in its own right must draw its own. */
+  Save.REGIONS.forEach(function (rg) {
+    if (!Save.world(rg.id)) return;   // a region that isn't a world may borrow
+    ok('region "' + rg.id + '" draws its own monsters, not a loan',
+       !rg.cards, 'borrows ' + rg.cards);
+  });
   ['little', 'big'].forEach(function (tr) {
     Save.mapTrail(tr).forEach(function (step) {
       if (!step.boss) return;

@@ -213,6 +213,50 @@ var Save = (function () {
           { id: 'l-emberk', name: 'Ember King',   emoji: '👑', hp: 12, scale: 1.16, r: 3 }
         ]
       }
+    },
+
+    /* Market Town and The Observatory shipped as regions with a borrowed card
+       pool — `cards: 'reef'` and `cards: 'ember'` — so their boss chests
+       promised a card and handed over one the hero very likely already had.
+       These are the monsters they should have had from the start. The regions
+       drop their `cards` fallback in the same change. */
+    {
+      id: 'market', name: 'Market Town', emoji: '🏪', gold: 3.6,
+      sub: 'Everything has a price, and most of it is haggling',
+      foes: {
+        math: [
+          { id: 'm-coinling', name: 'Coinling',     emoji: '🪙', hp: 7, scale: 0.90, r: 1 },
+          { id: 'm-crate',    name: 'Crate Creep',  emoji: '📦', hp: 8, scale: 1.00, r: 1 },
+          { id: 'm-scales',   name: 'Scale Sprite', emoji: '⚖️', hp: 9, scale: 1.05, r: 2 },
+          { id: 'm-haggler',  name: 'The Haggler',  emoji: '🏺', hp: 11, scale: 1.18, r: 3 }
+        ],
+        language: [
+          { id: 'l-signpost', name: 'Signpost',     emoji: '🪧', hp: 7, scale: 0.90, r: 1 },
+          { id: 'l-basket',   name: 'Basket Beast', emoji: '🧺', hp: 8, scale: 0.95, r: 1 },
+          { id: 'l-lantern',  name: 'Lantern Lad',  emoji: '🏮', hp: 8, scale: 1.00, r: 1 },
+          { id: 'l-crier',    name: 'Town Crier',   emoji: '📣', hp: 9, scale: 1.08, r: 2 },
+          { id: 'l-mayor',    name: 'The Mayor',    emoji: '🎩', hp: 12, scale: 1.18, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'observatory', name: 'The Observatory', emoji: '🔭', gold: 4.4,
+      sub: 'Where the numbers meet the stars',
+      foes: {
+        math: [
+          { id: 'm-cometling', name: 'Cometling',   emoji: '☄️', hp: 8, scale: 0.95, r: 1 },
+          { id: 'm-orbiter',   name: 'Orbiter',     emoji: '🪐', hp: 9, scale: 1.00, r: 1 },
+          { id: 'm-eclipse',   name: 'Eclipse',     emoji: '🌑', hp: 10, scale: 1.08, r: 2 },
+          { id: 'm-nova',      name: 'Nova',        emoji: '🌟', hp: 12, scale: 1.22, r: 3 }
+        ],
+        language: [
+          { id: 'l-peeper',    name: 'Peeper',      emoji: '🔭', hp: 8, scale: 0.92, r: 1 },
+          { id: 'l-starlet',   name: 'Starlet',     emoji: '⭐', hp: 8, scale: 0.95, r: 1 },
+          { id: 'l-mothling',  name: 'Moonmoth',    emoji: '🌙', hp: 9, scale: 1.00, r: 1 },
+          { id: 'l-chart',     name: 'Star Chart',  emoji: '🗺️', hp: 10, scale: 1.08, r: 2 },
+          { id: 'l-astronomer', name: 'The Astronomer', emoji: '🔮', hp: 13, scale: 1.22, r: 3 }
+        ]
+      }
     }
   ];
 
@@ -354,6 +398,10 @@ var Save = (function () {
       emoji: '🌊', cost: 14000, sub: 'New monsters · 2.3× gold' },
     { id: 'world-ember', kind: 'world', world: 'ember', name: 'Ember Peak',
       emoji: '🌋', cost: 30000, sub: 'New monsters · 3× gold' },
+    { id: 'world-market', kind: 'world', world: 'market', name: 'Market Town',
+      emoji: '🏪', cost: 55000, sub: 'New monsters · 3.6× gold' },
+    { id: 'world-observatory', kind: 'world', world: 'observatory', name: 'The Observatory',
+      emoji: '🔭', cost: 95000, sub: 'New monsters · 4.4× gold' },
 
     // The old automatic win reward, now something you choose to spend on.
     { id: 'ipad', kind: 'token', name: 'iPad Time Token', emoji: '🎟️', cost: 600,
@@ -659,15 +707,15 @@ var Save = (function () {
       props: ['🌋', '🔥', '🪨', '💀', '🗻', '🌑'] },
 
     /* Beyond the peak: the ground the everyday maths and the newer reading
-       tracks live on. `cards` points a region at the world its chests draw
-       from — these two have their own look but no monsters of their own, so
-       without it a boss chest would promise a card and hand over nothing.
-       (New worlds to go with them are the obvious next thing; the tracks
-       needed a home on the map first.) */
-    { id: 'market', name: 'Market Town',  emoji: '🏪', steps: 5, cards: 'reef',
+       tracks live on. Both of these once borrowed another world's monsters
+       through a `cards` fallback, which meant a boss chest here paid out a
+       Reef or Ember card the hero almost certainly already held. They have
+       their own lineups now, so the fallback is gone — a region whose id IS a
+       world doesn't need one. */
+    { id: 'market', name: 'Market Town',  emoji: '🏪', steps: 5,
       sky: ['#2a2350', '#e0a24a'], hills: ['#8a5a3c', '#6f472f', '#553626'],
       props: ['🏪', '🪙', '⚖️', '🧺', '🕰️', '🪧'] },
-    { id: 'observatory', name: 'The Observatory', emoji: '🔭', steps: 5, cards: 'ember',
+    { id: 'observatory', name: 'The Observatory', emoji: '🔭', steps: 5,
       sky: ['#08122e', '#2b3f7a'], hills: ['#1b2a54', '#152244', '#101a33'],
       props: ['🔭', '⭐', '🪐', '🌠', '🌙', '☄️'] }
   ];
@@ -1683,7 +1731,9 @@ var Save = (function () {
     cave:   { label: '+15% gold',           goldBonus: 0.15 },
     sky:    { label: 'wider DOUBLE window', fastBonus: 1000 },
     reef:   { label: '+1 heart, +15% gold', maxHp: 1, goldBonus: 0.15 },
-    ember:  { label: '+2 hearts',           maxHp: 2 }
+    ember:  { label: '+2 hearts',           maxHp: 2 },
+    market: { label: '+20% gold',          goldBonus: 0.20 },
+    observatory: { label: 'Better card luck', cardBonus: 0.5 }
   };
 
   function setPerks(p, base) {

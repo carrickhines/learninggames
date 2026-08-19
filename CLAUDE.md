@@ -173,9 +173,10 @@ blending tracks somewhere to live on the journey.
 `cardsOfWorld(region.cards || region.id)`, so a region whose id isn't a world
 must name one in `cards` — otherwise a boss chest promises a card and hands
 over nothing, which is exactly what happened the first time the two drifted
-apart. Market Town and The Observatory have their own look but no monsters of
-their own yet, so they borrow the Reef's and the Peak's. New worlds to match
-them are the obvious next thing.
+apart. Market Town and The Observatory used to borrow the Reef's and the Peak's
+this way, which meant a boss chest there paid out a card the hero had held for
+weeks; they have their own lineups now, and `save-test.html` fails if a region
+that *is* a world goes back to borrowing (`borrows reef`).
 
 **A step is one stop or a choice of two.** A fork always rejoins, so no route
 is a dead end and nothing is missable — the branch exists to make the journey
@@ -292,7 +293,7 @@ applied at the start of the next run via `Save.loadout()`:
   helm and armor together top out at twelve pips rather than running away.
 - **Boots** — the gentlest ladder of the six: thinking time and a small cut of
   the gold. It's the slot you fill once you've bought the thing you wanted.
-- **Worlds** — five in total, each a new foe lineup, a new card set, and a
+- **Worlds** — seven in total, each a new foe lineup, a new card set, and a
   better gold multiplier.
 - **🎟️ iPad Time Token** — see below.
 
@@ -313,7 +314,7 @@ math easy is not.
 
 ## Monster cards
 
-55 cards: every foe across five worlds and both battle games, plus one per
+73 cards: every foe across seven worlds and both battle games, plus one per
 Story Quest quest and one per little-hero game.
 
 **Cards are rare on purpose** — a collection you finish in a week isn't a
@@ -951,8 +952,6 @@ eat words. Use `git commit -F -` with a quoted heredoc.
   than it looks.
 - **No speech-to-text, ever.** The game never listens to the child. Reading
   aloud stays a parent-at-bedtime activity by design.
-- **Market Town and The Observatory borrow card pools** from the Reef and the
-  Peak. They have their own look but no monsters of their own yet.
 - **The streak grants nothing**, so it can take nothing away. Don't attach a
   reward to it — the daily's double gold is the reason to come back.
 - **`profile.row` is not a content gate.** Both menus stay fully open to both
@@ -969,8 +968,9 @@ Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
 daily challenge and streak, two new map regions, and `profile.row`.
 
 Current shape: **19 maths tracks, 15 language tracks, 8 quests + 2 mini games,
-32 map steps per trail through 7 regions, 5 worlds, 55 cards.** Suite: 397 save
-checks, 65 log checks, plus smoke / tracks / content / playthrough / upgrade.
+32 map steps per trail through 7 regions, 7 worlds, 73 cards, 6 gear slots.**
+Suite: 413 save checks, 65 log checks, plus smoke / tracks / content /
+playthrough / upgrade.
 
 **Outstanding, in rough priority order:**
 
@@ -982,9 +982,6 @@ checks, 65 log checks, plus smoke / tracks / content / playthrough / upgrade.
    `P_opposite` (plus their word clips) are not in `voice.js` and need
    recording in `record.html`, on the device the kids play on. mp4/AAC records
    and plays everywhere; Chrome-recorded webm may not play on iPads.
-3. **New worlds for Market Town and The Observatory** — their own monsters and
-   cards, so the last two regions drop something new rather than Reef and Peak
-   duplicates.
 4. **Watch the maths menu.** Nineteen tracks is a lot for a six-year-old even
    grouped; worth checking with the kids before adding more.
 
