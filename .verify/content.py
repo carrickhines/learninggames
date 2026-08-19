@@ -27,6 +27,19 @@ d = webdriver.Firefox(options=opts, service=service)
 failures = []
 
 
+MAP_STOPS_JS = (
+    '      var out = [];\n'
+    "      ['little', 'big'].forEach(function (tr) {\n"
+    '        Save.mapTrail(tr).forEach(function (st) {\n'
+    '          st.options.forEach(function (o) {\n'
+    "            if (o.g === 'math' || o.g === 'language') out.push([tr, st.i, o.g, o.t, o.m]);\n"
+    '          });\n'
+    '        });\n'
+    '      });\n'
+    '      return out;\n'
+)
+
+
 def check(label, ok, detail=""):
     print(("  PASS  " if ok else "  FAIL  ") + label + (("  -- " + detail) if detail and not ok else ""))
     if not ok:
@@ -306,10 +319,18 @@ try:
     check("shop: every item has a name, a blurb and a price",
           all(i.get("name") and i.get("sub") and i.get("cost") is not None for i in shop))
     worlds = js("Save.WORLDS")
-    unlockable = [i["world"] for i in shop if i["kind"] == "world"]
-    check("shop: every world beyond the first can be bought",
-          sorted(unlockable) == sorted(w["id"] for w in worlds[1:]),
-          "%s vs %s" % (unlockable, [w["id"] for w in worlds[1:]]))
+    # A world has to be reachable one way or another, or its monsters exist
+    # only as names on cards for creatures the kids have never met. Two ways
+    # count: buy it in the shop and fight there in free play, or be the home
+    # region of a stretch of map, since a map stop fights its own region's
+    # lineup. A world that is neither is stranded.
+    unlockable = set(i["world"] for i in shop if i["kind"] == "world")
+    regions = js("Save.REGIONS")
+    homed = set((r.get("cards") or r["id"]) for r in regions)
+    stranded = [w["id"] for w in worlds[1:]
+                if w["id"] not in unlockable and w["id"] not in homed]
+    check("shop: every world is either buyable or somewhere on the map",
+          not stranded, "no way to meet " + str(stranded))
     # ---- the economy curve ----
     # A price edit shouldn't be able to quietly turn "months" back into "a
     # week". Simulate a day of play against the real price table and check
@@ -450,6 +471,37 @@ try:
           str(n_lang) in claims[1], "%s vs %d tracks" % (claims[1], n_lang))
     check("hub: the quest count is right",
           str(n_quest) in claims[2], "%s vs %d quests" % (claims[2], n_quest))
+
+    # ---- every map stop points at a track that exists ----
+    # save.js has no idea what tracks the games actually declare, so a typo
+    # in MAP -- t: 'onelesss' -- passes every shape check in save-test and
+    # then opens a game with nothing to ask. Only a real page can settle it,
+    # so read both registries and hold the whole trail against them.
+    print("")
+    print("The map points at real tracks")
+    d.get("file://" + os.path.join(ROOT, "math/index.html"))
+    time.sleep(1.2)
+    math_tracks = set(js("Object.keys(window.TEST.makers || {})"))
+    d.get("file://" + os.path.join(ROOT, "language/index.html"))
+    time.sleep(1.2)
+    lang_tracks = set(js("(window.TEST.TRACKS || []).map(function (t) { return t.id; })"))
+    check("map: both games declare their tracks to the harness",
+          len(math_tracks) > 0 and len(lang_tracks) > 0,
+          "%d maths, %d language" % (len(math_tracks), len(lang_tracks)))
+
+    d.get("file://" + os.path.join(ROOT, "index.html"))
+    time.sleep(1.0)
+    stops = js('(function () {' + MAP_STOPS_JS + '}())')
+    unknown, badmode = [], []
+    for tr, i, g, t, m in stops:
+        if t not in (math_tracks if g == "math" else lang_tracks):
+            unknown.append("%s %d: %s/%s" % (tr, i, g, t))
+        if m not in ("easy", "normal", "expert"):
+            badmode.append("%s %d: %s" % (tr, i, m))
+    check("map: every stop names a track its game really has",
+          not unknown, str(unknown[:4]))
+    check("map: every stop names a real difficulty", not badmode, str(badmode[:4]))
+    check("map: there are stops to check", len(stops) > 50, "%d stops" % len(stops))
 
 finally:
     d.quit()

@@ -257,6 +257,70 @@ var Save = (function () {
           { id: 'l-astronomer', name: 'The Astronomer', emoji: '🔮', hp: 13, scale: 1.22, r: 3 }
         ]
       }
+    },
+
+    /* Beyond The Observatory the trail stops being buyable ground. These
+       worlds have no shop item: you meet their monsters by walking into the
+       land they live in, because `foesFor()` draws a map stop's lineup from
+       its own region. The world ladder tops out at The Observatory and the
+       map carries on without it — nine more rungs at 1.7x each would have
+       run into the millions. */
+    {
+      id: 'woods', name: 'Whispering Woods', emoji: '🌲', gold: 4.8,
+      sub: 'Everything here is listening',
+      foes: {
+        math: [
+          { id: 'm-sprout',    name: 'Sprout',        emoji: '🌱', hp: 9,  scale: 0.90, r: 1 },
+          { id: 'm-toadstool', name: 'Toadstool',     emoji: '🍄', hp: 10, scale: 1.00, r: 1 },
+          { id: 'm-owlkin',    name: 'Owlkin',        emoji: '🦉', hp: 11, scale: 1.06, r: 2 },
+          { id: 'm-greenman',  name: 'The Green Man', emoji: '🌳', hp: 13, scale: 1.22, r: 3 }
+        ],
+        language: [
+          { id: 'l-whisper',   name: 'Whisper',       emoji: '🍃', hp: 9,  scale: 0.90, r: 1 },
+          { id: 'l-fawn',      name: 'Fawn',          emoji: '🦌', hp: 9,  scale: 0.95, r: 1 },
+          { id: 'l-mossback',  name: 'Mossback',      emoji: '🪵', hp: 10, scale: 1.00, r: 1 },
+          { id: 'l-weaver',    name: 'Web Weaver',    emoji: '🕸️', hp: 11, scale: 1.08, r: 2 },
+          { id: 'l-hollowk',   name: 'The Hollow King', emoji: '🧝', hp: 14, scale: 1.22, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'mill', name: 'The Clockwork Mill', emoji: '⚙️', gold: 5.2,
+      sub: 'It has been running longer than anyone remembers',
+      foes: {
+        math: [
+          { id: 'm-cogling',   name: 'Cogling',       emoji: '⚙️', hp: 10, scale: 0.90, r: 1 },
+          { id: 'm-piston',    name: 'Piston',        emoji: '🔧', hp: 11, scale: 1.00, r: 1 },
+          { id: 'm-springer',  name: 'Springer',      emoji: '🌀', hp: 12, scale: 1.06, r: 2 },
+          { id: 'm-grandclock', name: 'The Grand Clock', emoji: '🕰️', hp: 14, scale: 1.24, r: 3 }
+        ],
+        language: [
+          { id: 'l-typebar',   name: 'Typebar',       emoji: '⌨️', hp: 10, scale: 0.90, r: 1 },
+          { id: 'l-bellows',   name: 'Bellows',       emoji: '🪗', hp: 10, scale: 0.95, r: 1 },
+          { id: 'l-rivet',     name: 'Rivet',         emoji: '🔩', hp: 11, scale: 1.00, r: 1 },
+          { id: 'l-printer',   name: 'Printer',       emoji: '🖨️', hp: 12, scale: 1.08, r: 2 },
+          { id: 'l-foreman',   name: 'The Foreman',   emoji: '🦾', hp: 15, scale: 1.24, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'frost', name: 'Frostfall', emoji: '❄️', gold: 5.6,
+      sub: 'The snow never quite stops',
+      foes: {
+        math: [
+          { id: 'm-flurry',    name: 'Flurry',        emoji: '❄️', hp: 11, scale: 0.90, r: 1 },
+          { id: 'm-icicle',    name: 'Icicle',        emoji: '🧊', hp: 12, scale: 1.00, r: 1 },
+          { id: 'm-snowbear',  name: 'Snow Bear',     emoji: '🐻‍❄️', hp: 13, scale: 1.06, r: 2 },
+          { id: 'm-glacier',   name: 'The Glacier',   emoji: '🏔️', hp: 15, scale: 1.26, r: 3 }
+        ],
+        language: [
+          { id: 'l-shiver',    name: 'Shiver',        emoji: '🥶', hp: 11, scale: 0.90, r: 1 },
+          { id: 'l-mitten',    name: 'Mitten',        emoji: '🧤', hp: 11, scale: 0.95, r: 1 },
+          { id: 'l-penguin',   name: 'Penguin',       emoji: '🐧', hp: 12, scale: 1.00, r: 1 },
+          { id: 'l-yetiling',  name: 'Yetiling',      emoji: '🦣', hp: 13, scale: 1.08, r: 2 },
+          { id: 'l-winterq',   name: 'The Winter Queen', emoji: '⛄', hp: 16, scale: 1.26, r: 3 }
+        ]
+      }
     }
   ];
 
@@ -555,6 +619,60 @@ var Save = (function () {
           boss: true,
           needs: 'sky',
           foe: { id: 'b-observatory', name: 'The Hourglass Owl', emoji: '🦉', hp: 13, scale: 1.3 },
+          loot: 'boss' } ],
+
+      /* ---- Whispering Woods ---- */
+      { g: 'language', t: 'rhyme',     m: 'normal', label: 'Whispering rhymes' },
+      { g: 'math',     t: 'bonds',     m: 'normal', label: 'Ten in the trees' },
+      [ { g: 'language', t: 'opposites', m: 'normal', label: 'Light and dark',
+          route: 'The bright path' },
+        { g: 'math',     t: 'sort',    m: 'normal', label: 'What belongs here?',
+          route: 'The mossy path' } ],
+      { g: 'story',    mini: 'finish',              label: 'A tale in the trees' },
+      { g: 'math',     t: 'coins',     m: 'normal', label: 'Acorn coins' },
+      [ { g: 'language', t: 'rhyme', m: 'expert', label: 'The Hollow King', route: 'The rhyming hollow', weak: true,
+          boss: true,
+          foe: { id: 'b-woods', name: 'The Hollow King', emoji: '🧝', hp: 12, scale: 1.26 },
+          loot: 'boss' },
+        { g: 'math', t: 'bonds', m: 'expert', label: 'The Hollow King', route: 'The counting hollow',
+          boss: true,
+          foe: { id: 'b-woods', name: 'The Hollow King', emoji: '🧝', hp: 12, scale: 1.26 },
+          loot: 'boss' } ],
+
+      /* ---- The Clockwork Mill ---- */
+      { g: 'math',     t: 'skip',      m: 'normal', label: 'Turning the cogs' },
+      { g: 'language', t: 'blend',     m: 'normal', label: 'Sound the whistle' },
+      [ { g: 'math',     t: 'clock',   m: 'normal', label: 'Read the great clock',
+          route: 'The clock face' },
+        { g: 'language', t: 'sight',   m: 'normal', label: 'Read the dials',
+          route: 'The dial row' } ],
+      { g: 'math',     t: 'add',       m: 'expert', label: 'Adding on the belt' },
+      { g: 'story',    mini: 'order',               label: 'How the mill works' },
+      [ { g: 'math', t: 'skip', m: 'expert', label: 'The Grand Clock', route: 'The gear stair', weak: true,
+          boss: true,
+          foe: { id: 'b-mill', name: 'The Grand Clock', emoji: '🕰️', hp: 13, scale: 1.28 },
+          loot: 'boss' },
+        { g: 'language', t: 'blend', m: 'expert', label: 'The Grand Clock', route: 'The steam stair',
+          boss: true,
+          foe: { id: 'b-mill', name: 'The Grand Clock', emoji: '🕰️', hp: 13, scale: 1.28 },
+          loot: 'boss' } ],
+
+      /* ---- Frostfall ---- */
+      { g: 'language', t: 'past',      m: 'normal', label: 'It happened yesterday' },
+      { g: 'math',     t: 'sub',       m: 'expert', label: 'Melting away' },
+      [ { g: 'math',     t: 'oneless', m: 'normal', label: 'One colder, one warmer',
+          route: 'The snow path' },
+        { g: 'language', t: 'read',    m: 'normal', label: 'Read it in the snow',
+          route: 'The ice path' } ],
+      { g: 'math',     t: 'clock',     m: 'expert', label: 'The long night' },
+      { g: 'language', t: 'opposites', m: 'expert', label: 'Hot and cold' },
+      [ { g: 'math', t: 'sub', m: 'expert', label: 'The Winter Queen', route: 'The frozen stair', weak: true,
+          boss: true,
+          foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
+          loot: 'boss' },
+        { g: 'language', t: 'past', m: 'expert', label: 'The Winter Queen', route: 'The whispering stair',
+          boss: true,
+          foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
           loot: 'boss' } ]
     ],
 
@@ -677,6 +795,60 @@ var Save = (function () {
           boss: true,
           needs: 'ember',
           foe: { id: 'b-observatory2', name: 'The Astral Reckoner', emoji: '🔭', hp: 15, scale: 1.35 },
+          loot: 'boss' } ],
+
+      /* ---- Whispering Woods ---- */
+      { g: 'language', t: 'twins',     m: 'expert', label: 'Words that pair' },
+      { g: 'math',     t: 'fract',     m: 'expert', label: 'Splitting the log' },
+      [ { g: 'language', t: 'grammar', m: 'expert', label: 'Name the part',
+          route: 'The bright path' },
+        { g: 'math',     t: 'place',   m: 'expert', label: 'How big is it?',
+          route: 'The mossy path' } ],
+      { g: 'story',    quest: 5,                    label: "The Yeti's Birthday" },
+      { g: 'math',     t: 'wordprob',  m: 'expert', label: 'A problem in the woods' },
+      [ { g: 'language', t: 'twins', m: 'expert', label: 'The Hollow King', route: 'The rhyming hollow', weak: true,
+          boss: true,
+          foe: { id: 'b-woods', name: 'The Hollow King', emoji: '🧝', hp: 12, scale: 1.26 },
+          loot: 'boss' },
+        { g: 'math', t: 'fract', m: 'expert', label: 'The Hollow King', route: 'The counting hollow',
+          boss: true,
+          foe: { id: 'b-woods', name: 'The Hollow King', emoji: '🧝', hp: 12, scale: 1.26 },
+          loot: 'boss' } ],
+
+      /* ---- The Clockwork Mill ---- */
+      { g: 'math',     t: 'mul',       m: 'expert', label: 'Counting the cogs' },
+      { g: 'math',     t: 'div',       m: 'expert', label: 'Sharing the output' },
+      [ { g: 'math',     t: 'rule',    m: 'expert', label: 'Find the pattern',
+          route: 'The gear row' },
+        { g: 'language', t: 'syllable', m: 'expert', label: 'Break it apart',
+          route: 'The hammer row' } ],
+      { g: 'language', t: 'marks',     m: 'expert', label: 'Mark the order' },
+      { g: 'math',     t: 'applied',   m: 'expert', label: 'Everyday machinery' },
+      [ { g: 'math', t: 'mul', m: 'expert', label: 'The Grand Clock', route: 'The gear stair', weak: true,
+          boss: true,
+          foe: { id: 'b-mill', name: 'The Grand Clock', emoji: '🕰️', hp: 13, scale: 1.28 },
+          loot: 'boss' },
+        { g: 'language', t: 'syllable', m: 'expert', label: 'The Grand Clock', route: 'The steam stair',
+          boss: true,
+          foe: { id: 'b-mill', name: 'The Grand Clock', emoji: '🕰️', hp: 13, scale: 1.28 },
+          loot: 'boss' } ],
+
+      /* ---- Frostfall ---- */
+      { g: 'math',     t: 'place',     m: 'expert', label: 'Numbers in the ice' },
+      { g: 'language', t: 'fixit',     m: 'expert', label: 'Fix the frozen sign' },
+      [ { g: 'math',     t: 'alg',     m: 'expert', label: 'Solve for the cold',
+          route: 'The snow path' },
+        { g: 'language', t: 'forge',   m: 'expert', label: 'Build the word',
+          route: 'The ice path' } ],
+      { g: 'math',     t: 'wordprob',  m: 'expert', label: 'A frozen problem' },
+      { g: 'language', t: 'marks',     m: 'expert', label: 'Punctuate the storm' },
+      [ { g: 'math', t: 'alg', m: 'expert', label: 'The Winter Queen', route: 'The frozen stair', weak: true,
+          boss: true,
+          foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
+          loot: 'boss' },
+        { g: 'language', t: 'fixit', m: 'expert', label: 'The Winter Queen', route: 'The whispering stair',
+          boss: true,
+          foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
           loot: 'boss' } ]
     ]
   };
@@ -717,7 +889,24 @@ var Save = (function () {
       props: ['🏪', '🪙', '⚖️', '🧺', '🕰️', '🪧'] },
     { id: 'observatory', name: 'The Observatory', emoji: '🔭', steps: 5,
       sky: ['#08122e', '#2b3f7a'], hills: ['#1b2a54', '#152244', '#101a33'],
-      props: ['🔭', '⭐', '🪐', '🌠', '🌙', '☄️'] }
+      props: ['🔭', '⭐', '🪐', '🌠', '🌙', '☄️'] },
+
+    /* The far trail. Each of these is a world in its own right, so a stop
+       here fights the things that live here. */
+    { id: 'woods', name: 'Whispering Woods', emoji: '🌲', steps: 6,
+      sky: ['#123026', '#3f6f4a'], hills: ['#2c5638', '#22432c', '#183020'],
+      props: ['🌲', '🍄', '🍃', '🦌', '🕸️', '🦉'] },
+    { id: 'mill', name: 'The Clockwork Mill', emoji: '⚙️', steps: 6,
+      sky: ['#3a2a12', '#b8862f'], hills: ['#6b4a1f', '#523716', '#3b2710'],
+      props: ['⚙️', '🔧', '🕰️', '🔩', '🪛', '🛠️'] },
+    /* Frostfall's first palette was near-white hills under a pale sky, which
+       looked like snow and made the stop labels — light text, by design
+       everywhere else — unreadable against it. Ice reads just as well a few
+       shades down, and the labels come back. Screenshot, not an assertion:
+       nothing in the suite can see low contrast. */
+    { id: 'frost', name: 'Frostfall', emoji: '❄️', steps: 6,
+      sky: ['#0d2340', '#3d6d99'], hills: ['#5d8fb8', '#48739c', '#365a7d'],
+      props: ['❄️', '🧊', '⛄', '🐧', '🌨️', '🏔️'] }
   ];
 
   /* Which region a step belongs to. */
@@ -1733,7 +1922,13 @@ var Save = (function () {
     reef:   { label: '+1 heart, +15% gold', maxHp: 1, goldBonus: 0.15 },
     ember:  { label: '+2 hearts',           maxHp: 2 },
     market: { label: '+20% gold',          goldBonus: 0.20 },
-    observatory: { label: 'Better card luck', cardBonus: 0.5 }
+    observatory: { label: 'Better card luck', cardBonus: 0.5 },
+    /* None of the far worlds grant hearts. Four sets already do, and armor
+       and a helm add seven more between them — another two would put a
+       finished hero past twenty pips, which is a row no phone draws well. */
+    woods:  { label: 'Much better card luck', cardBonus: 0.75 },
+    mill:   { label: 'A wider DOUBLE window', fastBonus: 1200 },
+    frost:  { label: '+25% gold',            goldBonus: 0.25 }
   };
 
   function setPerks(p, base) {
