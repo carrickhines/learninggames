@@ -448,8 +448,15 @@ var Save = (function () {
     { id: 's-yeti',    name: 'Birthday Yeti', emoji: '🧊' },
     { id: 's-moon',    name: 'Moon Rover',    emoji: '🚀' },
     { id: 's-volcano', name: 'Cloud Dragon',  emoji: '🌋' },
-    // the two little-hero games; kept after the quests so the first eight
-    // still line up with QUESTS by index
+    { id: 's-lamp',    name: 'Lamp Keeper',   emoji: '🗼' },
+    { id: 's-guard',   name: 'Night Guard',   emoji: '🚂' },
+    /* New quest cards go HERE, before the mini-game pair. The quest cards are
+       read positionally — `STORY_CARDS[state.questIdx]` — so appending one at
+       the end instead would hand a new quest the Story Sorter card and share
+       it with the mini game. The minis look themselves up by id, so they do
+       not mind being pushed along. */
+    // the two little-hero games; kept after the quests so every quest above
+    // still lines up with QUESTS by index
     { id: 's-order',   name: 'Story Sorter',  emoji: '🃏' },
     { id: 's-finish',  name: 'Storyteller',   emoji: '🌱' }
   ];

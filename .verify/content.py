@@ -299,9 +299,27 @@ try:
     check("finish: enough stories to fill a game without repeating",
           len(finish) > js("TEST.MINI_ROUNDS"))
 
-    check("quests: every quest has a collectible card",
-          len(quests) <= len(js("Save.STORY_CARDS")),
-          "%d quests, %d cards" % (len(quests), len(js("Save.STORY_CARDS"))))
+    # Quest cards are read POSITIONALLY -- STORY_CARDS[state.questIdx] --
+    # so the arrays have to stay parallel. A length check alone is not
+    # enough: appending a 9th quest card after s-order leaves the lengths
+    # fine while quest 9 quietly awards the Story Sorter card and shares
+    # it with the mini game. Check the actual mapping instead.
+    story_cards = js("Save.STORY_CARDS")
+    MINI_IDS = ("s-order", "s-finish")
+    bad = []
+    for qi, q in enumerate(quests):
+        if qi >= len(story_cards):
+            bad.append("%s has no card at all" % q["title"])
+        elif story_cards[qi]["id"] in MINI_IDS:
+            bad.append("%s would award %s, a mini game's card"
+                       % (q["title"], story_cards[qi]["id"]))
+    check("quests: each quest maps to its own card, not a mini game's",
+          not bad, str(bad[:3]))
+    quest_ids = [c["id"] for c in story_cards[:len(quests)]]
+    check("quests: no two quests share a card",
+          len(set(quest_ids)) == len(quest_ids), str(quest_ids))
+    check("quests: both mini games still have a card of their own",
+          all(any(c["id"] == m for c in story_cards) for m in MINI_IDS))
 
     # =================== Save data ===================
     print("\nShared data")
