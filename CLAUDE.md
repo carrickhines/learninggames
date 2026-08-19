@@ -333,7 +333,7 @@ math easy is not.
 
 ## Monster cards
 
-156 cards: every foe across sixteen worlds and both battle games, plus one per
+158 cards: every foe across sixteen worlds and both battle games, plus one per
 Story Quest quest and one per little-hero game.
 
 **Cards are rare on purpose** — a collection you finish in a week isn't a
@@ -656,12 +656,12 @@ gets you hurt and careful reading wins.
 **There is deliberately no timer.** Comprehension is the one skill where time
 pressure is counterproductive — the whole point is slowing down. Don't add one.
 
-## Big hero quests (10 quests · 107 scenes · 55 chests)
+## Big hero quests (12 quests · 129 scenes · 65 chests)
 
 🌉 The Troll Bridge · 🐉 The Dragon's Library · 👻 The Ghost Ship ·
 🧙 The Wizard's Maze · 🤖 The Robot Bakery · 🧊 The Yeti's Birthday ·
 🚀 The Moon Rescue · 🌋 The Grumbly Volcano · 🗼 The Lighthouse Keeper ·
-🚂 The Midnight Train
+🚂 The Midnight Train · 🏛️ The Museum at Night · 🌱 The Seed Vault
 
 When adding quests, pick settings and rule-mechanics these don't already use.
 
@@ -993,8 +993,8 @@ Round 4 shipped and is live (schema **v4**, `57a1acc`). It added seven tracks
 Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
 daily challenge and streak, two new map regions, and `profile.row`.
 
-Current shape: **19 maths tracks, 15 language tracks, 10 quests + 2 mini games,
-80 map steps per trail through 16 regions, 16 worlds, 156 cards, 6 gear
+Current shape: **19 maths tracks, 15 language tracks, 12 quests + 2 mini games,
+80 map steps per trail through 16 regions, 16 worlds, 158 cards, 6 gear
 slots.** Suite: 472 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
