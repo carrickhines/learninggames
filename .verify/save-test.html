@@ -1249,6 +1249,41 @@ try {
     ok('region "' + rg.id + '" draws its own monsters, not a loan',
        !rg.cards, 'borrows ' + rg.cards);
   });
+
+  /* ---------- a map stop fights what lives there ----------
+     This used to read progress.world whatever you were doing, so the map's
+     places were scenery: Ember Peak full of Meadow slimes if the Meadow was
+     all you owned. Free play still uses the world you chose — that's the
+     whole point of buying one. */
+  fresh();
+  Save.createProfile('Wanderer', '🧭');
+  Save.update(function (p) { p.progress.world = 'meadow'; });
+
+  ok('free play fights the world you chose',
+     Save.foesFor('math')[0].id === Save.world('meadow').foes.math[0].id);
+
+  // find a stop deep enough to be in a different region than the Meadow
+  var farRegion = null, farStep = -1;
+  Save.mapTrail('little').forEach(function (st) {
+    if (farStep === -1 && st.region.id !== 'meadow' && !st.boss) {
+      farRegion = st.region; farStep = st.i;
+    }
+  });
+  ok('the little trail leaves the meadow', farStep > -1);
+
+  Save.update(function (p) {
+    p.progress.activeNode = { trail: 'little', i: farStep, o: 0 };
+  });
+  var localFoes = Save.foesFor('math');
+  ok('a map stop fights its own region, not your bought world',
+     localFoes[0].id === Save.world(farRegion.cards || farRegion.id).foes.math[0].id,
+     'at ' + farRegion.id + ' got ' + localFoes[0].id);
+  ok('...and those are not the monsters free play would have given',
+     localFoes[0].id !== Save.world('meadow').foes.math[0].id);
+
+  Save.clearNode();
+  ok('leaving the map goes back to the world you chose',
+     Save.foesFor('math')[0].id === Save.world('meadow').foes.math[0].id);
   ['little', 'big'].forEach(function (tr) {
     Save.mapTrail(tr).forEach(function (step) {
       if (!step.boss) return;

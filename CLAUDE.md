@@ -178,6 +178,17 @@ this way, which meant a boss chest there paid out a card the hero had held for
 weeks; they have their own lineups now, and `save-test.html` fails if a region
 that *is* a world goes back to borrowing (`borrows reef`).
 
+**A map stop fights the monsters that live there.** `foesFor()` reads the armed
+`activeNode`'s region and draws that world's lineup; only free play uses the
+world you bought and chose. It used to be `progress.world` either way, which
+made the map's places cosmetic — Ember Peak full of Meadow slimes if the Meadow
+was all you owned, or Emberwyrms in the opening fields if you'd bought the Peak.
+It also meant a region could never have monsters of its own without a shop world
+to match, and that ladder cannot be climbed nine more times. Bosses are
+unaffected: they name their own `foe`. The gold multiplier still follows
+`progress.world`, not the region — worth revisiting, but changing both at once
+moves the economy twice.
+
 **A step is one stop or a choice of two.** A fork always rejoins, so no route
 is a dead end and nothing is missable — the branch exists to make the journey
 yours, not to punish a wrong turn. Beating either option advances the step;

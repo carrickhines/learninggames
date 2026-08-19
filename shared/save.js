@@ -1783,8 +1783,25 @@ var Save = (function () {
   }
 
   /* The foe lineup for a game, from the profile's currently selected world. */
+  /* Who you fight. Free play uses the world you've bought and chosen; a map
+     stop uses the monsters that actually live where it is.
+
+     It used to be progress.world either way, which made the map's places
+     cosmetic — you could walk into Ember Peak and meet Meadow slimes because
+     the Meadow was all you owned, or stroll the opening fields swatting
+     Emberwyrms because you'd bought the Peak. It also meant a region could
+     never have monsters of its own unless the shop grew a world to match,
+     which is a ladder that can't be climbed nine more times.
+
+     A boss stop overrides this anyway: it names its own `foe`. */
   function foesFor(game) {
     var p = me();
+    var a = p && p.progress.activeNode;
+    if (a && MAP[a.trail] && MAP[a.trail][a.i]) {
+      var rg = regionOf(a.i);
+      var rw = world(rg.cards || rg.id);
+      if (rw && rw.foes[game] && rw.foes[game].length) return rw.foes[game];
+    }
     var id = (p && p.progress.world) || 'meadow';
     var w = world(id) || WORLDS[0];
     return w.foes[game] || WORLDS[0].foes[game];
