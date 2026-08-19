@@ -26,13 +26,20 @@ failed = 0
 try:
     for page in PAGES:
         d.get("file://" + os.path.join(HERE, page))
-        for _ in range(60):                   # the import tests are async
+        for _ in range(150):                  # the import tests are async
             if d.execute_script("return !!window.RESULT"):
                 break
             time.sleep(0.1)
         result = d.execute_script("return window.RESULT")
-        for line in d.find_elements(By.CSS_SELECTOR, ".fail"):
-            print(line.text)
+        # textContent, not .text: Selenium reports "" for an element that is
+        # mid-fade, and these lines animate in. A run once reported "4 FAILED"
+        # with four blank lines above it, which told us nothing at all about
+        # which four — and it has not reproduced since, so the only defence is
+        # to make sure the next one says something.
+        for line in d.execute_script(
+                "return [].slice.call(document.querySelectorAll('.fail'))"
+                "  .map(function (e) { return e.textContent; });"):
+            print("  " + line)
         print("%-18s %s" % (page, d.find_element(By.ID, "summary").text))
         if not result or result["fail"]:
             failed += 1

@@ -333,7 +333,7 @@ math easy is not.
 
 ## Monster cards
 
-158 cards: every foe across sixteen worlds and both battle games, plus one per
+160 cards: every foe across sixteen worlds and both battle games, plus one per
 Story Quest quest and one per little-hero game.
 
 **Cards are rare on purpose** — a collection you finish in a week isn't a
@@ -656,12 +656,13 @@ gets you hurt and careful reading wins.
 **There is deliberately no timer.** Comprehension is the one skill where time
 pressure is counterproductive — the whole point is slowing down. Don't add one.
 
-## Big hero quests (12 quests · 129 scenes · 65 chests)
+## Big hero quests (14 quests · 151 scenes · 76 chests)
 
 🌉 The Troll Bridge · 🐉 The Dragon's Library · 👻 The Ghost Ship ·
 🧙 The Wizard's Maze · 🤖 The Robot Bakery · 🧊 The Yeti's Birthday ·
 🚀 The Moon Rescue · 🌋 The Grumbly Volcano · 🗼 The Lighthouse Keeper ·
-🚂 The Midnight Train · 🏛️ The Museum at Night · 🌱 The Seed Vault
+🚂 The Midnight Train · 🏛️ The Museum at Night · 🌱 The Seed Vault ·
+⚖️ The Courtroom of Animals · 🌦️ The Weather Station
 
 When adding quests, pick settings and rule-mechanics these don't already use.
 
@@ -927,7 +928,9 @@ d.execute_script("var tier = arguments[0];"
   can't scroll into view by its own rules; the `click()` helpers scroll the
   container themselves and fall back to a scripted click.
 - Selenium's `.text` returns `""` for an element mid-fade — read `textContent`
-  via JS instead.
+  via JS instead. `run-save-test.py` used to print failing lines with `.text`,
+  and a single unreproduced run reported *4 FAILED* above four blank lines,
+  which named nothing. It reads `textContent` now.
 - Python's `round()` is banker's rounding and the game's JS is half-up. A test
   once called the game wrong over 805 → 800.
 
@@ -993,8 +996,8 @@ Round 4 shipped and is live (schema **v4**, `57a1acc`). It added seven tracks
 Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
 daily challenge and streak, two new map regions, and `profile.row`.
 
-Current shape: **19 maths tracks, 15 language tracks, 12 quests + 2 mini games,
-80 map steps per trail through 16 regions, 16 worlds, 158 cards, 6 gear
+Current shape: **19 maths tracks, 15 language tracks, 14 quests + 2 mini games,
+80 map steps per trail through 16 regions, 16 worlds, 160 cards, 6 gear
 slots.** Suite: 472 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
