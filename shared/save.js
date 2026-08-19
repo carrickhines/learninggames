@@ -321,6 +321,63 @@ var Save = (function () {
           { id: 'l-winterq',   name: 'The Winter Queen', emoji: '⛄', hp: 16, scale: 1.26, r: 3 }
         ]
       }
+    },
+    {
+      id: 'library', name: 'The Drowned Library', emoji: '📚', gold: 6,
+      sub: 'Every book still readable, somehow',
+      foes: {
+        math: [
+          { id: 'm-inkblot',   name: 'Inkblot',       emoji: '🖋️', hp: 12, scale: 0.90, r: 1 },
+          { id: 'm-tomeling',  name: 'Tomeling',      emoji: '📕', hp: 13, scale: 1.00, r: 1 },
+          { id: 'm-indexer',   name: 'The Indexer',   emoji: '🗂️', hp: 14, scale: 1.06, r: 2 },
+          { id: 'm-archivist', name: 'The Archivist', emoji: '📚', hp: 16, scale: 1.28, r: 3 }
+        ],
+        language: [
+          { id: 'l-bookworm',  name: 'Bookworm',      emoji: '🐛', hp: 12, scale: 0.90, r: 1 },
+          { id: 'l-quill',     name: 'Quill',         emoji: '🪶', hp: 12, scale: 0.95, r: 1 },
+          { id: 'l-margin',    name: 'Margin Note',   emoji: '📄', hp: 13, scale: 1.00, r: 1 },
+          { id: 'l-riddler',   name: 'The Riddler',   emoji: '🔖', hp: 14, scale: 1.08, r: 2 },
+          { id: 'l-librarian', name: 'The Drowned Librarian', emoji: '🦑', hp: 17, scale: 1.28, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'thunder', name: 'Thunder Plateau', emoji: '⛈️', gold: 6.4,
+      sub: 'The storm never leaves, it only circles',
+      foes: {
+        math: [
+          { id: 'm-sparkling', name: 'Sparkling',     emoji: '⚡', hp: 13, scale: 0.90, r: 1 },
+          { id: 'm-boulder',   name: 'Boulder',       emoji: '🪨', hp: 14, scale: 1.00, r: 1 },
+          { id: 'm-thunderhead', name: 'Thunderhead', emoji: '🌩️', hp: 15, scale: 1.06, r: 2 },
+          { id: 'm-stormlord', name: 'The Storm Lord', emoji: '🌪️', hp: 17, scale: 1.30, r: 3 }
+        ],
+        language: [
+          { id: 'l-gale',      name: 'Gale',          emoji: '💨', hp: 13, scale: 0.90, r: 1 },
+          { id: 'l-echo',      name: 'Echo',          emoji: '📢', hp: 13, scale: 0.95, r: 1 },
+          { id: 'l-crag',      name: 'Crag',          emoji: '⛰️', hp: 14, scale: 1.00, r: 1 },
+          { id: 'l-tempest',   name: 'Tempest',       emoji: '☁️', hp: 15, scale: 1.08, r: 2 },
+          { id: 'l-skysinger', name: 'The Skysinger', emoji: '🎺', hp: 18, scale: 1.30, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'hollow', name: 'The Deep Hollow', emoji: '🍄', gold: 6.8,
+      sub: 'The light down here is alive',
+      foes: {
+        math: [
+          { id: 'm-glowcap',   name: 'Glowcap',       emoji: '💡', hp: 14, scale: 0.90, r: 1 },
+          { id: 'm-crawler',   name: 'Crawler',       emoji: '🪲', hp: 15, scale: 1.00, r: 1 },
+          { id: 'm-hollowed',  name: 'The Hollowed',  emoji: '🕳️', hp: 16, scale: 1.06, r: 2 },
+          { id: 'm-deepone',   name: 'The Deep One',  emoji: '🦠', hp: 18, scale: 1.32, r: 3 }
+        ],
+        language: [
+          { id: 'l-murmur',    name: 'Murmur',        emoji: '🫧', hp: 14, scale: 0.90, r: 1 },
+          { id: 'l-lichen',    name: 'Lichen',        emoji: '🪴', hp: 14, scale: 0.95, r: 1 },
+          { id: 'l-gloom',     name: 'Gloom',         emoji: '🌫️', hp: 15, scale: 1.00, r: 1 },
+          { id: 'l-echoer',    name: 'Echoer',        emoji: '🔊', hp: 16, scale: 1.08, r: 2 },
+          { id: 'l-deepvoice', name: 'The Deep Voice', emoji: '👁️', hp: 19, scale: 1.32, r: 3 }
+        ]
+      }
     }
   ];
 
@@ -673,6 +730,57 @@ var Save = (function () {
         { g: 'language', t: 'past', m: 'expert', label: 'The Winter Queen', route: 'The whispering stair',
           boss: true,
           foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
+          loot: 'boss' } ],
+
+      /* ---- The Drowned Library ---- */
+      { g: 'language', t: 'read',      m: 'expert', label: 'Read it in the deep' },
+      { g: 'language', t: 'sight',     m: 'expert', label: 'Words that float' },
+      [ { g: 'language', t: 'builder', m: 'expert', label: 'Build the word',
+          route: 'The shelf walk' },
+        { g: 'math',     t: 'pattern', m: 'expert', label: 'The pattern on the spine',
+          route: 'The spine walk' } ],
+      { g: 'story',    mini: 'finish',              label: 'A story from the shelf' },
+      [ { g: 'language', t: 'read', m: 'expert', label: 'The Drowned Librarian', route: 'The reading room', weak: true,
+          boss: true,
+          foe: { id: 'b-library', name: 'The Drowned Librarian', emoji: '🦑', hp: 15, scale: 1.30 },
+          loot: 'boss' },
+        { g: 'math', t: 'pattern', m: 'expert', label: 'The Drowned Librarian', route: 'The map room',
+          boss: true,
+          foe: { id: 'b-library', name: 'The Drowned Librarian', emoji: '🦑', hp: 15, scale: 1.30 },
+          loot: 'boss' } ],
+
+      /* ---- Thunder Plateau ---- */
+      { g: 'math',     t: 'skip',      m: 'expert', label: 'Counting the thunder' },
+      { g: 'language', t: 'sounds',    m: 'expert', label: 'What starts the storm?' },
+      [ { g: 'math',     t: 'count',   m: 'expert', label: 'Count the strikes',
+          route: 'The high ridge' },
+        { g: 'language', t: 'rhyme',   m: 'expert', label: 'Rhymes in the wind',
+          route: 'The low ridge' } ],
+      { g: 'math',     t: 'coins',     m: 'expert', label: 'Storm tolls' },
+      [ { g: 'math', t: 'skip', m: 'expert', label: 'The Storm Lord', route: 'The lightning stair', weak: true,
+          boss: true,
+          foe: { id: 'b-thunder', name: 'The Storm Lord', emoji: '🌪️', hp: 16, scale: 1.32 },
+          loot: 'boss' },
+        { g: 'language', t: 'sounds', m: 'expert', label: 'The Storm Lord', route: 'The rolling stair',
+          boss: true,
+          foe: { id: 'b-thunder', name: 'The Storm Lord', emoji: '🌪️', hp: 16, scale: 1.32 },
+          loot: 'boss' } ],
+
+      /* ---- The Deep Hollow ---- */
+      { g: 'language', t: 'blend',     m: 'expert', label: 'Sound it out in the dark' },
+      { g: 'math',     t: 'bonds',     m: 'expert', label: 'Ten in the dark' },
+      [ { g: 'math',     t: 'sort',    m: 'expert', label: 'What lives here?',
+          route: 'The mushroom way' },
+        { g: 'language', t: 'letters', m: 'expert', label: 'Find the letter',
+          route: 'The glowing way' } ],
+      { g: 'story',    mini: 'order',               label: 'How we got out' },
+      [ { g: 'language', t: 'blend', m: 'expert', label: 'The Deep Voice', route: 'The whispering deep', weak: true,
+          boss: true,
+          foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
+          loot: 'boss' },
+        { g: 'math', t: 'bonds', m: 'expert', label: 'The Deep Voice', route: 'The counting deep',
+          boss: true,
+          foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
           loot: 'boss' } ]
     ],
 
@@ -849,6 +957,57 @@ var Save = (function () {
         { g: 'language', t: 'fixit', m: 'expert', label: 'The Winter Queen', route: 'The whispering stair',
           boss: true,
           foe: { id: 'b-frost', name: 'The Winter Queen', emoji: '⛄', hp: 14, scale: 1.30 },
+          loot: 'boss' } ],
+
+      /* ---- The Drowned Library ---- */
+      { g: 'language', t: 'grammar',   m: 'expert', label: 'Grammar in the deep' },
+      { g: 'language', t: 'marks',     m: 'expert', label: 'Mark the manuscript' },
+      [ { g: 'language', t: 'fixit',   m: 'expert', label: 'Fix the flooded page',
+          route: 'The shelf walk' },
+        { g: 'math',     t: 'fract',   m: 'expert', label: 'Half a page',
+          route: 'The spine walk' } ],
+      { g: 'language', t: 'twins',     m: 'expert', label: 'Twins on the shelf' },
+      [ { g: 'language', t: 'grammar', m: 'expert', label: 'The Drowned Librarian', route: 'The reading room', weak: true,
+          boss: true,
+          foe: { id: 'b-library', name: 'The Drowned Librarian', emoji: '🦑', hp: 15, scale: 1.30 },
+          loot: 'boss' },
+        { g: 'math', t: 'fract', m: 'expert', label: 'The Drowned Librarian', route: 'The map room',
+          boss: true,
+          foe: { id: 'b-library', name: 'The Drowned Librarian', emoji: '🦑', hp: 15, scale: 1.30 },
+          loot: 'boss' } ],
+
+      /* ---- Thunder Plateau ---- */
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'Solve the storm' },
+      { g: 'math',     t: 'rule',      m: 'expert', label: 'The rule of thunder' },
+      [ { g: 'math',     t: 'mul',     m: 'expert', label: 'Counting strikes',
+          route: 'The high ridge' },
+        { g: 'language', t: 'syllable', m: 'expert', label: 'Break the thunder',
+          route: 'The low ridge' } ],
+      { g: 'math',     t: 'wordprob',  m: 'expert', label: 'A problem in the storm' },
+      [ { g: 'math', t: 'alg', m: 'expert', label: 'The Storm Lord', route: 'The lightning stair', weak: true,
+          boss: true,
+          foe: { id: 'b-thunder', name: 'The Storm Lord', emoji: '🌪️', hp: 16, scale: 1.32 },
+          loot: 'boss' },
+        { g: 'math', t: 'rule', m: 'expert', label: 'The Storm Lord', route: 'The rolling stair',
+          boss: true,
+          foe: { id: 'b-thunder', name: 'The Storm Lord', emoji: '🌪️', hp: 16, scale: 1.32 },
+          loot: 'boss' } ],
+
+      /* ---- The Deep Hollow ---- */
+      { g: 'language', t: 'forge',     m: 'expert', label: 'Forge in the dark' },
+      { g: 'math',     t: 'place',     m: 'expert', label: 'How deep is it?' },
+      [ { g: 'math',     t: 'div',     m: 'expert', label: 'Sharing the light',
+          route: 'The mushroom way' },
+        { g: 'language', t: 'syllable', m: 'expert', label: 'Break it in the dark',
+          route: 'The glowing way' } ],
+      { g: 'math',     t: 'applied',   m: 'expert', label: 'Everyday in the deep' },
+      [ { g: 'language', t: 'forge', m: 'expert', label: 'The Deep Voice', route: 'The whispering deep', weak: true,
+          boss: true,
+          foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
+          loot: 'boss' },
+        { g: 'math', t: 'div', m: 'expert', label: 'The Deep Voice', route: 'The counting deep',
+          boss: true,
+          foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
           loot: 'boss' } ]
     ]
   };
@@ -906,7 +1065,16 @@ var Save = (function () {
        nothing in the suite can see low contrast. */
     { id: 'frost', name: 'Frostfall', emoji: '❄️', steps: 6,
       sky: ['#0d2340', '#3d6d99'], hills: ['#5d8fb8', '#48739c', '#365a7d'],
-      props: ['❄️', '🧊', '⛄', '🐧', '🌨️', '🏔️'] }
+      props: ['❄️', '🧊', '⛄', '🐧', '🌨️', '🏔️'] },
+    { id: 'library', name: 'The Drowned Library', emoji: '📚', steps: 5,
+      sky: ['#07191f', '#2c6b6b'], hills: ['#3f6b63', '#325650', '#26423d'],
+      props: ['📚', '📕', '🪶', '🐛', '🔖', '🫧'] },
+    { id: 'thunder', name: 'Thunder Plateau', emoji: '⛈️', steps: 5,
+      sky: ['#161b2a', '#525c73'], hills: ['#4a5468', '#3a4254', '#2b3140'],
+      props: ['⛈️', '⚡', '🪨', '🌩️', '💨', '⛰️'] },
+    { id: 'hollow', name: 'The Deep Hollow', emoji: '🍄', steps: 5,
+      sky: ['#0f0a1e', '#3b2a52'], hills: ['#3a2a4e', '#2d203c', '#20172b'],
+      props: ['🍄', '💡', '🪲', '🫧', '🌫️', '🕳️'] }
   ];
 
   /* Which region a step belongs to. */
@@ -1928,7 +2096,10 @@ var Save = (function () {
        finished hero past twenty pips, which is a row no phone draws well. */
     woods:  { label: 'Much better card luck', cardBonus: 0.75 },
     mill:   { label: 'A wider DOUBLE window', fastBonus: 1200 },
-    frost:  { label: '+25% gold',            goldBonus: 0.25 }
+    frost:  { label: '+25% gold',            goldBonus: 0.25 },
+    library: { label: 'A wider DOUBLE window', fastBonus: 1500 },
+    thunder: { label: '+25% gold',            goldBonus: 0.25 },
+    hollow:  { label: 'Much better card luck', cardBonus: 0.75 }
   };
 
   function setPerks(p, base) {
