@@ -378,6 +378,63 @@ var Save = (function () {
           { id: 'l-deepvoice', name: 'The Deep Voice', emoji: '👁️', hp: 19, scale: 1.32, r: 3 }
         ]
       }
+    },
+    {
+      id: 'desert', name: 'The Glass Desert', emoji: '🏜️', gold: 7.2,
+      sub: 'The sand here was a sea once',
+      foes: {
+        math: [
+          { id: 'm-mirage',    name: 'Mirage',        emoji: '🌵', hp: 15, scale: 0.90, r: 1 },
+          { id: 'm-shard',     name: 'Shard',         emoji: '🔷', hp: 16, scale: 1.00, r: 1 },
+          { id: 'm-scorpion',  name: 'Glass Scorpion', emoji: '🦂', hp: 17, scale: 1.06, r: 2 },
+          { id: 'm-sunking',   name: 'The Sun King',  emoji: '☀️', hp: 19, scale: 1.34, r: 3 }
+        ],
+        language: [
+          { id: 'l-dune',      name: 'Dune',          emoji: '🏜️', hp: 15, scale: 0.90, r: 1 },
+          { id: 'l-whisperwind', name: 'Whisperwind', emoji: '🌬️', hp: 15, scale: 0.95, r: 1 },
+          { id: 'l-glasseye',  name: 'Glass Eye',     emoji: '🔍', hp: 16, scale: 1.00, r: 1 },
+          { id: 'l-sphinx',    name: 'Sphinx',        emoji: '🗿', hp: 17, scale: 1.08, r: 2 },
+          { id: 'l-mirageq',   name: 'The Mirage Queen', emoji: '💠', hp: 20, scale: 1.34, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'longnight', name: 'The Long Night', emoji: '🕯️', gold: 7.6,
+      sub: 'Morning is a rumour out here',
+      foes: {
+        math: [
+          { id: 'm-taper',     name: 'Taper',         emoji: '🕯️', hp: 16, scale: 0.90, r: 1 },
+          { id: 'm-shade',     name: 'Shade',         emoji: '🖤', hp: 17, scale: 1.00, r: 1 },
+          { id: 'm-nightjar',  name: 'Nightjar',      emoji: '🦇', hp: 18, scale: 1.06, r: 2 },
+          { id: 'm-longdark',  name: 'The Long Dark', emoji: '🌌', hp: 20, scale: 1.36, r: 3 }
+        ],
+        language: [
+          { id: 'l-hush',      name: 'Hush',          emoji: '🤫', hp: 16, scale: 0.90, r: 1 },
+          { id: 'l-lullaby',   name: 'Lullaby',       emoji: '🎶', hp: 16, scale: 0.95, r: 1 },
+          { id: 'l-candlewick', name: 'Candlewick',   emoji: '🪔', hp: 17, scale: 1.00, r: 1 },
+          { id: 'l-dreamer',   name: 'Dreamer',       emoji: '💤', hp: 18, scale: 1.08, r: 2 },
+          { id: 'l-nightq',    name: 'The Night Queen', emoji: '🌜', hp: 21, scale: 1.36, r: 3 }
+        ]
+      }
+    },
+    {
+      id: 'starroad', name: 'The Star Road', emoji: '🌌', gold: 8.2,
+      sub: 'The end of the trail, and it keeps going',
+      foes: {
+        math: [
+          { id: 'm-stardust',  name: 'Stardust',      emoji: '✨', hp: 18, scale: 0.90, r: 1 },
+          { id: 'm-quasar',    name: 'Quasar',        emoji: '💥', hp: 19, scale: 1.00, r: 1 },
+          { id: 'm-voidling',  name: 'Voidling',      emoji: '⚫', hp: 20, scale: 1.06, r: 2 },
+          { id: 'm-infinite',  name: 'The Infinite',  emoji: '♾️', hp: 22, scale: 1.40, r: 3 }
+        ],
+        language: [
+          { id: 'l-signal',    name: 'Signal',        emoji: '📡', hp: 18, scale: 0.90, r: 1 },
+          { id: 'l-constell',  name: 'Constellation', emoji: '🌠', hp: 18, scale: 0.95, r: 1 },
+          { id: 'l-cosmonaut', name: 'Cosmonaut',     emoji: '🧑‍🚀', hp: 19, scale: 1.00, r: 1 },
+          { id: 'l-oracle',    name: 'The Oracle',    emoji: '🛸', hp: 20, scale: 1.08, r: 2 },
+          { id: 'l-lastword',  name: 'The Last Word', emoji: '📜', hp: 23, scale: 1.40, r: 3 }
+        ]
+      }
     }
   ];
 
@@ -781,6 +838,57 @@ var Save = (function () {
         { g: 'math', t: 'bonds', m: 'expert', label: 'The Deep Voice', route: 'The counting deep',
           boss: true,
           foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
+          loot: 'boss' } ],
+
+      /* ---- The Glass Desert ---- */
+      { g: 'math',     t: 'clock',     m: 'expert', label: 'The sun dial' },
+      { g: 'language', t: 'opposites', m: 'expert', label: 'Hot glass, cool glass' },
+      [ { g: 'math',     t: 'add',     m: 'expert', label: 'Adding grains',
+          route: 'The dune road' },
+        { g: 'language', t: 'sight',   m: 'expert', label: 'Words in the sand',
+          route: 'The glass road' } ],
+      { g: 'math',     t: 'coins',     m: 'expert', label: 'Desert trade' },
+      [ { g: 'math', t: 'add', m: 'expert', label: 'The Sun King', route: 'The burning road', weak: true,
+          boss: true,
+          foe: { id: 'b-desert', name: 'The Sun King', emoji: '☀️', hp: 18, scale: 1.36 },
+          loot: 'boss' },
+        { g: 'language', t: 'opposites', m: 'expert', label: 'The Sun King', route: 'The shaded road',
+          boss: true,
+          foe: { id: 'b-desert', name: 'The Sun King', emoji: '☀️', hp: 18, scale: 1.36 },
+          loot: 'boss' } ],
+
+      /* ---- The Long Night ---- */
+      { g: 'language', t: 'read',      m: 'expert', label: 'Read by candlelight' },
+      { g: 'math',     t: 'sub',       m: 'expert', label: 'The hours going down' },
+      [ { g: 'language', t: 'rhyme',   m: 'expert', label: 'A lullaby',
+          route: 'The quiet way' },
+        { g: 'math',     t: 'oneless', m: 'expert', label: 'One star fewer',
+          route: 'The dark way' } ],
+      { g: 'story',    mini: 'finish',              label: 'A bedtime story' },
+      [ { g: 'language', t: 'read', m: 'expert', label: 'The Night Queen', route: 'The last candle', weak: true,
+          boss: true,
+          foe: { id: 'b-longnight', name: 'The Night Queen', emoji: '🌜', hp: 19, scale: 1.38 },
+          loot: 'boss' },
+        { g: 'math', t: 'sub', m: 'expert', label: 'The Night Queen', route: 'The long hour',
+          boss: true,
+          foe: { id: 'b-longnight', name: 'The Night Queen', emoji: '🌜', hp: 19, scale: 1.38 },
+          loot: 'boss' } ],
+
+      /* ---- The Star Road ---- */
+      { g: 'math',     t: 'skip',      m: 'expert', label: 'Counting the stars' },
+      { g: 'language', t: 'builder',   m: 'expert', label: 'Building starlight' },
+      [ { g: 'math',     t: 'pattern', m: 'expert', label: 'The pattern of the sky',
+          route: 'The bright road' },
+        { g: 'language', t: 'past',    m: 'expert', label: 'What the stars did',
+          route: 'The old road' } ],
+      { g: 'story',    mini: 'order',               label: 'How the journey went' },
+      [ { g: 'math', t: 'skip', m: 'expert', label: 'The Infinite', route: 'The last road', weak: true,
+          boss: true,
+          foe: { id: 'b-starroad', name: 'The Infinite', emoji: '♾️', hp: 20, scale: 1.42 },
+          loot: 'boss' },
+        { g: 'language', t: 'builder', m: 'expert', label: 'The Infinite', route: 'The long road',
+          boss: true,
+          foe: { id: 'b-starroad', name: 'The Infinite', emoji: '♾️', hp: 20, scale: 1.42 },
           loot: 'boss' } ]
     ],
 
@@ -1008,6 +1116,57 @@ var Save = (function () {
         { g: 'math', t: 'div', m: 'expert', label: 'The Deep Voice', route: 'The counting deep',
           boss: true,
           foe: { id: 'b-hollow', name: 'The Deep Voice', emoji: '👁️', hp: 17, scale: 1.34 },
+          loot: 'boss' } ],
+
+      /* ---- The Glass Desert ---- */
+      { g: 'math',     t: 'fract',     m: 'expert', label: 'Fractions of a dune' },
+      { g: 'math',     t: 'wordprob',  m: 'expert', label: 'A problem in the sand' },
+      [ { g: 'math',     t: 'place',   m: 'expert', label: 'Grains beyond counting',
+          route: 'The dune road' },
+        { g: 'language', t: 'marks',   m: 'expert', label: 'Mark the map',
+          route: 'The glass road' } ],
+      { g: 'language', t: 'grammar',   m: 'expert', label: 'Grammar in the heat' },
+      [ { g: 'math', t: 'fract', m: 'expert', label: 'The Sun King', route: 'The burning road', weak: true,
+          boss: true,
+          foe: { id: 'b-desert', name: 'The Sun King', emoji: '☀️', hp: 18, scale: 1.36 },
+          loot: 'boss' },
+        { g: 'math', t: 'place', m: 'expert', label: 'The Sun King', route: 'The shaded road',
+          boss: true,
+          foe: { id: 'b-desert', name: 'The Sun King', emoji: '☀️', hp: 18, scale: 1.36 },
+          loot: 'boss' } ],
+
+      /* ---- The Long Night ---- */
+      { g: 'language', t: 'fixit',     m: 'expert', label: 'Fix it by candlelight' },
+      { g: 'math',     t: 'alg',       m: 'expert', label: 'Solve in the dark' },
+      [ { g: 'language', t: 'syllable', m: 'expert', label: 'Count the beats',
+          route: 'The quiet way' },
+        { g: 'math',     t: 'div',     m: 'expert', label: 'Divide the watch',
+          route: 'The dark way' } ],
+      { g: 'language', t: 'twins',     m: 'expert', label: 'Twins by lamplight' },
+      [ { g: 'language', t: 'fixit', m: 'expert', label: 'The Night Queen', route: 'The last candle', weak: true,
+          boss: true,
+          foe: { id: 'b-longnight', name: 'The Night Queen', emoji: '🌜', hp: 19, scale: 1.38 },
+          loot: 'boss' },
+        { g: 'math', t: 'alg', m: 'expert', label: 'The Night Queen', route: 'The long hour',
+          boss: true,
+          foe: { id: 'b-longnight', name: 'The Night Queen', emoji: '🌜', hp: 19, scale: 1.38 },
+          loot: 'boss' } ],
+
+      /* ---- The Star Road ---- */
+      { g: 'math',     t: 'rule',      m: 'expert', label: 'The rule of the stars' },
+      { g: 'math',     t: 'mul',       m: 'expert', label: 'Multiplying light' },
+      [ { g: 'math',     t: 'applied', m: 'expert', label: 'Everyday infinity',
+          route: 'The bright road' },
+        { g: 'language', t: 'forge',   m: 'expert', label: 'Forge the last word',
+          route: 'The old road' } ],
+      { g: 'language', t: 'marks',     m: 'expert', label: 'The final full stop' },
+      [ { g: 'math', t: 'rule', m: 'expert', label: 'The Infinite', route: 'The last road', weak: true,
+          boss: true,
+          foe: { id: 'b-starroad', name: 'The Infinite', emoji: '♾️', hp: 20, scale: 1.42 },
+          loot: 'boss' },
+        { g: 'language', t: 'forge', m: 'expert', label: 'The Infinite', route: 'The long road',
+          boss: true,
+          foe: { id: 'b-starroad', name: 'The Infinite', emoji: '♾️', hp: 20, scale: 1.42 },
           loot: 'boss' } ]
     ]
   };
@@ -1074,7 +1233,16 @@ var Save = (function () {
       props: ['⛈️', '⚡', '🪨', '🌩️', '💨', '⛰️'] },
     { id: 'hollow', name: 'The Deep Hollow', emoji: '🍄', steps: 5,
       sky: ['#0f0a1e', '#3b2a52'], hills: ['#3a2a4e', '#2d203c', '#20172b'],
-      props: ['🍄', '💡', '🪲', '🫧', '🌫️', '🕳️'] }
+      props: ['🍄', '💡', '🪲', '🫧', '🌫️', '🕳️'] },
+    { id: 'desert', name: 'The Glass Desert', emoji: '🏜️', steps: 5,
+      sky: ['#3a1f10', '#c9873f'], hills: ['#a87a44', '#875e33', '#6b4926'],
+      props: ['🏜️', '🌵', '🔷', '🦂', '🌬️', '☀️'] },
+    { id: 'longnight', name: 'The Long Night', emoji: '🕯️', steps: 5,
+      sky: ['#08060f', '#2a1f3d'], hills: ['#2b2340', '#211a31', '#171223'],
+      props: ['🕯️', '🪔', '🌜', '💤', '🦇', '🤫'] },
+    { id: 'starroad', name: 'The Star Road', emoji: '🌌', steps: 5,
+      sky: ['#04050d', '#1b1b3a'], hills: ['#232048', '#1a1836', '#121028'],
+      props: ['🌌', '✨', '🌠', '🛸', '💫', '♾️'] }
   ];
 
   /* Which region a step belongs to. */
@@ -2099,7 +2267,12 @@ var Save = (function () {
     frost:  { label: '+25% gold',            goldBonus: 0.25 },
     library: { label: 'A wider DOUBLE window', fastBonus: 1500 },
     thunder: { label: '+25% gold',            goldBonus: 0.25 },
-    hollow:  { label: 'Much better card luck', cardBonus: 0.75 }
+    hollow:  { label: 'Much better card luck', cardBonus: 0.75 },
+    desert:  { label: '+30% gold',             goldBonus: 0.30 },
+    longnight: { label: 'A much wider DOUBLE window', fastBonus: 2000 },
+    /* The last set on the trail, so it pays a little of everything rather
+       than more hearts — the pip row is already long enough. */
+    starroad: { label: 'A bit of everything',  goldBonus: 0.25, cardBonus: 0.5, fastBonus: 1000 }
   };
 
   function setPerks(p, base) {

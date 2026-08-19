@@ -159,15 +159,17 @@ path when a stop is beaten — that walk is the moment the screen exists for.
 
 **Two trails, deliberately.** The five-year-old and the eight-year-old play
 genuinely different content, so a single path would strand the younger one at
-the first Algebra stop. `MAP.little` and `MAP.big` are 65 steps each, with
+the first Algebra stop. `MAP.little` and `MAP.big` are 80 steps each, with
 independent progress per profile.
 
 **New ground is appended, never inserted.** `progress.map` is an *index* into
 the trail, so removing or reordering a step teleports every hero standing past
 it. `save-test.html` freezes the first road of every step that has shipped and
-fails if one moves. The last two regions — Market Town and The
-Observatory — were added this way, to give the everyday-maths, fractions and
-blending tracks somewhere to live on the journey.
+fails if one moves. The trail now runs nine
+regions past Ember Peak, all added this way — Market Town and The Observatory
+first, to give the everyday-maths, fractions and blending tracks a home, then
+Whispering Woods, The Clockwork Mill, Frostfall, The Drowned Library, Thunder
+Plateau, The Deep Hollow, The Glass Desert, The Long Night and The Star Road.
 
 **A region draws its chests from a world.** `rollLoot()` looks up
 `cardsOfWorld(region.cards || region.id)`, so a region whose id isn't a world
@@ -310,7 +312,7 @@ applied at the start of the next run via `Save.loadout()`:
   helm and armor together top out at twelve pips rather than running away.
 - **Boots** — the gentlest ladder of the six: thinking time and a small cut of
   the gold. It's the slot you fill once you've bought the thing you wanted.
-- **Worlds** — thirteen in total, each a new foe lineup, a new card set, and a
+- **Worlds** — sixteen in total, each a new foe lineup, a new card set, and a
   better gold multiplier.
 - **🎟️ iPad Time Token** — see below.
 
@@ -331,7 +333,7 @@ math easy is not.
 
 ## Monster cards
 
-127 cards: every foe across thirteen worlds and both battle games, plus one per
+154 cards: every foe across sixteen worlds and both battle games, plus one per
 Story Quest quest and one per little-hero game.
 
 **Cards are rare on purpose** — a collection you finish in a week isn't a
@@ -985,8 +987,8 @@ Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
 daily challenge and streak, two new map regions, and `profile.row`.
 
 Current shape: **19 maths tracks, 15 language tracks, 8 quests + 2 mini games,
-65 map steps per trail through 13 regions, 13 worlds, 127 cards, 6 gear
-slots.** Suite: 454 save checks, 65 log checks, plus smoke / tracks / content /
+80 map steps per trail through 16 regions, 16 worlds, 154 cards, 6 gear
+slots.** Suite: 472 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
 **Outstanding, in rough priority order:**
