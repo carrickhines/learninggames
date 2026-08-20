@@ -1388,6 +1388,158 @@ try {
     });
   });
 
+  /* ---------- the dungeon ----------
+
+     A floor is generated, not authored, so it cannot be reviewed by reading
+     it. The only honest way to check generated content is to generate a great
+     deal of it and assert the things that must hold every single time. */
+
+  var floorsChecked = 0, noStairs = [], noFight = [], badType = [], earlyElite = [];
+  var KNOWN = ['entrance', 'stairs', 'monster', 'elite', 'shrine', 'treasure', 'empty'];
+  ['little', 'big'].forEach(function (row) {
+    for (var seed = 1; seed <= 400; seed++) {
+      for (var fl = 1; fl <= 12; fl++) {
+        var rooms = Save.dungeonFloor(seed * 7919, fl, row);
+        floorsChecked++;
+        var stairs = 0, fights = 0;
+        rooms.forEach(function (r) {
+          if (r.t === 'stairs') stairs++;
+          if (r.t === 'monster' || r.t === 'elite') fights++;
+          if (KNOWN.indexOf(r.t) === -1) badType.push(row + ' ' + seed + '/' + fl + ': ' + r.t);
+          if (r.t === 'elite' && fl < Save.ECONOMY.dungeon.eliteFrom) {
+            earlyElite.push(row + ' floor ' + fl);
+          }
+        });
+        if (stairs !== 1) noStairs.push(row + ' ' + seed + '/' + fl + ': ' + stairs);
+        if (fights < 1) noFight.push(row + ' ' + seed + '/' + fl);
+        if (rooms[0].t !== 'entrance') badType.push(row + ' ' + seed + '/' + fl + ': no entrance');
+      }
+    }
+  });
+  ok('dungeon: a lot of floors were generated to check', floorsChecked === 9600,
+     floorsChecked + ' floors');
+  ok('dungeon: every floor has exactly one staircase', noStairs.length === 0,
+     noStairs.slice(0, 3).join('; '));
+  ok('dungeon: every floor has something to fight', noFight.length === 0,
+     noFight.slice(0, 3).join('; '));
+  ok('dungeon: no room is of a type nothing can draw', badType.length === 0,
+     badType.slice(0, 3).join('; '));
+  ok('dungeon: elites keep away from the shallow floors', earlyElite.length === 0,
+     earlyElite.slice(0, 3).join('; '));
+
+  /* Every room must be walkable to from the entrance. The grid has no walls
+     precisely so this can never fail — but "can never fail" is exactly the
+     kind of claim that stops being true when somebody adds walls later. */
+  var stranded = [];
+  ['little', 'big'].forEach(function (row) {
+    var side = Save.dungeonSide(row);
+    var rooms = Save.dungeonFloor(999, 5, row);
+    var seen = {}, queue = [0];
+    seen[0] = true;
+    while (queue.length) {
+      var at = queue.shift();
+      Save.dungeonNeighbours(at, row).forEach(function (nb) {
+        if (!seen[nb]) { seen[nb] = true; queue.push(nb); }
+      });
+    }
+    for (var i = 0; i < rooms.length; i++) if (!seen[i]) stranded.push(row + ' room ' + i);
+    ok('dungeon: the ' + row + ' grid is ' + side + 'x' + side,
+       rooms.length === side * side);
+  });
+  ok('dungeon: no room can be walled off from the entrance', stranded.length === 0,
+     stranded.slice(0, 4).join('; '));
+
+  // the same seed must draw the same floor, or a reload rebuilds the world
+  var a1 = Save.dungeonFloor(4242, 3, 'big').map(function (r) { return r.t; }).join(',');
+  var a2 = Save.dungeonFloor(4242, 3, 'big').map(function (r) { return r.t; }).join(',');
+  var a3 = Save.dungeonFloor(4243, 3, 'big').map(function (r) { return r.t; }).join(',');
+  ok('dungeon: the same seed draws the same floor', a1 === a2);
+  ok('dungeon: a different seed draws a different one', a1 !== a3);
+
+  // deeper floors really are more of a fight
+  function fightShare(fl) {
+    var n = 0, tot = 0;
+    for (var seed = 1; seed <= 120; seed++) {
+      var rooms = Save.dungeonFloor(seed * 31, fl, 'big');
+      rooms.forEach(function (r) {
+        tot++;
+        if (r.t === 'monster' || r.t === 'elite') n++;
+      });
+    }
+    return n / tot;
+  }
+  var shallow = fightShare(1), deep = fightShare(12);
+  ok('dungeon: it gets harder the further down you go', deep > shallow + 0.1,
+     'floor 1 ' + shallow.toFixed(2) + ' vs floor 12 ' + deep.toFixed(2));
+
+  /* ---------- a descent, played ---------- */
+  fresh();
+  Save.createProfile('Delver', '🦎');
+  Save.update(function (p) { p.row = 'little'; });
+  var run = Save.dungeonStart();
+  ok('dungeon: a run starts on floor one', run && run.floor === 1);
+  ok('dungeon: it starts at the entrance', run.pos === 0);
+  ok('dungeon: the run is remembered on the profile', !!Save.dungeonRun());
+
+  var nbs = Save.dungeonNeighbours(0, 'little');
+  ok('dungeon: the entrance has somewhere to go', nbs.length >= 2);
+  ok('dungeon: you cannot step to a room that is not next to you',
+     Save.dungeonMove(15) === null);
+  ok('dungeon: you can step to one that is', !!Save.dungeonMove(nbs[0]));
+  ok('dungeon: and you are now standing there', Save.dungeonRun().pos === nbs[0]);
+
+  // an unfought monster holds you in place
+  Save.update(function (p) {
+    p.progress.dungeon.rooms[p.progress.dungeon.pos] = { t: 'monster', done: false };
+  });
+  var held = Save.dungeonRun().pos;
+  ok('dungeon: an unbeaten monster keeps you in the room',
+     Save.dungeonMove(Save.dungeonNeighbours(held, 'little')[0]) === null);
+  Save.update(function (p) { p.progress.dungeon.rooms[held].done = true; });
+  ok('dungeon: beating it lets you move on',
+     !!Save.dungeonMove(Save.dungeonNeighbours(held, 'little')[0]));
+
+  // a blessing is felt by the games, and only while you are down there
+  var beforeBless = Save.loadout().maxHp;
+  Save.update(function (p) {
+    p.progress.dungeon.rooms[p.progress.dungeon.pos] = { t: 'shrine', done: false };
+  });
+  var offer = Save.dungeonOffer(Save.dungeonRun());
+  ok('dungeon: a shrine offers three blessings',
+     offer.length === Save.ECONOMY.dungeon.blessings, offer.length + ' offered');
+  ok('dungeon: it offers three different ones',
+     offer[0].id !== offer[1].id && offer[1].id !== offer[2].id);
+  ok('dungeon: taking one works', Save.dungeonBless('hearts'));
+  ok('dungeon: a blessing reaches the loadout the games read',
+     Save.loadout().maxHp === beforeBless + Save.BLESSINGS.filter(
+       function (b) { return b.id === 'hearts'; })[0].maxHp,
+     beforeBless + ' -> ' + Save.loadout().maxHp);
+
+  // going down
+  Save.update(function (p) {
+    p.progress.dungeon.rooms[p.progress.dungeon.pos] = { t: 'stairs', done: false };
+  });
+  var floor2 = Save.dungeonDescend();
+  ok('dungeon: the stairs go down', floor2.floor === 2);
+  ok('dungeon: a new floor puts you back at its entrance', floor2.pos === 0);
+  ok('dungeon: the deepest floor is remembered', Save.me().progress.dungeonBest === 2);
+
+  /* The rule that matters most down here. Losing must cost nothing that was
+     already found — not gold, not cards, not gear. It ends the descent, and
+     that is the whole of the punishment. */
+  Save.award(500, 0);
+  var goldBefore = Save.me().gold;
+  var cardsBefore = JSON.stringify(Save.me().cards);
+  var out = Save.dungeonEnd('lost');
+  ok('dungeon: falling over ends the run', Save.dungeonRun() === null);
+  ok('dungeon: ...and costs not one coin', Save.me().gold === goldBefore,
+     goldBefore + ' -> ' + Save.me().gold);
+  ok('dungeon: ...nor a single card', JSON.stringify(Save.me().cards) === cardsBefore);
+  ok('dungeon: ...and the depth still counts', Save.me().progress.dungeonBest === 2);
+  ok('dungeon: it says how deep you got', out.floor === 2 && out.reason === 'lost');
+  ok('dungeon: the blessing does not follow you out',
+     Save.loadout().maxHp === beforeBless, 'still ' + Save.loadout().maxHp);
+
   fresh();
 
   /* ---------- corrupt storage ---------- */

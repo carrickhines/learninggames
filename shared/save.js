@@ -103,7 +103,25 @@ var Save = (function () {
     maxAllies: 3,
 
     baseXpToLevel: 100,   // XP for level 1 -> 2
-    xpStepPerLevel: 50    // each level costs this much more than the last
+    xpStepPerLevel: 50,   // each level costs this much more than the last
+
+    /* ---- The dungeon ----
+       A place that builds itself, so the one authored trail is not the only
+       thing to do. Everything found is kept the moment it is found — losing
+       ends the descent, it never takes anything back, because "nothing is
+       ever taken away" outranks any amount of roguelike tension. What you are
+       actually gambling is how much deeper you get. */
+    dungeon: {
+      side: { little: 4, big: 5 },  // grid is side x side rooms
+      monsterShare: [0.30, 0.55],   // floor 1 -> deepest: how much of it fights
+      eliteFrom: 3,                 // elites only appear from this floor down
+      shrineChance: 0.55,           // a floor usually, not always, has one
+      treasureGold: 45,             // per treasure room, multiplied by floor
+      treasureCard: 0.18,           // and its chance of a card
+      eliteCard: 0.60,              // an elite is the reliable card
+      floorClearGold: 25,           // for taking the stairs rather than leaving
+      blessings: 3                  // how many are offered at a shrine
+    }
   };
 
   /* ---------- Worlds and their monsters ----------------------------------
@@ -1392,6 +1410,215 @@ var Save = (function () {
              done: (p.progress.map[a.trail] >= MAP[a.trail].length) };
   }
 
+  /* ---------- The dungeon -------------------------------------------------
+
+     The map is authored and fixed; that is its job. This is the opposite —
+     a floor is generated from a seed, so no two descents are the same and
+     there is no end to it.
+
+     `dungeonFloor` is deliberately PURE: seed and floor in, rooms out, no
+     reading or writing of the save at all. That is what makes it testable
+     across thousands of floors instead of hopefully-looking-alright once.
+
+     Every room is reachable from every other: the grid has no walls, and you
+     may step to any orthogonal neighbour. A maze that can lock a child out of
+     the staircase is a bug with no upside, and removing walls removes the
+     whole class of it. The exploring is "what is in this room", not "can I
+     even get there". */
+
+  /* mulberry32 — small, fast, and identical everywhere, which is the only
+     property that matters here: the same seed must draw the same floor on an
+     iPad, in a test, and next Tuesday. */
+  function rngFrom(seed) {
+    var a = (seed >>> 0) || 1;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function dungeonSide(row) {
+    return ECONOMY.dungeon.side[row === 'big' ? 'big' : 'little'];
+  }
+
+  /* The rooms of one floor. Pure. */
+  function dungeonFloor(seed, floor, row) {
+    var D = ECONOMY.dungeon;
+    var side = dungeonSide(row);
+    var n = side * side;
+    var rng = rngFrom((seed >>> 0) ^ Math.imul(floor, 7919));
+
+    var rooms = [];
+    for (var i = 0; i < n; i++) rooms.push({ t: 'empty', done: false });
+
+    // the way in, and the way down: opposite corners, always reachable
+    rooms[0] = { t: 'entrance', done: true };
+    rooms[n - 1] = { t: 'stairs', done: false };
+
+    // how much of the floor fights, climbing with depth
+    var lo = D.monsterShare[0], hi = D.monsterShare[1];
+    var deep = Math.min(1, (floor - 1) / 12);
+    var monsters = Math.max(1, Math.round((n - 2) * (lo + (hi - lo) * deep)));
+
+    var free = [];
+    for (var j = 1; j < n - 1; j++) free.push(j);
+    // shuffle the free rooms with the seeded rng, then deal roles off the top
+    for (var k = free.length - 1; k > 0; k--) {
+      var m = Math.floor(rng() * (k + 1));
+      var tmp = free[k]; free[k] = free[m]; free[m] = tmp;
+    }
+
+    var at = 0;
+    for (var q = 0; q < monsters && at < free.length; q++, at++) {
+      rooms[free[at]] = { t: 'monster', done: false };
+    }
+    if (floor >= D.eliteFrom && at < free.length) {
+      rooms[free[at++]] = { t: 'elite', done: false };
+    }
+    if (rng() < D.shrineChance && at < free.length) {
+      rooms[free[at++]] = { t: 'shrine', done: false };
+    }
+    // whatever is left over is treasure, up to a third of the floor
+    var treasure = Math.max(1, Math.round((n - 2) * 0.22));
+    for (var r = 0; r < treasure && at < free.length; r++, at++) {
+      rooms[free[at]] = { t: 'treasure', done: false };
+    }
+    return rooms;
+  }
+
+  /* Which rooms you may step to from here. */
+  function dungeonNeighbours(i, row) {
+    var side = dungeonSide(row);
+    var r = Math.floor(i / side), c = i % side, out = [];
+    if (r > 0) out.push(i - side);
+    if (r < side - 1) out.push(i + side);
+    if (c > 0) out.push(i - 1);
+    if (c < side - 1) out.push(i + 1);
+    return out;
+  }
+
+  /* What a shrine can offer. All of these are things loadout() already knows
+     how to add up, so a blessing costs the battle games nothing. */
+  var BLESSINGS = [
+    { id: 'heart',  label: 'A brave heart',    sub: '+1 heart for this run',      maxHp: 1 },
+    { id: 'hearts', label: 'A stout heart',    sub: '+2 hearts for this run',     maxHp: 2 },
+    { id: 'think',  label: 'A clear head',     sub: '+3 seconds to think',        bonusTime: 3000 },
+    { id: 'quick',  label: 'Quick fingers',    sub: 'A wider DOUBLE window',      fastBonus: 1800 },
+    { id: 'greed',  label: 'A heavy purse',    sub: '+40% gold down here',        goldBonus: 0.40 },
+    { id: 'luck',   label: "A finder's eye",   sub: 'Better card luck down here', cardBonus: 0.75 }
+  ];
+
+  function blessing(id) {
+    for (var i = 0; i < BLESSINGS.length; i++) if (BLESSINGS[i].id === id) return BLESSINGS[i];
+    return null;
+  }
+
+  /* Three to choose from, drawn from the seed so the same shrine on the same
+     floor always offers the same three. */
+  function dungeonOffer(run) {
+    var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 104729) ^ run.pos);
+    var pool = BLESSINGS.slice();
+    var out = [];
+    for (var i = 0; i < ECONOMY.dungeon.blessings && pool.length; i++) {
+      out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+    }
+    return out;
+  }
+
+  function dungeonRun() {
+    var p = me();
+    return (p && p.progress.dungeon) || null;
+  }
+
+  /* Begin a descent. */
+  function dungeonStart() {
+    var p = me();
+    if (!p) return null;
+    var row = heroTrail();
+    p.progress.dungeon = {
+      seed: (Math.random() * 0x7fffffff) >>> 0,
+      row: row,
+      floor: 1,
+      pos: 0,
+      rooms: dungeonFloor(0, 1, row),   // replaced below, once the seed is set
+      blessings: [],
+      gold: 0,
+      cards: 0,
+      fighting: null
+    };
+    p.progress.dungeon.rooms = dungeonFloor(p.progress.dungeon.seed, 1, row);
+    write();
+    return p.progress.dungeon;
+  }
+
+  /* Step to an adjacent room. Returns the room you land in, or null. */
+  function dungeonMove(i) {
+    var p = me();
+    var run = dungeonRun();
+    if (!p || !run) return null;
+    if (dungeonNeighbours(run.pos, run.row).indexOf(i) === -1) return null;
+    var here = run.rooms[run.pos];
+    // an uncleared fight holds you where you are until it is settled
+    if (here && (here.t === 'monster' || here.t === 'elite') && !here.done) return null;
+    run.pos = i;
+    write();
+    return run.rooms[i];
+  }
+
+  /* Down one. The floor below is harder and pays better. */
+  function dungeonDescend() {
+    var p = me();
+    var run = dungeonRun();
+    if (!p || !run) return null;
+    if (run.rooms[run.pos].t !== 'stairs') return null;
+    run.floor += 1;
+    run.pos = 0;
+    run.rooms = dungeonFloor(run.seed, run.floor, run.row);
+    if (run.floor > (p.progress.dungeonBest || 0)) p.progress.dungeonBest = run.floor;
+    write();
+    return run;
+  }
+
+  /* Walk out, or fall over — either way you keep every single thing you
+     found. The only thing a loss costs is the rest of the descent. */
+  function dungeonEnd(reason) {
+    var p = me();
+    var run = dungeonRun();
+    if (!p || !run) return null;
+    var summary = { floor: run.floor, gold: run.gold, cards: run.cards,
+                    reason: reason || 'left' };
+    if (run.floor > (p.progress.dungeonBest || 0)) p.progress.dungeonBest = run.floor;
+    p.progress.dungeon = null;
+    write();
+    return summary;
+  }
+
+  /* The blessings in force, folded into the loadout the games already read. */
+  function dungeonPerks(base) {
+    var run = dungeonRun();
+    if (!run) return;
+    (run.blessings || []).forEach(function (id) {
+      var b = blessing(id);
+      if (!b) return;
+      base.maxHp += b.maxHp || 0;
+      base.bonusTime += b.bonusTime || 0;
+      base.fastBonus += b.fastBonus || 0;
+      base.goldBonus += b.goldBonus || 0;
+      base.cardBonus += b.cardBonus || 0;
+    });
+  }
+
+  function dungeonBless(id) {
+    var run = dungeonRun();
+    if (!run || !blessing(id)) return false;
+    run.blessings.push(id);
+    run.rooms[run.pos].done = true;
+    write();
+    return true;
+  }
+
   /* ---------- Loot ---------------------------------------------------------
      Every stop pays a chest, revealed on the map when the hero arrives — the
      reason to walk back and look. A boss chest is bigger and always holds a
@@ -2284,6 +2511,8 @@ var Save = (function () {
     }
     // completing a world's card set is permanent, and stacks
     setPerks(p, base);
+    // a shrine's blessing lasts the descent and no longer
+    dungeonPerks(base);
     return base;
   }
 
@@ -2554,6 +2783,17 @@ var Save = (function () {
     mapPick: mapPick,
     mapWalkFrom: mapWalkFrom,
     regionOf: regionOf,
+    dungeonFloor: dungeonFloor,
+    dungeonNeighbours: dungeonNeighbours,
+    dungeonSide: dungeonSide,
+    dungeonRun: dungeonRun,
+    dungeonStart: dungeonStart,
+    dungeonMove: dungeonMove,
+    dungeonDescend: dungeonDescend,
+    dungeonEnd: dungeonEnd,
+    dungeonOffer: dungeonOffer,
+    dungeonBless: dungeonBless,
+    BLESSINGS: BLESSINGS,
     nodeState: nodeState,
     startNode: startNode,
     activeNode: activeNode,
