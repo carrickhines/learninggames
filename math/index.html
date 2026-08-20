@@ -327,11 +327,15 @@
 
     <!-- Both rows are rendered from the TRACKS registry in the script below,
          grouped so nineteen cards stay findable. -->
-    <div class="group-label">Little hero powers</div>
+    <div class="group-label" id="littleLabel">Little hero powers</div>
     <div id="trackRow"></div>
 
-    <div class="group-label">Big hero powers</div>
+    <div class="group-label" id="bigLabel">Big hero powers</div>
     <div id="trackRow2"></div>
+
+    <div class="btn-row" id="showAllRow">
+      <button id="showAllBtn" class="ghost-btn"></button>
+    </div>
 
     <div class="group-label">Choose your difficulty</div>
     <div class="btn-row" id="modeRow">
@@ -528,6 +532,8 @@
   const el = {
     menu: $("menu"), battle: $("battle"), end: $("endScreen"),
     trackRow: $("trackRow"), trackRow2: $("trackRow2"),
+    littleLabel: $("littleLabel"), bigLabel: $("bigLabel"),
+    showAllBtn: $("showAllBtn"),
     modeRow: $("modeRow"), startBtn: $("startBtn"),
     playerHp: $("playerHp"), foeHp: $("foeHp"), foeName: $("foeName"),
     playerSprite: $("playerSprite"), foeSprite: $("foeSprite"), pet: $("pet"),
@@ -619,6 +625,37 @@
       });
     });
   })();
+
+  /* Show this hero's own half of the menu first.
+
+     Nineteen tracks is a lot to scan for a six-year-old, and the other row is
+     work they cannot do yet. It is HIDDEN, not removed: `profile.row` is not
+     meant to be a content gate, so one tap shows everything and a five-year-old
+     who wants to poke at fractions still can. The choice is not stored — the
+     menu opens tidy every time, which is the point of it. */
+  let showingAll = false;
+
+  function applyRowFilter() {
+    const mine = Save.heroTrail();
+    const other = mine === "big" ? "little" : "big";
+    const show = (label, host, on) => {
+      label.style.display = on ? "" : "none";
+      host.style.display = on ? "" : "none";
+    };
+    show(el.littleLabel, el.trackRow, showingAll || mine === "little");
+    show(el.bigLabel, el.trackRow2, showingAll || mine === "big");
+    el.showAllBtn.textContent = showingAll
+      ? "Just my powers"
+      : (other === "big" ? "👀 Show the big hero powers too"
+                         : "👀 Show the little hero powers too");
+  }
+
+  el.showAllBtn.addEventListener("click", () => {
+    Sound.click();
+    showingAll = !showingAll;
+    applyRowFilter();
+  });
+  applyRowFilter();
 
   /* The Rematch card, pinned above everything when questions are owed. */
   (function buildRematch() {

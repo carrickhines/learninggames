@@ -229,11 +229,15 @@
 
     <!-- Both quest rows are rendered from the TRACKS registry in the script
          below, so a new track is one entry in one place. -->
-    <div class="group-label">Little hero quests</div>
+    <div class="group-label" id="littleLabel">Little hero quests</div>
     <div class="btn-row" id="trackGrid"></div>
 
-    <div class="group-label">Big hero quests</div>
+    <div class="group-label" id="bigLabel">Big hero quests</div>
     <div class="btn-row" id="trackGrid2"></div>
+
+    <div class="btn-row">
+      <button id="showAllBtn" class="ghost-btn"></button>
+    </div>
 
     <div class="group-label">Choose your speed</div>
     <div class="btn-row" id="modeRow">
@@ -1283,6 +1287,27 @@ function showScreen(id) {
 /* ==================================================================
    Menu wiring
    ================================================================== */
+/* Show this hero's own half of the menu first.
+
+   The other row is work they cannot do yet, and fourteen cards is already a
+   wall. It is HIDDEN, not removed: profile.row is not meant to be a content
+   gate, so one tap shows everything. The choice is not stored, so the menu
+   opens tidy every time. */
+function applyRowFilter() {
+  const mine = Save.heroTrail();
+  const other = mine === 'big' ? 'little' : 'big';
+  const show = (label, host, on) => {
+    $(label).style.display = on ? '' : 'none';
+    $(host).style.display = on ? '' : 'none';
+  };
+  show('littleLabel', 'trackGrid', window.__showAll || mine === 'little');
+  show('bigLabel', 'trackGrid2', window.__showAll || mine === 'big');
+  $('showAllBtn').textContent = window.__showAll
+    ? 'Just my quests'
+    : (other === 'big' ? '👀 Show the big hero quests too'
+                       : '👀 Show the little hero quests too');
+}
+
 /* The quest cards, built from TRACKS and grouped inside each hero row —
    fourteen cards in one strip is a wall to a child scanning for the one he
    wants. Both rows remain a single selection. */
@@ -1363,6 +1388,14 @@ function renderMute() {
   $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
   $('muteBtn').classList.toggle('muted', Sound.muted);
 }
+window.__showAll = false;
+$('showAllBtn').addEventListener('click', () => {
+  Sound.click();
+  window.__showAll = !window.__showAll;
+  applyRowFilter();
+});
+applyRowFilter();
+
 $('muteBtn').addEventListener('click', () => {
   Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
   renderMute();

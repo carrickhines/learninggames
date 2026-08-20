@@ -184,7 +184,7 @@
     <h1>Story Quest</h1>
     <div class="subtitle">Read carefully — the story tells you what to do!</div>
 
-    <div class="group-label">Little hero games</div>
+    <div class="group-label" id="littleLabel">Little hero games</div>
     <div class="btn-row" id="miniRow">
       <button class="choice" data-mini="order">
         <span class="emoji">🃏</span>Story Order
@@ -196,8 +196,12 @@
       </button>
     </div>
 
-    <div class="group-label">Big hero quests</div>
+    <div class="group-label" id="bigLabel">Big hero quests</div>
     <div class="btn-row" id="questRow"></div>
+
+    <div class="btn-row">
+      <button id="showAllBtn" class="ghost-btn"></button>
+    </div>
 
     <div style="margin-top:22px">
       <button id="startBtn" disabled>Begin the Quest!</button>
@@ -1764,6 +1768,30 @@ function renderMute() {
   $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
   $('muteBtn').classList.toggle('muted', Sound.muted);
 }
+/* Show this hero's own half of the menu first. Hidden, not removed — one tap
+   shows everything, because profile.row is not meant to be a content gate. */
+window.__showAll = false;
+function applyRowFilter() {
+  const mine = Save.heroTrail();
+  const other = mine === 'big' ? 'little' : 'big';
+  const show = (label, host, on) => {
+    $(label).style.display = on ? '' : 'none';
+    $(host).style.display = on ? '' : 'none';
+  };
+  show('littleLabel', 'miniRow', window.__showAll || mine === 'little');
+  show('bigLabel', 'questRow', window.__showAll || mine === 'big');
+  $('showAllBtn').textContent = window.__showAll
+    ? 'Just my games'
+    : (other === 'big' ? '👀 Show the big hero quests too'
+                       : '👀 Show the little hero games too');
+}
+$('showAllBtn').addEventListener('click', () => {
+  Sound.click();
+  window.__showAll = !window.__showAll;
+  applyRowFilter();
+});
+applyRowFilter();
+
 $('muteBtn').addEventListener('click', () => {
   Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
   renderMute();

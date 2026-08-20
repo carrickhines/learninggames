@@ -411,9 +411,20 @@ shown on the hero picker and in Settings so a wrong guess is one tap to fix.
 **Switching costs nothing.** The two trails have always kept separate progress,
 so a hero can move between them and lose neither.
 
-Note this is *not* a content gate: both menus stay fully open to both kids, and
-free play is never restricted. A five-year-old who wants to poke at fractions
-still can.
+**The menus open on your own row, but nothing is locked.** Nineteen maths
+tracks is a lot to scan for a six-year-old and half of them are the other kid's
+work, so a game's menu shows only this hero's row — with a *"👀 Show the … too"*
+button that brings the rest back in one tap. Hidden, not gone: `profile.row` is
+still not a content gate, and a five-year-old who wants to poke at fractions
+still can. The choice isn't stored, so the menu opens tidy every time.
+
+`smoke.py` checks both halves of this on all three games and both rows — that
+your own row shows, that the other is put away, and that one tap brings it
+back. Note `load()` in the harness taps the reveal on purpose, because the rest
+of the suite drives tracks from both rows.
+
+A map stop or the daily challenge locks the game to its track and skips the
+menu entirely, so neither is affected by any of this.
 
 ## Today's challenge, and a streak that can't hurt
 

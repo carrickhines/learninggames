@@ -39,12 +39,19 @@ def check(label, ok, detail=""):
 
 
 def load(relpath):
-    """Load a page and install an error trap for anything that throws later."""
+    """Load a page and install an error trap for anything that throws later.
+
+    A menu now opens showing only the hero's own row, with the other behind a
+    "Show everything" tap. The rest of this file drives tracks from BOTH rows,
+    so reveal them here once — the same tap a child makes. The filtering
+    itself is checked on its own further down, so this does not hide it."""
     d.get("file://" + os.path.join(ROOT, relpath))
     time.sleep(0.8)  # let the fadeIn settle
     d.execute_script(
         "window.__errs = window.__errs || [];"
         "window.addEventListener('error', function (e) { window.__errs.push(String(e.message)); });"
+        "var b = document.getElementById('showAllBtn');"
+        "if (b && /Show/.test(b.textContent)) b.click();"
     )
 
 
@@ -529,6 +536,43 @@ try:
     check("dungeon: an unbeaten monster pins you in the room", d.execute_script(
         "return document.querySelectorAll('.room.step').length === 0;"))
     check("dungeon: no JS errors", errs() == [], str(errs()))
+
+    # --------------------------------------------------- the menus open tidy
+    # Nineteen maths tracks is a lot to scan for a six-year-old, and half of
+    # them are work the other kid does. A menu opens showing only this hero's
+    # row -- but HIDDEN is not GONE: profile.row is not a content gate, so the
+    # rest stays one tap away. Both halves of that are checked here.
+    print("\nThe menus open on your own row")
+    ROWS = {"math/index.html": ("trackRow", "trackRow2"),
+            "language/index.html": ("trackGrid", "trackGrid2"),
+            "story/index.html": ("miniRow", "questRow")}
+    for row in ("little", "big"):
+        d.get("file://" + os.path.join(ROOT, "index.html"))
+        time.sleep(0.6)
+        d.execute_script("var r = arguments[0];"
+                         "Save.reset(); Save.createProfile('Row', 'R');"
+                         "Save.update(function (p) { p.row = r; });", row)
+        for page, (lil, big) in ROWS.items():
+            name = page.split("/")[0]
+            # NOT load(): that reveals everything on purpose
+            d.get("file://" + os.path.join(ROOT, page))
+            time.sleep(0.9)
+            seen = d.execute_script(
+                "return [document.getElementById(arguments[0]).offsetParent !== null,"
+                "        document.getElementById(arguments[1]).offsetParent !== null];",
+                lil, big)
+            check("menu (%s/%s): your own row is showing" % (name, row),
+                  seen[0] if row == "little" else seen[1], str(seen))
+            check("menu (%s/%s): the other row is put away" % (name, row),
+                  not (seen[1] if row == "little" else seen[0]), str(seen))
+            d.execute_script("document.getElementById('showAllBtn').click();")
+            time.sleep(0.3)
+            both = d.execute_script(
+                "return [document.getElementById(arguments[0]).offsetParent !== null,"
+                "        document.getElementById(arguments[1]).offsetParent !== null];",
+                lil, big)
+            check("menu (%s/%s): one tap brings the rest back" % (name, row),
+                  both[0] and both[1], str(both))
 
     # ------------------------------------------------------- the mute button
     # The dungeon shipped its mute button with class="mute", a class that does
