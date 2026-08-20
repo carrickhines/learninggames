@@ -1183,6 +1183,39 @@ try {
         settings: { modeByGame: { math: 'expert' }, lastTrack: { math: 'alg' } },
         stats: { correct: 3400, wrong: 410, streak: 9, bestStreak: 52 }
       } }
+    },
+    /* A v4 hero, caught mid-journey: two trails part-walked, a boss stop
+       half-played on the big trail, a set nearly finished, and a row they
+       said out loud rather than one guessed for them. This is the shape that
+       was on the iPads the day the dungeon landed. */
+    4: {
+      v: 4, active: 'kid',
+      profiles: { kid: {
+        name: 'Rowan', avatar: '🦊', xp: 9200, gold: 48000, level: 14, row: 'big',
+        inventory: { owned: ['frost', 'scale', 'griffin', 'clover', 'ipad'],
+                     weapon: 'frost', armor: 'scale', pet: 'griffin',
+                     trinket: 'clover', tokens: 3,
+                     petXp: { griffin: 210, drake: 88 } },
+        cards: { 'm-slime': 4, 'm-bat': 2, 'm-ghost': 1, 'm-dragon': 1,
+                 'l-slime': 3, 'l-imp': 1, 'l-ghost': 2, 'l-rex': 1,
+                 'm-crab': 2, 'l-troll': 1, 's-troll': 1, 's-dragon': 1 },
+        foils: { 'm-dragon': 1, 's-troll': 1 },
+        progress: { world: 'reef',
+                    unlockedWorlds: ['meadow', 'cave', 'sky', 'reef'],
+                    runsWon: { math: 96, language: 51 },
+                    questsDone: [0, 1, 2, 3, 4],
+                    seqTier: 5, koSinceCard: 17, skipMastered: true,
+                    map: { little: 9, big: 21 },
+                    mapPicks: { little: { 2: 1, 5: 0, 7: 1 },
+                                big: { 2: 0, 7: 1, 10: 0, 14: 1, 18: 0 } },
+                    mapWalk: null,
+                    activeNode: { trail: 'big', i: 21, o: 0 },
+                    dailyDone: '2026-08-18',
+                    streak: { days: 11, last: '2026-08-18' } },
+        settings: { modeByGame: { math: 'expert', language: 'normal' },
+                    lastTrack: { math: 'rule', language: 'twins' } },
+        stats: { correct: 9100, wrong: 980, streak: 22, bestStreak: 88 }
+      } }
     }
   };
 
@@ -1243,6 +1276,20 @@ try {
        Save.rowOf() === (was.progress.map.big > was.progress.map.little
                          ? 'big' : 'little'),
        Save.rowOf() + ' with map ' + JSON.stringify(was.progress.map));
+
+    /* v5 opened the dungeon and the forge. Every field it adds must arrive
+       present and EMPTY — an old hero has never been underground, so a
+       dungeonBest of anything but zero would be a record they never set, and
+       a `dungeon` that is not null would drop them into a descent they never
+       started. The whole point of this migration is that it is invisible. */
+    ok(tag + 'the dungeon fields arrived', p.progress.dungeon === null,
+       JSON.stringify(p.progress.dungeon));
+    ok(tag + 'no deepest floor is invented', p.progress.dungeonBest === 0,
+       'best ' + p.progress.dungeonBest);
+    ok(tag + 'found gear starts empty',
+       !!p.inventory.found && Object.keys(p.inventory.found).length === 0);
+    ok(tag + 'nothing arrives pre-forged',
+       !!p.inventory.forge && Object.keys(p.inventory.forge).length === 0);
 
     ok(tag + 'it is stamped with the current schema afterwards',
        JSON.parse(localStorage.getItem(Save._key)).v === Save._version);

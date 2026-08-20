@@ -1469,6 +1469,9 @@ var Save = (function () {
         trinket: null,
         helm: null,
         boots: null,
+        // gear that only drops underground, and what the forge has done to it
+        found: {},
+        forge: {},
         tokens: 0
       },
       cards: {},                     // card id -> copies held (foils included)
@@ -1478,6 +1481,8 @@ var Save = (function () {
         mapPicks: { little: {}, big: {} },// which route was taken at each fork
         mapWalk: null,                   // where to walk the hero from, once
         activeNode: null,                // the map stop being played, if any
+        dungeon: null,                   // the descent in progress, if any
+        dungeonBest: 0,                  // deepest floor ever reached
         world: 'meadow',
         unlockedWorlds: ['meadow'],
         runsWon: {},                 // game id -> wins
@@ -1492,7 +1497,7 @@ var Save = (function () {
     };
   }
 
-  var VERSION = 4;
+  var VERSION = 5;
   var V2_GOLD_SCALE = 20;   // see migrate(): the v2 price rebalance factor
 
   function blankSave() {
@@ -1562,6 +1567,27 @@ var Save = (function () {
       Object.keys(d.profiles).forEach(function (id) {
         var p = d.profiles[id];
         if (p.row !== 'little' && p.row !== 'big') p.row = guessRow(p);
+      });
+    }
+
+    if (v < 5) {
+      /* v5 makes room for the dungeon and the forge. Every field here is new
+         and empty — nothing existing is read, rewritten or reset, so a hero
+         who never goes down a staircase is bit-for-bit the hero they were.
+
+         `dungeon` is the run in progress (null between runs), `dungeonBest`
+         the deepest floor ever reached, which is the record they chase.
+         `found` holds gear that only ever drops underground, and `forge` the
+         upgrade level of anything they have poured gold into, keyed by item
+         id so a forged sword keeps its level when it is put away. */
+      Object.keys(d.profiles).forEach(function (id) {
+        var p = d.profiles[id];
+        if (!p.inventory) p.inventory = {};
+        if (!p.inventory.found) p.inventory.found = {};
+        if (!p.inventory.forge) p.inventory.forge = {};
+        if (!p.progress) p.progress = {};
+        if (p.progress.dungeon === undefined) p.progress.dungeon = null;
+        if (!p.progress.dungeonBest) p.progress.dungeonBest = 0;
       });
     }
 

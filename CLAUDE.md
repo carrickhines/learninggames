@@ -33,7 +33,7 @@ Renaming a key is indistinguishable from wiping the save.
 
 ## Schema changes go through `migrate()`, and only ever add
 
-Bump `VERSION` in `shared/save.js` (currently **4**) and add an `if (v < N)`
+Bump `VERSION` in `shared/save.js` (currently **5**) and add an `if (v < N)`
 block. Inside it:
 
 - **Add missing fields; never remove, rename or re-key an existing one.** Old
@@ -51,7 +51,7 @@ block. Inside it:
 ## Every shipped version keeps a fixture
 
 `.verify/save-test.html` holds a `FIXTURES` map: one realistic save blob per
-schema version that has ever been deployed (currently v2 and v3). Each is
+schema version that has ever been deployed (currently v2, v3 and v4). Each is
 loaded and checked for gold, XP, gear, owned items, tokens, cards, foils,
 worlds, map position, roads already taken, quests, stats, pity counter,
 remembered track and mode, and that a half-played stop still resumes into the
@@ -999,7 +999,7 @@ daily challenge and streak, two new map regions, and `profile.row`.
 
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
 80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear
-slots.** Suite: 472 save checks, 65 log checks, plus smoke / tracks / content /
+slots.** Suite: 505 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
 **Outstanding, in rough priority order:**
