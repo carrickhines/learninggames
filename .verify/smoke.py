@@ -530,6 +530,37 @@ try:
         "return document.querySelectorAll('.room.step').length === 0;"))
     check("dungeon: no JS errors", errs() == [], str(errs()))
 
+    # ------------------------------------------------------- the mute button
+    # The dungeon shipped its mute button with class="mute", a class that does
+    # not exist. It fell through to the generic gold button style and sat in
+    # the top-LEFT corner as a yellow slab behind the hero chip. Nothing in
+    # the suite could see it, because nothing checked. Now something does.
+    print("\nThe sound toggle is where it belongs")
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Sam', 'S');")
+    for page in ("index.html", "math/index.html", "language/index.html",
+                 "story/index.html", "dungeon/index.html"):
+        load(page)
+        box = d.execute_script("""
+            var b = document.getElementById('muteBtn');
+            if (!b) return null;
+            var app = document.getElementById('app');
+            var r = b.getBoundingClientRect(), a = app.getBoundingClientRect();
+            var c = getComputedStyle(b);
+            return {right: Math.round(a.right - r.right),
+                    top: Math.round(r.top - a.top),
+                    gold: c.backgroundImage !== 'none',
+                    round: c.borderRadius};
+        """)
+        name = page.split("/")[0]
+        check("mute (%s): it exists" % name, box is not None)
+        if not box:
+            continue
+        check("mute (%s): it sits in the top-right corner" % name,
+              0 <= box["right"] <= 24 and 0 <= box["top"] <= 24, str(box))
+        check("mute (%s): it is the round toggle, not a gold button" % name,
+              not box["gold"] and box["round"] == "50%", str(box))
+
     print("\nThe topbar has room for everyone")
     # The hero chip's width depends on the name and the gold in it. It used to
     # have a hardcoded clearance, which the five-figure economy outgrew — the

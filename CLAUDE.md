@@ -333,6 +333,29 @@ dearest item is gold-only fails with `gold alone buys the best ['helm']`.
 **Keep the buffs mild.** Owning something that grows is the point; making the
 math easy is not.
 
+## Gear you cannot buy, and the Forge
+
+`FOUND` holds gear that only ever drops in the dungeon. Same shape as a `SHOP`
+item minus the price, so `item()` and `loadout()` treat it identically — and
+`buy()` explicitly refuses it, because `p.gold < undefined` is false and
+without that guard it would be handed over for nothing to anyone who asked.
+
+Each drop carries a **star roll**, one to three, which scales everything the
+item does. A child reads three stars at a glance; a table of rolled statistics
+they cannot. `awardFound()` keeps the better roll, never the newer one.
+
+**The Forge** (a hub screen) pours gold into something already owned, +1 to +5,
+keyed by item id so a forged sword keeps its level when it is put away. Costs
+climb steeply so it stays a long-term sink.
+
+**The ladder must survive both.** `save-test.html` walks every rung of the
+weapon ladder with the lower tier forged to the ceiling and checks it never
+overtakes the plain tier above. It compares whole weapons, not crit alone — the
+shop does not climb on crit (the Flame Blade beats the Axe on DOUBLE damage
+while barely moving crit), so a crit-only comparison reports the ladder itself
+as broken. At seven times the intended forge step it fails with
+`sword+5 0.480 >= plain axe 0.200`.
+
 ## Monster cards
 
 162 cards: every foe across sixteen worlds and both battle games, plus one per
@@ -1038,7 +1061,7 @@ daily challenge and streak, two new map regions, and `profile.row`.
 
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
 80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear
-slots.** Suite: 538 save checks, 65 log checks, plus smoke / tracks / content /
+slots.** Suite: 571 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
 **Outstanding, in rough priority order:**

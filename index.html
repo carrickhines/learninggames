@@ -688,6 +688,7 @@
       <div class="btn-row" style="margin-top:22px">
         <button id="dungeonBtn">⛏️ The Dungeon</button>
         <button id="shopBtn">🛒 Shop</button>
+        <button id="forgeBtn">🔨 Forge</button>
         <button id="cardsBtn">🃏 Cards</button>
         <button id="redeemBtn" style="display:none">🎟️ iPad time</button>
         <button id="settingsBtn" class="ghost-btn">⚙️ Settings</button>
@@ -829,6 +830,23 @@
   </section>
 
   <!-- ================= SHOP ================= -->
+  <section class="screen scrolls" id="forge">
+    <div class="screen-inner">
+      <h1>The Forge</h1>
+      <div class="purse-big" id="forgeGold">🪙 0</div>
+      <div class="subtitle">Pour gold into something you already own and it
+        gets better. A favourite can stay a favourite.</div>
+
+      <div id="forgeList"></div>
+
+      <div class="flash" id="forgeFlash"></div>
+
+      <div class="btn-row back-row">
+        <button id="forgeBackBtn" class="ghost-btn">Back</button>
+      </div>
+    </div>
+  </section>
+
   <section class="screen scrolls" id="shop">
     <div class="screen-inner">
       <h1>Shop</h1>
@@ -1258,6 +1276,85 @@ $('dungeonBtn').addEventListener('click', () => {
   Sound.click();
   location.href = 'dungeon/index.html';
 });
+
+/* ---------- The Forge ----------
+   Everything worn or ownable, with its star roll and what another level
+   costs. The point of it is that a piece you like does not have to be
+   abandoned the moment the next tier appears in the shop. */
+function forgeFlash(msg, bad) {
+  const f = $('forgeFlash');
+  f.textContent = msg || '';
+  f.classList.toggle('bad', !!bad);
+}
+
+function renderForge() {
+  const me = Save.me();
+  if (!me) return;
+  $('forgeGold').textContent = '🪙 ' + me.gold;
+  const list = $('forgeList');
+  list.innerHTML = '';
+
+  const owned = me.inventory.owned
+    .map((id) => Save.item(id))
+    .filter((it) => it && ['weapon', 'armor', 'pet', 'trinket', 'helm', 'boots'].includes(it.kind));
+
+  if (!owned.length) {
+    list.innerHTML = '<div class="subtitle">Nothing to work on yet. Buy some ' +
+      'gear, or go and find some in the dungeon.</div>';
+    return;
+  }
+
+  const heading = document.createElement('div');
+  heading.className = 'group-label';
+  heading.textContent = 'What you own';
+  list.appendChild(heading);
+
+  const rack = document.createElement('div');
+  rack.className = 'rack';
+  owned.forEach((it) => {
+    const lvl = Save.forgeLevel(it.id);
+    const stars = Save.starsOf(it.id);
+    const cost = Save.forgeCost(it.id);
+    const worn = me.inventory[it.kind] === it.id;
+
+    // same markup as a shop card, so it inherits the shop's whole look
+    const card = document.createElement('button');
+    card.className = 'choice shop-item'
+      + (worn ? ' worn' : '')
+      + (cost !== null && me.gold < cost ? ' broke' : '');
+    card.innerHTML =
+      `<span class="emoji">${it.emoji}</span>` +
+      escapeHtml(it.name + (lvl ? ' +' + lvl : '')) +
+      `<span class="sub"></span><span class="price"></span>`;
+    card.querySelector('.sub').textContent =
+      (stars ? '⭐'.repeat(stars) + ' · ' : '') + it.sub;
+    card.querySelector('.price').textContent =
+      cost === null ? '✨ Fully forged' : '🔨 ' + cost + ' to improve';
+    card.onclick = () => {
+      const r = Save.forgeUp(it.id);
+      if (r === 'ok') {
+        Sound.buy();
+        forgeFlash(`${it.name} is now +${Save.forgeLevel(it.id)}!`);
+      } else if (r === 'broke') {
+        Sound.denied();
+        forgeFlash('Not enough gold for that one yet.', true);
+      } else if (r === 'max') {
+        forgeFlash(`${it.name} cannot get any better.`);
+      }
+      renderForge();
+    };
+    rack.appendChild(card);
+  });
+  list.appendChild(rack);
+}
+
+$('forgeBtn').addEventListener('click', () => {
+  Sound.click();
+  forgeFlash('');
+  renderForge();
+  showScreen('forge');
+});
+$('forgeBackBtn').addEventListener('click', () => { Sound.click(); showScreen('home'); });
 $('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 
 /* ---------- The map ----------

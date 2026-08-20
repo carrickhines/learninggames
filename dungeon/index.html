@@ -65,7 +65,7 @@
 </head>
 <body>
 <div id="app">
-  <button id="muteBtn" class="mute" aria-label="Sound on or off">🔊</button>
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
 
   <!-- ---------- the way in ---------- -->
   <section id="startScreen" class="screen show">
@@ -295,6 +295,16 @@
   $('againBtn').onclick = () => { Save.dungeonStart(); showScreen('floorScreen'); render(); };
   $('homeBtn').onclick = () => (location.href = HOME);
   $('outBtn').onclick = () => (location.href = HOME);
+
+  function renderMute() {
+    $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
+    $('muteBtn').classList.toggle('muted', Sound.muted);
+  }
+  $('muteBtn').addEventListener('click', () => {
+    Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
+    renderMute();
+  });
+  renderMute();
 
   Hud.render();
 

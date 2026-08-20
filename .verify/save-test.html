@@ -1388,6 +1388,122 @@ try {
     });
   });
 
+  /* ---------- gear you find, and the forge ---------- */
+  fresh();
+  Save.createProfile('Smith', '🔨');
+  Save.update(function (p) { p.gold = 200000; });
+
+  ok('found gear is not for sale at any price', Save.buy('f-gloom') === 'notforsale');
+  ok('...and asking does not quietly hand it over', !Save.owns('f-gloom'));
+
+  var drop = Save.awardFound('f-gloom', 2);
+  ok('a drop grants the item', Save.owns('f-gloom') && drop.better);
+  ok('...with the stars it rolled', Save.starsOf('f-gloom') === 2);
+  var worse = Save.awardFound('f-gloom', 1);
+  ok('a worse roll never downgrades what you hold', Save.starsOf('f-gloom') === 2,
+     'stars now ' + Save.starsOf('f-gloom'));
+  ok('...and says so rather than pretending', worse.better === false);
+  Save.awardFound('f-gloom', 3);
+  ok('a better roll does replace it', Save.starsOf('f-gloom') === 3);
+
+  // stars scale what the thing does
+  Save.equip('f-gloom');
+  ok('found gear can be worn', Save.me().inventory.weapon === 'f-gloom');
+  var threeStar = Save.loadout().crit;
+  ok('three stars is worth more than the plain item',
+     threeStar > Save.item('f-gloom').crit,
+     Save.item('f-gloom').crit + ' -> ' + threeStar);
+
+  // the forge
+  var cost = Save.forgeCost('f-gloom');
+  var goldBefore = Save.me().gold;
+  ok('the forge quotes a price', cost > 0);
+  ok('forging works', Save.forgeUp('f-gloom') === 'ok');
+  ok('...and charges for it', Save.me().gold === goldBefore - cost,
+     goldBefore + ' -> ' + Save.me().gold);
+  ok('...and the level went up', Save.forgeLevel('f-gloom') === 1);
+  ok('a forged item is worth more than it was',
+     Save.loadout().crit > threeStar,
+     threeStar + ' -> ' + Save.loadout().crit);
+  ok('each level costs more than the last', Save.forgeCost('f-gloom') > cost,
+     cost + ' then ' + Save.forgeCost('f-gloom'));
+
+  // it caps, and it says so rather than silently taking the gold
+  var guard = 0;
+  while (Save.forgeUp('f-gloom') === 'ok' && guard++ < 20) { /* keep going */ }
+  ok('the forge has a ceiling', Save.forgeLevel('f-gloom') === Save.forgeMax,
+     'level ' + Save.forgeLevel('f-gloom'));
+  ok('...and refuses politely at the top', Save.forgeUp('f-gloom') === 'max');
+  ok('...and asks nothing more for it', Save.forgeCost('f-gloom') === null);
+
+  var pooredGold = Save.me().gold;
+  Save.buy('sword');
+  Save.update(function (p) { p.gold = 5; });
+  ok('you cannot forge what you cannot afford', Save.forgeUp('sword') === 'broke');
+  ok('...and it costs nothing to be told so', Save.me().gold === 5);
+  ok('and forging what you do not own is refused', Save.forgeUp('aegis') === 'nosuch');
+  Save.update(function (p) { p.gold = pooredGold; });
+
+  /* Work done on a piece belongs to the piece, not the slot — putting it away
+     and bringing it back must not undo it, for the same reason a pet keeps
+     what it grew. */
+  Save.buy('axe');
+  Save.equip('axe');
+  ok('swapping weapons does not undo the forge',
+     Save.forgeLevel('f-gloom') === Save.forgeMax);
+  Save.equip('f-gloom');
+  ok('...and it is still there when it comes back out',
+     Save.loadout().crit > threeStar);
+
+  /* The pet rule, applied to gear: a cheap piece forged to the hilt must not
+     beat a plain dearer one on every count at once, or the ladder stops
+     meaning anything and the forge becomes the only thing worth doing. */
+  Save.update(function (p) { p.gold = 900000; });
+  Save.buy('frost');
+  var g2 = 0;
+  Save.equip('sword');
+  while (Save.forgeUp('sword') === 'ok' && g2++ < 20) { /* max the cheap one */ }
+  var maxedSword = Save.loadout();
+  Save.equip('frost');
+  var plainFrost = Save.loadout();
+  ok('the cheap weapon really was forged to the top',
+     Save.forgeLevel('sword') === Save.forgeMax);
+
+  /* The ladder property, stated properly. Forging must never let a tier
+     overtake the tier above it — otherwise the shop stops being a ladder and
+     the forge becomes the only thing worth spending on. Checked across every
+     rung of the weapon ladder rather than one hand-picked pair, because a
+     single comparison can pass while the tuning is wildly wrong: at seven
+     times the intended step this said nothing at all, since the cheap sword
+     still lacked the dearer one's DOUBLE damage. */
+  /* Compare the whole weapon, not its crit. The shop ladder does not climb on
+     crit alone — the Flame Blade beats the Axe on DOUBLE damage while barely
+     moving crit at all — so a crit-only comparison reports the ladder itself
+     as broken. A point of DOUBLE damage is worth far more than a percentage
+     of crit, hence the weighting. */
+  function power(l) { return l.crit + (l.superDamage - 2) * 0.5; }
+  var ladder = Save.SHOP.filter(function (i) { return i.kind === 'weapon' && i.crit; });
+  var overtakes = [];
+  ladder.forEach(function (lower, li) {
+    var upper = ladder[li + 1];
+    if (!upper) return;
+    Save.update(function (p) {
+      p.inventory.owned.push(lower.id, upper.id);
+      p.inventory.forge[lower.id] = Save.forgeMax;
+      p.inventory.forge[upper.id] = 0;
+      p.inventory.weapon = lower.id;
+    });
+    var forged = power(Save.loadout());
+    Save.update(function (p) { p.inventory.weapon = upper.id; });
+    var plain = power(Save.loadout());
+    if (forged >= plain) {
+      overtakes.push(lower.id + '+' + Save.forgeMax + ' ' + forged.toFixed(3) +
+                     ' >= plain ' + upper.id + ' ' + plain.toFixed(3));
+    }
+  });
+  ok('forging never lets a tier overtake the one above it',
+     overtakes.length === 0, overtakes.slice(0, 3).join('; '));
+
   /* ---------- the dungeon ----------
 
      A floor is generated, not authored, so it cannot be reviewed by reading
@@ -1471,6 +1587,51 @@ try {
   var shallow = fightShare(1), deep = fightShare(12);
   ok('dungeon: it gets harder the further down you go', deep > shallow + 0.1,
      'floor 1 ' + shallow.toFixed(2) + ' vs floor 12 ' + deep.toFixed(2));
+
+  /* Which kid is playing has to reach all the way down here too. The dungeon
+     draws its fights from the hero's OWN trail, so a five-year-old must never
+     be handed algebra in a monster room — the same failure the map had when
+     heroTrail() was inferred rather than stored. Checked by holding every
+     fight the floor can offer against that row's trail. */
+  ['little', 'big'].forEach(function (row) {
+    fresh();
+    Save.createProfile('Row ' + row, '🧭');
+    Save.update(function (p) { p.row = row; });
+
+    var mine = {}, theirs = {};
+    Save.mapTrail(row).forEach(function (st) {
+      st.options.forEach(function (o) { if (o.t) mine[o.g + ':' + o.t] = true; });
+    });
+    Save.mapTrail(row === 'little' ? 'big' : 'little').forEach(function (st) {
+      st.options.forEach(function (o) { if (o.t) theirs[o.g + ':' + o.t] = true; });
+    });
+
+    var run = Save.dungeonStart();
+    var leaked = [], seen = 0;
+    for (var floor = 1; floor <= 10; floor++) {
+      for (var i = 0; i < run.rooms.length; i++) {
+        Save.update(function (p) {
+          p.progress.dungeon.floor = floor;
+          p.progress.dungeon.pos = i;
+          p.progress.dungeon.rooms[i] = { t: 'monster', done: false };
+        });
+        var f = Save.dungeonFight();
+        if (!f) continue;
+        seen++;
+        var key = f.g + ':' + f.t;
+        if (!mine[key]) leaked.push('floor ' + floor + ': ' + key);
+      }
+    }
+    ok('dungeon: the ' + row + ' hero was offered plenty of fights', seen > 50,
+       seen + ' fights');
+    ok('dungeon: a ' + row + ' hero only ever meets their own trail\'s work',
+       leaked.length === 0, leaked.slice(0, 3).join('; '));
+    ok('dungeon: the two trails really are different work',
+       Object.keys(mine).some(function (k) { return !theirs[k]; }));
+    ok('dungeon: the ' + row + ' grid is the size that row uses',
+       run.rooms.length ===
+         Save.dungeonSide(row) * Save.dungeonSide(row));
+  });
 
   /* ---------- a descent, played ---------- */
   fresh();

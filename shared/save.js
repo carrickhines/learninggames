@@ -617,6 +617,104 @@ var Save = (function () {
       sub: '5–10 minutes, redeem any time' }
   ];
 
+  /* ---------- Gear you cannot buy -----------------------------------------
+
+     These only ever drop underground. They are the reason to go down rather
+     than to grind gold, and they carry a star roll — one to three — which
+     scales what they do. A child can read three stars at a glance; a table of
+     rolled statistics they cannot.
+
+     Same shape as a SHOP item minus the price, so `item()` and `loadout()`
+     treat them identically and nothing else had to learn a new kind. */
+  var FOUND = [
+    { id: 'f-gloom',   kind: 'weapon',  name: 'Gloomedge',      emoji: '🗡️',
+      sub: 'Found in the dark', slash: '🌑', crit: 0.24, superDamage: 3 },
+    { id: 'f-quartz',  kind: 'weapon',  name: 'Quartz Pick',    emoji: '⛏️',
+      sub: 'Found in the dark', slash: '💠', crit: 0.30 },
+    { id: 'f-carapace', kind: 'armor',  name: 'Carapace',       emoji: '🪲',
+      sub: 'Found in the dark', bonusHp: 3 },
+    { id: 'f-cavecloak', kind: 'armor', name: 'Cave Cloak',     emoji: '🧥',
+      sub: 'Found in the dark', bonusHp: 2 },
+    { id: 'f-lantern', kind: 'trinket', name: 'Deep Lantern',   emoji: '🏮',
+      sub: 'Found in the dark', cardBonus: 0.6, goldBonus: 0.12 },
+    { id: 'f-compass', kind: 'trinket', name: 'Bent Compass',   emoji: '🧭',
+      sub: 'Found in the dark', goldBonus: 0.28 },
+    { id: 'f-hood',    kind: 'helm',    name: 'Delver Hood',    emoji: '⛑️',
+      sub: 'Found in the dark', fastBonus: 1700, bonusHp: 1 },
+    { id: 'f-treads',  kind: 'boots',   name: 'Stone Treads',   emoji: '🥾',
+      sub: 'Found in the dark', bonusTime: 2600, goldBonus: 0.14 }
+  ];
+
+  /* What a star roll and a forge level are worth. Both deliberately gentle —
+     fifty pieces of gear is fifty chances to trivialise a battle, so what
+     grows is the number of things to want, not the size of the numbers. */
+  var STAR_SCALE = [1, 1, 1.25, 1.5];      // indexed by stars, 1..3
+  var FORGE_STEP = 0.08;                   // per +1
+  var FORGE_MAX = 5;
+
+  function foundItem(id) {
+    for (var i = 0; i < FOUND.length; i++) if (FOUND[i].id === id) return FOUND[i];
+    return null;
+  }
+
+  /* Stars held for a found item, or 0 if it has never dropped. */
+  function starsOf(id, p) {
+    p = p || me();
+    return (p && p.inventory.found && p.inventory.found[id]) || 0;
+  }
+
+  function forgeLevel(id, p) {
+    p = p || me();
+    return (p && p.inventory.forge && p.inventory.forge[id]) || 0;
+  }
+
+  /* What the next +1 costs. Climbs steeply so the forge is a long-term sink
+     rather than a thing you max out the afternoon you find it. */
+  function forgeCost(id) {
+    var lvl = forgeLevel(id);
+    if (lvl >= FORGE_MAX) return null;
+    var it = item(id);
+    var base = Math.max(400, Math.round((it && it.cost ? it.cost : 3000) * 0.22));
+    return Math.round(base * Math.pow(2.1, lvl));
+  }
+
+  /* Pour gold into something you own. Returns 'ok', 'broke', 'max', 'nosuch'. */
+  function forgeUp(id) {
+    var p = me();
+    var it = item(id);
+    if (!p || !it) return 'nosuch';
+    if (!owns(id)) return 'nosuch';
+    if (forgeLevel(id) >= FORGE_MAX) return 'max';
+    var cost = forgeCost(id);
+    if (p.gold < cost) return 'broke';
+    p.gold -= cost;
+    if (!p.inventory.forge) p.inventory.forge = {};
+    p.inventory.forge[id] = forgeLevel(id) + 1;
+    write();
+    return 'ok';
+  }
+
+  /* How much everything on this item is multiplied by. */
+  function gearScale(id, p) {
+    var stars = starsOf(id, p);
+    var star = STAR_SCALE[stars] || 1;
+    return star * (1 + forgeLevel(id, p) * FORGE_STEP);
+  }
+
+  /* Give a found item, keeping the better roll if one is already held. */
+  function awardFound(id, stars) {
+    var p = me();
+    var it = foundItem(id);
+    if (!p || !it) return null;
+    if (!p.inventory.found) p.inventory.found = {};
+    var had = p.inventory.found[id] || 0;
+    if (stars <= had) { write(); return { item: it, stars: stars, better: false }; }
+    p.inventory.found[id] = stars;
+    if (p.inventory.owned.indexOf(id) === -1) p.inventory.owned.push(id);
+    write();
+    return { item: it, stars: stars, better: true, first: had === 0 };
+  }
+
   /* ---------- The map -----------------------------------------------------
      A journey across a landscape, not a menu. The hero walks a path that
      climbs through five regions; each stop is a real challenge, and beating
@@ -1676,9 +1774,24 @@ var Save = (function () {
         }
       }
     }
+    /* Gear is the reason to come down here rather than grind gold, so an
+       elite always has a chance of it and a deep treasure room sometimes
+       does. The star roll climbs with the floor. */
+    var gear = null;
+    var gearOdds = kind === 'elite' ? 0.5 : (run.floor >= 3 ? 0.14 : 0);
+    if (gearOdds > 0) {
+      var g = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 2654435761) ^ (run.pos * 13));
+      if (g() < gearOdds) {
+        var pick = FOUND[Math.floor(g() * FOUND.length)];
+        var roll = g();
+        var stars = roll < 0.12 + Math.min(0.25, run.floor * 0.02) ? 3
+                  : roll < 0.45 ? 2 : 1;
+        gear = awardFound(pick.id, stars);
+      }
+    }
     run.rooms[run.pos].done = true;
     write();
-    return { gold: paid.gold, card: got, leveledTo: paid.leveledTo };
+    return { gold: paid.gold, card: got, gear: gear, leveledTo: paid.leveledTo };
   }
 
   /* Won the fight in this room. */
@@ -2300,7 +2413,7 @@ var Save = (function () {
 
   function item(id) {
     for (var i = 0; i < SHOP.length; i++) if (SHOP[i].id === id) return SHOP[i];
-    return null;
+    return foundItem(id);          // gear that only drops underground
   }
 
   function owns(id) {
@@ -2314,6 +2427,11 @@ var Save = (function () {
     var p = me();
     var it = item(id);
     if (!p || !it) return 'nosuch';
+    /* Found gear has no price, and `p.gold < undefined` is false — so without
+       this it would be handed over for nothing the moment anyone asked. It is
+       not for sale at any price; that is the whole point of it. */
+    if (foundItem(id)) return 'notforsale';
+
     if (it.kind !== 'token' && owns(id)) return 'owned';
     // the best of each slot is gated on a finished card set, not just gold
     if (it.set && !hasSet(it.set, p)) return 'noset';
@@ -2550,11 +2668,13 @@ var Save = (function () {
     var pet = item(p.inventory.pet);
     var tr = item(p.inventory.trinket);
     if (w) {
-      base.crit = w.crit || 0;
+      var ws = gearScale(w.id, p);
+      base.crit = (w.crit || 0) * ws;
+      // damage stays a whole number of hearts; a forge cannot invent half a hit
       base.superDamage = w.superDamage || 2;
       base.slash = w.slash || '💥';
     }
-    if (a) base.maxHp = 5 + (a.bonusHp || 0);
+    if (a) base.maxHp = 5 + Math.round((a.bonusHp || 0) * gearScale(a.id, p));
     if (pet) {
       // a grown pet wears its later form and carries the growth bonus
       var stage = petStage();
@@ -2567,10 +2687,11 @@ var Save = (function () {
                     (pet.shield ? (ECONOMY.petStageShield[base.petStage] || 0) : 0);
     }
     if (tr) {
-      base.goldBonus = tr.goldBonus || 0;
-      base.cardBonus = tr.cardBonus || 0;
-      base.fastBonus = tr.fastBonus || 0;
-      base.bonusTime += tr.bonusTime || 0;
+      var ts = gearScale(tr.id, p);
+      base.goldBonus = (tr.goldBonus || 0) * ts;
+      base.cardBonus = (tr.cardBonus || 0) * ts;
+      base.fastBonus = Math.round((tr.fastBonus || 0) * ts);
+      base.bonusTime += Math.round((tr.bonusTime || 0) * ts);
     }
     /* The two later slots add to what the four originals set rather than
        replacing it, so a helm and a trinket that both widen the DOUBLE window
@@ -2580,14 +2701,16 @@ var Save = (function () {
     var hm = item(p.inventory.helm);
     var bt = item(p.inventory.boots);
     if (hm) {
-      base.fastBonus += hm.fastBonus || 0;
-      base.maxHp += hm.bonusHp || 0;
-      base.bonusTime += hm.bonusTime || 0;
+      var hs = gearScale(hm.id, p);
+      base.fastBonus += Math.round((hm.fastBonus || 0) * hs);
+      base.maxHp += Math.round((hm.bonusHp || 0) * hs);
+      base.bonusTime += Math.round((hm.bonusTime || 0) * hs);
     }
     if (bt) {
-      base.bonusTime += bt.bonusTime || 0;
-      base.goldBonus += bt.goldBonus || 0;
-      base.fastBonus += bt.fastBonus || 0;
+      var bs = gearScale(bt.id, p);
+      base.bonusTime += Math.round((bt.bonusTime || 0) * bs);
+      base.goldBonus += (bt.goldBonus || 0) * bs;
+      base.fastBonus += Math.round((bt.fastBonus || 0) * bs);
     }
     // completing a world's card set is permanent, and stacks
     setPerks(p, base);
@@ -2876,6 +2999,15 @@ var Save = (function () {
     dungeonFight: dungeonFight,
     dungeonWin: dungeonWin,
     dungeonLoot: dungeonLoot,
+    FOUND: FOUND,
+    foundItem: foundItem,
+    starsOf: starsOf,
+    forgeLevel: forgeLevel,
+    forgeCost: forgeCost,
+    forgeUp: forgeUp,
+    forgeMax: FORGE_MAX,
+    gearScale: gearScale,
+    awardFound: awardFound,
     BLESSINGS: BLESSINGS,
     nodeState: nodeState,
     startNode: startNode,
