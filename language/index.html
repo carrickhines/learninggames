@@ -1266,6 +1266,7 @@ const state = {
   askedAt: 0,              // when the current question went up
   node: null,              // the map stop being played, if any
   mapReturn: null,         // set on winning one, so the win screen sends you back
+  dungeon: null,           // a dungeon room's fight, if that's where we came from
 };
 
 // The hero chip, and the gate: no hero picked means back to the hub.
@@ -2229,7 +2230,12 @@ function winGame() {
   }
   // a beaten map stop pays out on the map, where the walk and the chest are
   state.mapReturn = node && node.advanced ? node : null;
-  $('winAgainBtn').textContent = state.mapReturn ? '🗺️ Back to the map' : 'Play Again';
+  $('winAgainBtn').textContent = state.dungeon ? '⛏️ Back down'
+    : state.mapReturn ? '🗺️ Back to the map' : 'Play Again';
+  if (state.dungeon) {
+    // the dungeon pays its own loot; this only has to say the room is clear
+    try { sessionStorage.setItem('lg_dungeon_result', 'won'); } catch (e) {}
+  }
   Save.recordRunWon('language');
   // today's challenge counts once it's beaten, not once it's started
   if (state.daily && Save.claimDaily()) {
@@ -2263,6 +2269,10 @@ function showEarnings() {
 
 function gameOver() {
   stopTimer();
+  if (state.dungeon) {
+    try { sessionStorage.setItem('lg_dungeon_result', 'lost'); } catch (e) {}
+    $('loseAgainBtn').textContent = '🪜 Back up';
+  }
   Sound.gameover();
   Voice.play(['P_lose'], 'Oh no! Try again — you can do it!');
   Log.endSession({ won: false, gold: earnedThisRun() });
@@ -2272,12 +2282,17 @@ function gameOver() {
 
 $('winAgainBtn').addEventListener('click', () => {
   Sound.click();
+  if (state.dungeon) return (location.href = '../dungeon/index.html');
   if (state.mapReturn) return Hud.backToMap(state.mapReturn);
   state.node = null;        // back to the menu is free play again
   Save.clearNode();
   showScreen('menu');
 });
-$('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('menu'); });
+$('loseAgainBtn').addEventListener('click', () => {
+  Sound.click();
+  if (state.dungeon) return (location.href = '../dungeon/index.html');
+  showScreen('menu');
+});
 
 // Arrived from a map stop? Play exactly that, and skip the menu.
 (function fromMap() {
@@ -2290,6 +2305,18 @@ $('loseAgainBtn').addEventListener('click', () => { Sound.click(); showScreen('m
       state.daily = true;
       Voice.unlock();
       Speech.init();
+      startGame();
+      return;
+    }
+  }
+  // ...or a room in the dungeon, which draws its track from this hero's own
+  // trail so it can only ever be work they have already met
+  if (/[?&]dungeon=1/.test(location.search)) {
+    const f = Save.dungeonFight();
+    if (f && f.g === 'language') {
+      state.track = f.t;
+      state.mode = f.m;
+      state.dungeon = f;
       startGame();
       return;
     }

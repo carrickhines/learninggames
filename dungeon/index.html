@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Dungeon</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+  /* The floor is a plain grid. Rooms you have not reached stay shut, so the
+     whole screen is "what is behind that door" rather than a map to read. */
+  .floorbar {
+    display: flex; align-items: center; justify-content: center;
+    gap: .5rem 1.1rem; flex-wrap: wrap; margin: .2rem 0 .9rem;
+    font-family: var(--display);
+  }
+  .floorbar .deep { font-size: 1.5rem; color: var(--accent); }
+  .floorbar .best { color: #cbb7e8; font-size: .95rem; }
+  .floorbar .purse { color: var(--gold); font-size: .95rem; }
+
+  .grid { display: grid; gap: 8px; justify-content: center; margin: 0 auto; }
+  .room {
+    width: 74px; height: 74px; border-radius: 14px;
+    background: rgba(10, 5, 24, .55);
+    border: 2px solid rgba(255, 255, 255, .10);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 1.7rem; line-height: 1; cursor: default;
+    transition: transform .12s ease, border-color .12s ease, background .2s ease;
+    position: relative;
+  }
+  .room .sub {
+    font-size: .52rem; font-family: var(--display); letter-spacing: .04em;
+    color: #b9a8d8; margin-top: 3px; text-transform: uppercase;
+  }
+  .room.shut { background: rgba(6, 3, 16, .72); color: #4b3a6b; }
+  .room.here { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,210,63,.28); }
+  .room.step { border-color: var(--good); cursor: pointer; }
+  .room.step:hover { transform: translateY(-2px); }
+  .room.done { opacity: .45; }
+  /* The marker sat above the tile at first, which put it in the gap between
+     two rows and made it genuinely unclear which room you were standing in.
+     Tucked into the corner of its own tile it can only mean one thing. */
+  .room .hero {
+    position: absolute; right: 2px; bottom: 1px; font-size: 1.05rem;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,.8));
+  }
+
+  .roomcard {
+    margin: 1rem auto 0; max-width: 30rem; text-align: center;
+    background: var(--panel); border: 1px solid rgba(255,255,255,.10);
+    border-radius: 16px; padding: 1rem 1.1rem; backdrop-filter: blur(6px);
+  }
+  .roomcard h3 { margin: 0 0 .3rem; font-family: var(--display); font-size: 1.25rem; }
+  .roomcard p { margin: 0 0 .8rem; color: #cbb7e8; font-size: .95rem; }
+  .blessrow { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+  .bless {
+    flex: 1 1 8.5rem; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
+    padding: .6rem .5rem; cursor: pointer; font-family: var(--display);
+  }
+  .bless:hover { border-color: var(--accent); }
+  .bless b { display: block; font-size: .95rem; }
+  .bless span { display: block; font-size: .72rem; color: #b9a8d8; margin-top: .15rem; }
+</style>
+</head>
+<body>
+<div id="app">
+  <button id="muteBtn" class="mute" aria-label="Sound on or off">🔊</button>
+
+  <!-- ---------- the way in ---------- -->
+  <section id="startScreen" class="screen show">
+    <h1 class="title">The Dungeon</h1>
+    <p class="sub" id="startSub">It is different every time you go down.</p>
+    <div class="roomcard">
+      <h3>How it works</h3>
+      <p>Every floor builds itself. Find the stairs to go deeper, where the
+         monsters are tougher and the treasure is better.
+         <b>Everything you find is yours the moment you find it</b> — if you
+         fall over down there you keep all of it, the descent just ends.</p>
+      <button id="goBtn" class="btn">⛏️ Go down</button>
+    </div>
+    <button id="homeBtn" class="btn ghost">🏠 Back to the hub</button>
+  </section>
+
+  <!-- ---------- a floor ---------- -->
+  <section id="floorScreen" class="screen">
+    <div class="floorbar">
+      <span class="deep" id="floorNum">Floor 1</span>
+      <span class="best" id="bestNum"></span>
+      <span class="purse" id="purseNum"></span>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="roomcard" id="roomCard"></div>
+  </section>
+
+  <!-- ---------- out ---------- -->
+  <section id="endScreen" class="screen">
+    <h1 class="title" id="endTitle">Back in the daylight</h1>
+    <p class="sub" id="endText"></p>
+    <div class="roomcard" id="endStats"></div>
+    <button id="againBtn" class="btn">⛏️ Go down again</button>
+    <button id="outBtn" class="btn ghost">🏠 Back to the hub</button>
+  </section>
+</div>
+
+<script src="../shared/sound.js"></script>
+<script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
+<script src="../shared/hud.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const HOME = "../index.html";
+
+  const ART = {
+    entrance: ['🚪', 'in'],
+    stairs:   ['🪜', 'down'],
+    monster:  ['👹', 'monster'],
+    elite:    ['👑', 'elite'],
+    treasure: ['💰', 'treasure'],
+    shrine:   ['✨', 'shrine'],
+    empty:    ['·', '']
+  };
+
+  Hud.mount({ home: HOME });
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('show'));
+    $(id).classList.add('show');
+  }
+
+  /* ---------- drawing a floor ---------- */
+  function render() {
+    const run = Save.dungeonRun();
+    if (!run) return showScreen('startScreen');
+
+    const side = Save.dungeonSide(run.row);
+    const near = Save.dungeonNeighbours(run.pos, run.row);
+    const here = run.rooms[run.pos];
+    const stuck = here && (here.t === 'monster' || here.t === 'elite') && !here.done;
+
+    $('floorNum').textContent = 'Floor ' + run.floor;
+    const best = (Save.me() || {}).progress ? Save.me().progress.dungeonBest : 0;
+    $('bestNum').textContent = best ? '🏅 deepest ' + best : '';
+    $('purseNum').textContent = run.gold ? '🪙 ' + run.gold + ' this trip' : '';
+
+    const grid = $('grid');
+    grid.style.gridTemplateColumns = `repeat(${side}, 74px)`;
+    grid.innerHTML = '';
+
+    run.rooms.forEach((room, i) => {
+      const seen = room.done || i === run.pos || near.indexOf(i) !== -1;
+      const el = document.createElement('div');
+      const art = ART[room.t] || ART.empty;
+      el.className = 'room'
+        + (seen ? '' : ' shut')
+        + (i === run.pos ? ' here' : '')
+        + (room.done && i !== run.pos ? ' done' : '')
+        + (!stuck && near.indexOf(i) !== -1 ? ' step' : '');
+      el.innerHTML = (i === run.pos ? '<span class="hero">🧍</span>' : '')
+        + (seen ? art[0] : '🚪')
+        + (seen && art[1] ? `<span class="sub">${art[1]}</span>` : '');
+      if (!stuck && near.indexOf(i) !== -1) {
+        el.onclick = () => { Sound.click(); Save.dungeonMove(i); render(); };
+      }
+      grid.appendChild(el);
+    });
+
+    renderRoom(run, here, stuck);
+  }
+
+  /* ---------- what you can do where you stand ---------- */
+  function renderRoom(run, room, stuck) {
+    const card = $('roomCard');
+    const fight = Save.dungeonFight();
+
+    if (fight) {
+      card.innerHTML = `<h3>${room.t === 'elite' ? '👑 Something bigger' : '👹 A monster'}</h3>
+        <p>It will not let you past. ${fight.g === 'math' ? '🔢' : '🔤'}
+           <b>${fight.label || fight.t}</b></p>`;
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.textContent = '⚔️ Fight it';
+      b.onclick = () => {
+        try { sessionStorage.setItem('lg_dungeon', '1'); } catch (e) {}
+        location.href = '../' + fight.g + '/index.html?dungeon=1';
+      };
+      card.appendChild(b);
+      return;
+    }
+
+    if (room.t === 'treasure' && !room.done) {
+      card.innerHTML = `<h3>💰 Treasure</h3><p>Something is glinting in the corner.</p>`;
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.textContent = 'Open it';
+      b.onclick = () => {
+        const got = Save.dungeonLoot('treasure');
+        Sound.coin();
+        if (got && got.card) Hud.cardDrop(got.card);
+        card.innerHTML = `<h3>💰 ${got ? got.gold : 0} gold</h3>
+          <p>${got && got.card ? 'And a card: ' + got.card.emoji + ' ' + got.card.name
+                               : 'Nothing else in there.'}</p>`;
+        Hud.render(); Hud.flush(render);
+      };
+      card.appendChild(b);
+      return;
+    }
+
+    if (room.t === 'shrine' && !room.done) {
+      const offer = Save.dungeonOffer(run);
+      card.innerHTML = `<h3>✨ A shrine</h3><p>Take one. It lasts until you come back up.</p>`;
+      const row = document.createElement('div');
+      row.className = 'blessrow';
+      offer.forEach((b) => {
+        const el = document.createElement('button');
+        el.className = 'bless';
+        el.innerHTML = `<b>${b.label}</b><span>${b.sub}</span>`;
+        el.onclick = () => { Sound.levelUp(); Save.dungeonBless(b.id); render(); };
+        row.appendChild(el);
+      });
+      card.appendChild(row);
+      return;
+    }
+
+    if (room.t === 'stairs') {
+      card.innerHTML = `<h3>🪜 The stairs down</h3>
+        <p>Floor ${run.floor + 1} is harder, and pays better. You keep
+           everything either way.</p>`;
+      const down = document.createElement('button');
+      down.className = 'btn';
+      down.textContent = '⬇️ Go deeper';
+      down.onclick = () => { Sound.click(); Save.dungeonDescend(); render(); };
+      const out = document.createElement('button');
+      out.className = 'btn ghost';
+      out.textContent = '🪜 Climb out';
+      out.onclick = () => finish('left');
+      card.appendChild(down);
+      card.appendChild(out);
+      return;
+    }
+
+    card.innerHTML = `<h3>Nothing here</h3><p>Just dust and old air. Pick a door.</p>`;
+    const out = document.createElement('button');
+    out.className = 'btn ghost';
+    out.textContent = '🚪 Give up and climb out';
+    out.onclick = () => finish('left');
+    card.appendChild(out);
+  }
+
+  function finish(reason) {
+    const out = Save.dungeonEnd(reason);
+    if (!out) return showScreen('startScreen');
+    $('endTitle').textContent = reason === 'lost' ? 'The way back up' : 'Back in the daylight';
+    $('endText').textContent = reason === 'lost'
+      ? 'You came off worst — but everything you found came up with you.'
+      : 'You climbed out with the lot.';
+    $('endStats').innerHTML =
+      `<h3>Floor ${out.floor}</h3>
+       <p>🪙 ${out.gold} gold${out.cards ? ' · 🃏 ' + out.cards + ' card' + (out.cards > 1 ? 's' : '') : ''}<br>
+       🏅 Deepest ever: floor ${Save.me().progress.dungeonBest}</p>`;
+    showScreen('endScreen');
+    Sound.win();
+    Hud.render();
+  }
+
+  /* ---------- coming back from a fight ---------- */
+  (function resume() {
+    let won = null;
+    try {
+      won = sessionStorage.getItem('lg_dungeon_result');
+      if (won) sessionStorage.removeItem('lg_dungeon_result');
+    } catch (e) {}
+    if (won === 'lost') return finish('lost');
+    if (won === 'won') {
+      const got = Save.dungeonWin();
+      Hud.render();
+      render();
+      if (got && got.card) Hud.cardDrop(got.card);
+      Hud.flush();
+      return;
+    }
+    if (Save.dungeonRun()) { showScreen('floorScreen'); render(); }
+    else showScreen('startScreen');
+  })();
+
+  $('goBtn').onclick = () => {
+    if (!Save.me()) { location.href = HOME; return; }
+    Save.dungeonStart();
+    Sound.click();
+    showScreen('floorScreen');
+    render();
+  };
+  $('againBtn').onclick = () => { Save.dungeonStart(); showScreen('floorScreen'); render(); };
+  $('homeBtn').onclick = () => (location.href = HOME);
+  $('outBtn').onclick = () => (location.href = HOME);
+
+  Hud.render();
+
+  // Test seam — the harness drives the real screen, same as every other game.
+  window.TEST = { render, finish, showScreen };
+})();
+</script>
+</body>
+</html>

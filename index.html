@@ -686,6 +686,7 @@
       </div>
 
       <div class="btn-row" style="margin-top:22px">
+        <button id="dungeonBtn">⛏️ The Dungeon</button>
         <button id="shopBtn">🛒 Shop</button>
         <button id="cardsBtn">🃏 Cards</button>
         <button id="redeemBtn" style="display:none">🎟️ iPad time</button>
@@ -1248,6 +1249,14 @@ $('shopBtn').addEventListener('click', () => {
   shopFlash('');
   renderShop();
   showScreen('shop');
+});
+
+/* The dungeon is its own page rather than a screen here: it holds a run in
+   progress across a trip out to a battle game and back, and that is much
+   easier to reason about when it owns the tab. */
+$('dungeonBtn').addEventListener('click', () => {
+  Sound.click();
+  location.href = 'dungeon/index.html';
 });
 $('shopBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 

@@ -483,6 +483,53 @@ try:
             if (cards[i].textContent === ok.t) { cards[i].click(); break; }
         }
     """)
+    # ---------------------------------------------------------------- dungeon
+    print("\nThe dungeon")
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Delver', 'D');"
+                     "Save.update(function (p) { p.row = 'little'; });")
+    load("dungeon/index.html")
+    booted("dungeon")
+    d.execute_script("document.getElementById('goBtn').click();")
+    time.sleep(0.6)
+    check("dungeon: a run starts on a floor", d.execute_script(
+        "return document.getElementById('floorScreen').classList.contains('show');"))
+    side = d.execute_script("return Save.dungeonSide('little');")
+    check("dungeon: the whole floor is drawn",
+          len(d.find_elements(By.CSS_SELECTOR, ".room")) == side * side,
+          "%d rooms for a %dx%d grid"
+          % (len(d.find_elements(By.CSS_SELECTOR, ".room")), side, side))
+    check("dungeon: only the rooms next to you can be stepped into",
+          0 < len(d.find_elements(By.CSS_SELECTOR, ".room.step")) <= 2,
+          "%d steps" % len(d.find_elements(By.CSS_SELECTOR, ".room.step")))
+
+    # walk to a monster and check the fight is real and armed
+    d.execute_script("""
+        var run = Save.dungeonRun(), side = Save.dungeonSide(run.row), target = -1;
+        for (var i = 0; i < run.rooms.length; i++)
+            if (run.rooms[i].t === 'monster') { target = i; break; }
+        var guard = 0;
+        while (target >= 0 && Save.dungeonRun().pos !== target && guard++ < 40) {
+            var r = Save.dungeonRun();
+            var pr = Math.floor(r.pos / side), pc = r.pos % side;
+            var tr = Math.floor(target / side), tc = target % side;
+            var nx = pr !== tr ? r.pos + (tr > pr ? side : -side)
+                               : r.pos + (tc > pc ? 1 : -1);
+            if (!Save.dungeonMove(nx)) break;
+        }
+        TEST.render();
+    """)
+    time.sleep(0.4)
+    fight = d.execute_script("return Save.dungeonFight();")
+    check("dungeon: a monster room offers a real fight",
+          bool(fight) and fight["g"] in ("math", "language") and bool(fight["t"]),
+          str(fight))
+    check("dungeon: the fight is a track the hero's own trail uses",
+          bool(fight) and fight["m"] in ("easy", "normal", "expert"), str(fight))
+    check("dungeon: an unbeaten monster pins you in the room", d.execute_script(
+        "return document.querySelectorAll('.room.step').length === 0;"))
+    check("dungeon: no JS errors", errs() == [], str(errs()))
+
     print("\nThe topbar has room for everyone")
     # The hero chip's width depends on the name and the gold in it. It used to
     # have a hardcoded clearance, which the five-figure economy outgrew — the

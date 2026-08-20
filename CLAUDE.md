@@ -145,6 +145,8 @@ shared/
 math/index.html
 language/index.html + record.html (Voice Studio) + voice.js (generated clips)
 story/index.html
+dungeon/index.html   a floor that builds itself; fights are played in the
+                     battle games and come back here
 .verify/            the test harness — see "Testing"
 ```
 
@@ -702,6 +704,43 @@ Both run `MINI_ROUNDS` rounds and share the hearts, panel, and end screens.
 
 ---
 
+# The dungeon
+
+The map is authored and fixed — that is its job. The dungeon is the opposite:
+a floor is generated from a seed, so no two descents are alike and there is no
+end to it. It is the answer to "there is nothing else to do".
+
+**`dungeonFloor()` is pure.** Seed and floor in, rooms out, no reading or
+writing of the save. That is what lets `save-test.html` generate **9,600
+floors** across both grid sizes and twelve depths and assert what must hold
+every time: exactly one staircase, something to fight, no room of a type
+nothing can draw, no elite on the shallow floors.
+
+**The grid has no walls.** Any orthogonal neighbour is a step, so every room is
+reachable and a floor that locks a child out of the staircase cannot exist.
+There is a flood-fill test for it anyway, because "can never fail" is exactly
+the claim that stops being true when somebody adds walls later.
+
+**Losing takes nothing.** Everything found is banked the moment it is found —
+gold, cards, all of it. A loss ends the descent and that is the whole of the
+punishment; what you gamble is how much deeper you get, and `dungeonBest` is
+the record you chase. `save-test.html` asserts a lost run costs neither a coin
+nor a card.
+
+**A room's fight is drawn from the hero's own trail**, the same trick the daily
+challenge uses, so it can only ever be work they have already met and there is
+no second registry of tracks to keep in step. Deeper floors reach further along
+the trail, which is where the harder modes live.
+
+**Shrines** offer three blessings drawn from the seed. They are all fields
+`loadout()` already sums, so a blessing costs the battle games nothing to
+honour, and they last the descent and no longer.
+
+**Fights are played in the real games.** A monster room sends you to
+`math/index.html?dungeon=1` (or language), which locks to the picked track and,
+on the end screen, offers *⛏️ Back down* instead of *Play Again*. The result
+crosses back in `sessionStorage` under `lg_dungeon_result`.
+
 # Difficulty modes
 
 Three modes in the two battle games, distinguished by **time pressure**:
@@ -999,7 +1038,7 @@ daily challenge and streak, two new map regions, and `profile.row`.
 
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
 80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear
-slots.** Suite: 505 save checks, 65 log checks, plus smoke / tracks / content /
+slots.** Suite: 538 save checks, 65 log checks, plus smoke / tracks / content /
 playthrough / upgrade.
 
 **Outstanding, in rough priority order:**

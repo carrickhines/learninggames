@@ -1610,6 +1610,86 @@ var Save = (function () {
     });
   }
 
+  /* What this room's fight is. Drawn from the hero's OWN trail rather than a
+     new registry of tracks, for the same reason the daily challenge is: it
+     can then only ever be work they have already met, and there is no second
+     list to keep in step with the games. Deeper floors reach further along
+     the trail, which is where the harder modes live. */
+  function dungeonPickFor(run) {
+    var opts = [];
+    mapTrail(run.row).forEach(function (st) {
+      st.options.forEach(function (o) {
+        if ((o.g === 'math' || o.g === 'language') && !o.boss) opts.push(o);
+      });
+    });
+    if (!opts.length) return null;
+    var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 31337) ^ (run.pos * 17));
+    var reach = Math.max(4, Math.min(opts.length,
+      Math.round(opts.length * Math.min(1, (run.floor + 2) / 14))));
+    var pick = opts[Math.floor(rng() * reach)] || opts[0];
+    return { g: pick.g, t: pick.t, m: pick.m, label: pick.label };
+  }
+
+  /* The fight waiting in this room, or null if there isn't one. */
+  function dungeonFight() {
+    var run = dungeonRun();
+    if (!run) return null;
+    var room = run.rooms[run.pos];
+    if (!room || room.done) return null;
+    if (room.t !== 'monster' && room.t !== 'elite') return null;
+    var pick = dungeonPickFor(run);
+    if (!pick) return null;
+    pick.elite = room.t === 'elite';
+    pick.floor = run.floor;
+    return pick;
+  }
+
+  /* A world to draw a card from, deeper floors reaching richer sets. */
+  function dungeonWorldFor(floor) {
+    var i = Math.min(WORLDS.length - 1, Math.floor((floor - 1) / 2));
+    return WORLDS[i] || WORLDS[0];
+  }
+
+  /* Pay out a room. `kind` is 'monster', 'elite' or 'treasure'. Everything
+     paid here is banked immediately — see dungeonEnd for why. */
+  function dungeonLoot(kind) {
+    var p = me();
+    var run = dungeonRun();
+    if (!p || !run) return null;
+    var D = ECONOMY.dungeon;
+    var mult = kind === 'elite' ? 2.2 : kind === 'monster' ? 0.9 : 1;
+    var gold = Math.round(D.treasureGold * run.floor * mult);
+    var paid = award(gold, Math.round(gold / 4));
+    run.gold += paid.gold;
+
+    var odds = kind === 'elite' ? D.eliteCard
+             : kind === 'treasure' ? D.treasureCard : 0;
+    var got = null;
+    if (odds > 0) {
+      var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 65599) ^ (run.pos * 7) ^ 0x5bf0);
+      if (rng() < odds) {
+        var pool = cardsOfWorld(dungeonWorldFor(run.floor).id);
+        if (pool.length) {
+          var foe = pool[Math.floor(rng() * pool.length)];
+          got = awardCard(foe.id, true);   // a promised card is always paid
+          if (got) run.cards += 1;
+        }
+      }
+    }
+    run.rooms[run.pos].done = true;
+    write();
+    return { gold: paid.gold, card: got, leveledTo: paid.leveledTo };
+  }
+
+  /* Won the fight in this room. */
+  function dungeonWin() {
+    var run = dungeonRun();
+    if (!run) return null;
+    var room = run.rooms[run.pos];
+    if (!room) return null;
+    return dungeonLoot(room.t === 'elite' ? 'elite' : 'monster');
+  }
+
   function dungeonBless(id) {
     var run = dungeonRun();
     if (!run || !blessing(id)) return false;
@@ -2793,6 +2873,9 @@ var Save = (function () {
     dungeonEnd: dungeonEnd,
     dungeonOffer: dungeonOffer,
     dungeonBless: dungeonBless,
+    dungeonFight: dungeonFight,
+    dungeonWin: dungeonWin,
+    dungeonLoot: dungeonLoot,
     BLESSINGS: BLESSINGS,
     nodeState: nodeState,
     startNode: startNode,

@@ -518,6 +518,7 @@
     rematchOf: null,     // the one currently being re-asked
     node: null,          // the map stop being played, if any
     mapReturn: null,     // set on winning one, so the end screen sends you back
+    dungeon: null,       // a dungeon room's fight, if that's where we came from
     shield: 0,           // one free hit, if a pet is equipped
     goldAtStart: 0,      // so the win screen can show what this run paid
   };
@@ -1976,6 +1977,11 @@
   function win() {
     stopTimer();
     const node = state.node ? Save.completeNode() : null;
+    if (state.dungeon) {
+      // the dungeon pays its own loot and draws its own chest; all this has
+      // to do is say the room was cleared
+      try { sessionStorage.setItem("lg_dungeon_result", "won"); } catch (e) {}
+    }
     Save.recordRunWon("math");
     // beating a whole run of skip counting unlocks the harder step sizes
     if (state.track === "skip") Save.update((p) => { p.progress.skipMastered = true; });
@@ -1992,7 +1998,8 @@
     showEarnings();
     // a beaten map stop pays out on the map, where the walk and the chest are
     state.mapReturn = node && node.advanced ? node : null;
-    el.playAgainBtn.textContent = state.mapReturn ? "🗺️ Back to the map" : "Play Again";
+    el.playAgainBtn.textContent = state.dungeon ? "⛏️ Back down"
+      : state.mapReturn ? "🗺️ Back to the map" : "Play Again";
     Sound.win();
     Log.endSession({ won: true, gold: earnedThisRun() });
     showScreen("endScreen");
@@ -2002,6 +2009,10 @@
 
   function gameOver() {
     stopTimer();
+    if (state.dungeon) {
+      try { sessionStorage.setItem("lg_dungeon_result", "lost"); } catch (e) {}
+      el.playAgainBtn.textContent = "🪜 Back up";
+    }
     showEarnings();
     el.endEmoji.textContent = "💀";
     el.endTitle.textContent = "Game Over";
@@ -2051,6 +2062,7 @@
   });
   el.playAgainBtn.addEventListener("click", () => {
     Sound.click();
+    if (state.dungeon) return (location.href = "../dungeon/index.html");
     if (state.mapReturn) return Hud.backToMap(state.mapReturn);
     // back to the menu is free play again
     state.node = null;
@@ -2093,6 +2105,18 @@
         state.track = d.node.t;
         state.mode = d.node.m;
         state.daily = true;
+        startGame();
+        return;
+      }
+    }
+    // ...or a room in the dungeon, which picks the track from this hero's own
+    // trail so it can only ever be work they have already met
+    if (/[?&]dungeon=1/.test(location.search)) {
+      const f = Save.dungeonFight();
+      if (f && f.g === "math") {
+        state.track = f.t;
+        state.mode = f.m;
+        state.dungeon = f;
         startGame();
         return;
       }
