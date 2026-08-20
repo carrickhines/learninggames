@@ -502,13 +502,48 @@ try:
     check("dungeon: a run starts on a floor", d.execute_script(
         "return document.getElementById('floorScreen').classList.contains('show');"))
     side = d.execute_script("return Save.dungeonSide('little');")
-    check("dungeon: the whole floor is drawn",
-          len(d.find_elements(By.CSS_SELECTOR, ".room")) == side * side,
-          "%d rooms for a %dx%d grid"
-          % (len(d.find_elements(By.CSS_SELECTOR, ".room")), side, side))
-    check("dungeon: only the rooms next to you can be stepped into",
-          0 < len(d.find_elements(By.CSS_SELECTOR, ".room.step")) <= 2,
-          "%d steps" % len(d.find_elements(By.CSS_SELECTOR, ".room.step")))
+    check("dungeon: the minimap shows the whole floor",
+          len(d.find_elements(By.CSS_SELECTOR, "#mini i")) == side * side,
+          "%d cells for a %dx%d grid"
+          % (len(d.find_elements(By.CSS_SELECTOR, "#mini i")), side, side))
+    check("dungeon: the entrance corner has exactly two ways out",
+          len(d.find_elements(By.CSS_SELECTOR, ".door")) == 2,
+          "%d doors" % len(d.find_elements(By.CSS_SELECTOR, ".door")))
+
+    # the hero is drawn from the gear actually worn, not a fixed sprite
+    pieces = d.execute_script(
+        "return [].slice.call(document.querySelectorAll('#walker > span'))"
+        "  .map(function (s) { return s.className; });")
+    check("dungeon: the hero is drawn as a figure", "h-body" in pieces, str(pieces))
+    d.execute_script("Save.update(function (p) { p.inventory.owned.push('warhelm');"
+                     "  p.inventory.helm = 'warhelm'; }); TEST.render();")
+    time.sleep(0.3)
+    worn = d.execute_script(
+        "return [].slice.call(document.querySelectorAll('#walker > span'))"
+        "  .map(function (s) { return s.className; });")
+    check("dungeon: putting a helm on shows a helm", "h-helm" in worn, str(worn))
+
+    # walking: hold a direction and the hero really moves
+    start = d.execute_script("return [TEST.me.x, TEST.me.y];")
+    d.execute_script("TEST.held.up = true;")
+    time.sleep(0.6)
+    d.execute_script("TEST.held.up = false;")
+    moved = d.execute_script("return [TEST.me.x, TEST.me.y];")
+    check("dungeon: holding a direction walks the hero",
+          moved[1] < start[1] - 3, "%s -> %s" % (start, moved))
+    check("dungeon: the loop is actually running",
+          d.execute_script("return TEST.tick.frames;") > 10,
+          "%d frames" % d.execute_script("return TEST.tick.frames;"))
+
+    # and walking into a doorway changes room
+    was = d.execute_script("return Save.dungeonRun().pos;")
+    d.execute_script("TEST.held.right = true;")
+    time.sleep(2.2)
+    d.execute_script("TEST.held.right = false;")
+    time.sleep(0.3)
+    check("dungeon: walking into a doorway moves you to the next room",
+          d.execute_script("return Save.dungeonRun().pos;") != was,
+          "still in room %d" % was)
 
     # walk to a monster and check the fight is real and armed
     d.execute_script("""
@@ -524,6 +559,7 @@ try:
                                : r.pos + (tc > pc ? 1 : -1);
             if (!Save.dungeonMove(nx)) break;
         }
+        TEST.me.x = 50; TEST.me.y = 46;   // stand on the thing in the room
         TEST.render();
     """)
     time.sleep(0.4)
@@ -533,8 +569,9 @@ try:
           str(fight))
     check("dungeon: the fight is a track the hero's own trail uses",
           bool(fight) and fight["m"] in ("easy", "normal", "expert"), str(fight))
-    check("dungeon: an unbeaten monster pins you in the room", d.execute_script(
-        "return document.querySelectorAll('.room.step').length === 0;"))
+    check("dungeon: an unbeaten monster bars the doorways", d.execute_script(
+        "return document.querySelectorAll('.door.shut').length > 0"
+        "    && document.querySelectorAll('.door:not(.shut)').length === 0;"))
     check("dungeon: no JS errors", errs() == [], str(errs()))
 
     # --------------------------------------------------- the menus open tidy

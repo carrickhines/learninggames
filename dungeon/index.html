@@ -7,60 +7,133 @@
 <link rel="stylesheet" href="../shared/tokens.css">
 <link rel="stylesheet" href="../shared/ui.css">
 <style>
-  /* The floor is a plain grid. Rooms you have not reached stay shut, so the
-     whole screen is "what is behind that door" rather than a map to read. */
+  /* ---------- the room ----------
+     One room fills the screen and you walk around inside it. The grid is
+     still there, but as a minimap in the corner: the thing you look at is
+     the room, not a plan of it. */
   .floorbar {
     display: flex; align-items: center; justify-content: center;
-    gap: .5rem 1.1rem; flex-wrap: wrap; margin: .2rem 0 .9rem;
-    font-family: var(--display);
+    gap: .4rem 1rem; flex-wrap: wrap; margin: .1rem 0 .5rem;
+    font-family: var(--display); font-size: .95rem;
   }
-  .floorbar .deep { font-size: 1.5rem; color: var(--accent); }
-  .floorbar .best { color: #cbb7e8; font-size: .95rem; }
-  .floorbar .purse { color: var(--gold); font-size: .95rem; }
+  .floorbar .deep { font-size: 1.35rem; color: var(--accent); }
+  .floorbar .best { color: #cbb7e8; }
+  .floorbar .purse { color: var(--gold); }
 
-  .grid { display: grid; gap: 8px; justify-content: center; margin: 0 auto; }
-  .room {
-    width: 74px; height: 74px; border-radius: 14px;
-    background: rgba(10, 5, 24, .55);
-    border: 2px solid rgba(255, 255, 255, .10);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 1.7rem; line-height: 1; cursor: default;
-    transition: transform .12s ease, border-color .12s ease, background .2s ease;
-    position: relative;
+  /* Flagstones, lit from the torch line at the top. The first version used
+     two near-identical purples and the floor read as a flat black box — you
+     could not tell you were moving. */
+  .room2d {
+    position: relative; width: 100%; max-width: 640px; margin: 0 auto;
+    aspect-ratio: 4 / 3; border-radius: 18px; overflow: hidden;
+    background:
+      radial-gradient(90% 70% at 50% 8%, rgba(255, 214, 140, .13), transparent 62%),
+      repeating-linear-gradient(0deg,
+        rgba(255,255,255,.055) 0 2px, transparent 2px 54px),
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,.055) 0 2px, transparent 2px 54px),
+      linear-gradient(180deg, #33254f, #1c1330);
+    border: 3px solid #0f0a1c;
+    box-shadow: inset 0 0 70px rgba(0,0,0,.7), 0 10px 26px rgba(0,0,0,.45);
+    touch-action: none;
   }
-  .room .sub {
-    font-size: .52rem; font-family: var(--display); letter-spacing: .04em;
-    color: #b9a8d8; margin-top: 3px; text-transform: uppercase;
+  /* the wall band, with a lighter inner lip so the room reads as a box */
+  .room2d::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+    border: 16px solid #150e28; border-radius: 16px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.07),
+                inset 0 0 40px rgba(0,0,0,.55);
   }
-  .room.shut { background: rgba(6, 3, 16, .72); color: #4b3a6b; }
-  .room.here { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,210,63,.28); }
-  .room.step { border-color: var(--good); cursor: pointer; }
-  .room.step:hover { transform: translateY(-2px); }
-  .room.done { opacity: .45; }
-  /* The marker sat above the tile at first, which put it in the gap between
-     two rows and made it genuinely unclear which room you were standing in.
-     Tucked into the corner of its own tile it can only mean one thing. */
-  .room .hero {
-    position: absolute; right: 2px; bottom: 1px; font-size: 1.05rem;
-    filter: drop-shadow(0 1px 3px rgba(0,0,0,.8));
+
+  /* Doorways: an arch cut into the wall, lit from beyond. */
+  .door {
+    position: absolute; z-index: 6;
+    background: radial-gradient(60% 90% at 50% 100%, #ffd98a, #b1712f 55%, #5c3a18);
+    box-shadow: 0 0 16px rgba(255, 200, 120, .5);
+    display: flex; align-items: center; justify-content: center;
   }
+  .door::after {
+    content: ''; width: 60%; height: 60%; border-radius: 50% 50% 4px 4px;
+    background: rgba(20, 10, 4, .55);
+  }
+  .door.n, .door.s { width: 74px; height: 17px; left: 50%; transform: translateX(-50%); }
+  .door.w, .door.e { width: 17px; height: 74px; top: 50%; transform: translateY(-50%); }
+  .door.n { top: 0; border-radius: 0 0 10px 10px; }
+  .door.s { bottom: 0; border-radius: 10px 10px 0 0; }
+  .door.w { left: 0; border-radius: 0 10px 10px 0; }
+  .door.e { right: 0; border-radius: 10px 0 0 10px; }
+  .door.shut { filter: grayscale(1) brightness(.42); box-shadow: none; }
+
+  .prop {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 3;
+    font-size: 52px; line-height: 1; text-align: center;
+    filter: drop-shadow(0 6px 8px rgba(0,0,0,.6));
+  }
+  .prop .cap {
+    display: block; font-size: 11px; font-family: var(--display);
+    letter-spacing: .06em; text-transform: uppercase; color: #cbb7e8; margin-top: 4px;
+  }
+  .prop.done { opacity: .35; }
+  .prop.near { animation: propPulse 1s ease-in-out infinite; }
+  @keyframes propPulse { 0%,100% { scale: 1 } 50% { scale: 1.08 } }
+
+  /* Positioned with translate rather than left/top: setting left/top forces a
+     layout on every frame and dragged the walk down to about twenty frames a
+     second. The percentages are of the walker's own box, so the room offset
+     goes in the transform too. */
+  .walker { position: absolute; left: 0; top: 0; z-index: 4; will-change: transform; }
+
+  /* ---------- the minimap ---------- */
+  .mini {
+    position: absolute; right: 10px; top: 10px; z-index: 7; display: grid; gap: 3px;
+    padding: 5px; border-radius: 9px; background: rgba(8,4,18,.7);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .mini i {
+    width: 11px; height: 11px; border-radius: 3px; display: block;
+    background: rgba(255,255,255,.10);
+  }
+  .mini i.seen { background: rgba(255,255,255,.30); }
+  .mini i.here { background: var(--accent); }
+  .mini i.stairs { background: var(--good); }
+
+  /* ---------- controls ---------- */
+  .pad {
+    display: grid; grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 52px); gap: 6px;
+    justify-content: center; margin: .8rem auto 0;
+  }
+  .pad button {
+    font-size: 1.5rem; padding: 0; border-radius: 14px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+    color: #fff; font-family: var(--display);
+  }
+  .pad button:active { transform: translateY(2px); background: rgba(255,255,255,.16); }
+  .pad .sp { visibility: hidden; }
 
   .roomcard {
-    margin: 1rem auto 0; max-width: 30rem; text-align: center;
+    margin: .9rem auto 0; max-width: 30rem; text-align: center;
     background: var(--panel); border: 1px solid rgba(255,255,255,.10);
-    border-radius: 16px; padding: 1rem 1.1rem; backdrop-filter: blur(6px);
+    border-radius: 16px; padding: .9rem 1rem; backdrop-filter: blur(6px);
+    min-height: 3.2rem;
   }
-  .roomcard h3 { margin: 0 0 .3rem; font-family: var(--display); font-size: 1.25rem; }
-  .roomcard p { margin: 0 0 .8rem; color: #cbb7e8; font-size: .95rem; }
+  .roomcard h3 { margin: 0 0 .25rem; font-family: var(--display); font-size: 1.15rem; }
+  .roomcard p { margin: 0 0 .6rem; color: #cbb7e8; font-size: .92rem; }
   .blessrow { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
   .bless {
     flex: 1 1 8.5rem; background: rgba(255,255,255,.06);
     border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
-    padding: .6rem .5rem; cursor: pointer; font-family: var(--display);
+    padding: .55rem .5rem; cursor: pointer; font-family: var(--display); color: #fff;
   }
   .bless:hover { border-color: var(--accent); }
-  .bless b { display: block; font-size: .95rem; }
-  .bless span { display: block; font-size: .72rem; color: #b9a8d8; margin-top: .15rem; }
+  .bless b { display: block; font-size: .92rem; }
+  .bless span { display: block; font-size: .7rem; color: #b9a8d8; margin-top: .15rem; }
+
+  .kitline {
+    display: flex; gap: .5rem; align-items: center; justify-content: center;
+    flex-wrap: wrap; color: #cbb7e8; font-size: .85rem; margin-top: .5rem;
+    font-family: var(--display);
+  }
 </style>
 </head>
 <body>
@@ -70,11 +143,15 @@
   <!-- ---------- the way in ---------- -->
   <section id="startScreen" class="screen show">
     <h1 class="title">The Dungeon</h1>
-    <p class="sub" id="startSub">It is different every time you go down.</p>
+    <p class="sub">It is different every time you go down.</p>
     <div class="roomcard">
-      <h3>How it works</h3>
-      <p>Every floor builds itself. Find the stairs to go deeper, where the
-         monsters are tougher and the treasure is better.
+      <h3>You, as you are</h3>
+      <div style="display:flex;justify-content:center;margin:.4rem 0 .2rem">
+        <div id="startHero"></div>
+      </div>
+      <div class="kitline" id="startKit"></div>
+      <p style="margin-top:.7rem">Walk with the arrows. Find the stairs to go
+         deeper, where the monsters are tougher and the treasure is better.
          <b>Everything you find is yours the moment you find it</b> — if you
          fall over down there you keep all of it, the descent just ends.</p>
       <button id="goBtn" class="btn">⛏️ Go down</button>
@@ -89,7 +166,22 @@
       <span class="best" id="bestNum"></span>
       <span class="purse" id="purseNum"></span>
     </div>
-    <div class="grid" id="grid"></div>
+
+    <div class="room2d" id="room">
+      <div class="mini" id="mini"></div>
+      <div class="prop" id="prop"></div>
+      <div class="walker" id="walker"></div>
+    </div>
+
+    <div class="pad">
+      <span class="sp"></span>
+      <button data-dir="up" aria-label="Up">⬆️</button>
+      <span class="sp"></span>
+      <button data-dir="left" aria-label="Left">⬅️</button>
+      <button data-dir="down" aria-label="Down">⬇️</button>
+      <button data-dir="right" aria-label="Right">➡️</button>
+    </div>
+
     <div class="roomcard" id="roomCard"></div>
   </section>
 
@@ -107,6 +199,7 @@
 <script src="../shared/save.js"></script>
 <script src="../shared/log.js"></script>
 <script src="../shared/hud.js"></script>
+<script src="../shared/hero.js"></script>
 <script>
 (function () {
   "use strict";
@@ -114,13 +207,13 @@
   const HOME = "../index.html";
 
   const ART = {
-    entrance: ['🚪', 'in'],
-    stairs:   ['🪜', 'down'],
-    monster:  ['👹', 'monster'],
-    elite:    ['👑', 'elite'],
+    entrance: ['🚪', 'the way in'],
+    stairs:   ['🪜', 'stairs down'],
+    monster:  ['👹', 'a monster'],
+    elite:    ['👑', 'something bigger'],
     treasure: ['💰', 'treasure'],
-    shrine:   ['✨', 'shrine'],
-    empty:    ['·', '']
+    shrine:   ['✨', 'a shrine'],
+    empty:    ['', '']
   };
 
   Hud.mount({ home: HOME });
@@ -130,48 +223,187 @@
     $(id).classList.add('show');
   }
 
-  /* ---------- drawing a floor ---------- */
+  /* ---------- where the hero is standing, in room percent ----------
+     Kept in percent rather than pixels so the room can be any size the iPad
+     gives it and nothing has to be recalculated on rotate. */
+  const me = { x: 50, y: 74, vx: 0, vy: 0 };
+  const tick = { frames: 0, dt: 0 };        // so the harness can see the loop
+  const SPEED = 62;              // percent of the room per second
+  const held = {};               // which directions are pressed
+  let raf = null, lastT = 0, near = null;
+
+  const PROP_X = 50, PROP_Y = 46;
+  const PROP_W = 16, PROP_H = 20;    // the feature's reach, per axis
+  const DOOR_DEPTH = 6, DOOR_SPAN = 18;
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  /* Which door the hero is standing in, if any.
+
+     Checked per axis rather than by distance. A percentage of the width and a
+     percentage of the height are different numbers of pixels in a 4:3 room, so
+     hypot() over the two draws a squashed ellipse — which is why walking to
+     the east wall a little above centre used to slide along it without ever
+     opening the door. */
+  function doorUnder(run) {
+    const side = Save.dungeonSide(run.row);
+    const r = Math.floor(run.pos / side), c = run.pos % side;
+    const midX = Math.abs(me.x - 50) < DOOR_SPAN;
+    const midY = Math.abs(me.y - 50) < DOOR_SPAN;
+    if (me.y <= 4 + DOOR_DEPTH && midX && r > 0)         return run.pos - side;
+    if (me.y >= 96 - DOOR_DEPTH && midX && r < side - 1) return run.pos + side;
+    if (me.x <= 4 + DOOR_DEPTH && midY && c > 0)         return run.pos - 1;
+    if (me.x >= 96 - DOOR_DEPTH && midY && c < side - 1) return run.pos + 1;
+    return null;
+  }
+
+  function atProp() {
+    return Math.abs(me.x - PROP_X) < PROP_W && Math.abs(me.y - PROP_Y) < PROP_H;
+  }
+
+  /* ---------- the loop ---------- */
+  function step(t) {
+    const run = Save.dungeonRun();
+    if (!run) { raf = null; return; }
+    const dt = Math.min(0.05, (t - (lastT || t)) / 1000);
+    lastT = t;
+    tick.frames++; tick.dt = dt;
+
+    let dx = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+    let dy = (held.down ? 1 : 0) - (held.up ? 1 : 0);
+    if (dx && dy) { dx *= 0.71; dy *= 0.71; }     // no free speed on the diagonal
+
+    if (dx) Hero.face($('walker'), dx < 0 ? 'left' : 'right');
+
+    const room = run.rooms[run.pos];
+    const blocked = room && (room.t === 'monster' || room.t === 'elite') && !room.done;
+
+    me.x = clamp(me.x + dx * SPEED * dt, 4, 96);
+    me.y = clamp(me.y + dy * SPEED * dt, 8, 96);
+
+    // an unbeaten monster stands between you and everywhere else
+    if (blocked) {
+      me.x = clamp(me.x, 12, 88);
+      me.y = clamp(me.y, 14, 90);
+    }
+
+    place();
+
+    const onProp = atProp() && room && room.t !== 'empty' && room.t !== 'entrance';
+    if (onProp !== (near === 'prop')) {
+      near = onProp ? 'prop' : null;
+      $('prop').classList.toggle('near', !!onProp);
+      renderCard();
+    }
+
+    if (!blocked) {
+      const door = doorUnder(run);
+      if (door !== null) {
+        Sound.tap();
+        Save.dungeonMove(door);
+        enterRoom(door, run.pos);
+        return;                                  // enterRoom restarts the loop
+      }
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  /* The room's pixel size, cached. Reading clientWidth inside the loop forces
+     a synchronous reflow on every frame, which is worse than the left/top it
+     replaced — measured at eight percent of the room per second instead of
+     sixty. Measured once here, and again only when the window changes. */
+  let roomW = 0, roomH = 0;
+  function measureRoom() {
+    const r = $('room');
+    roomW = r.clientWidth;
+    roomH = r.clientHeight;
+  }
+  addEventListener('resize', () => { measureRoom(); place(); });
+
+  function place() {
+    if (!roomW) measureRoom();
+    $('walker').style.transform =
+      'translate(' + Math.round(roomW * me.x / 100) + 'px,' +
+                     Math.round(roomH * me.y / 100) + 'px) translate(-50%, -85%)';
+  }
+
+  function startLoop() {
+    if (raf) cancelAnimationFrame(raf);
+    lastT = 0;
+    raf = requestAnimationFrame(step);
+  }
+
+  /* Walking through a door drops you at the opposite wall of the next room,
+     which is what makes the floor feel joined up rather than teleported. */
+  function enterRoom(to, from) {
+    const run = Save.dungeonRun();
+    const side = Save.dungeonSide(run.row);
+    const d = to - from;
+    if (d === -side) { me.y = 88; me.x = 50; }
+    else if (d === side) { me.y = 16; me.x = 50; }
+    else if (d === -1) { me.x = 88; me.y = 50; }
+    else if (d === 1) { me.x = 12; me.y = 50; }
+    near = null;
+    render();
+    startLoop();
+  }
+
+  /* ---------- drawing ---------- */
   function render() {
     const run = Save.dungeonRun();
     if (!run) return showScreen('startScreen');
-
     const side = Save.dungeonSide(run.row);
-    const near = Save.dungeonNeighbours(run.pos, run.row);
-    const here = run.rooms[run.pos];
-    const stuck = here && (here.t === 'monster' || here.t === 'elite') && !here.done;
+    const room = run.rooms[run.pos];
 
     $('floorNum').textContent = 'Floor ' + run.floor;
-    const best = (Save.me() || {}).progress ? Save.me().progress.dungeonBest : 0;
+    const best = Save.me().progress.dungeonBest || 0;
     $('bestNum').textContent = best ? '🏅 deepest ' + best : '';
     $('purseNum').textContent = run.gold ? '🪙 ' + run.gold + ' this trip' : '';
 
-    const grid = $('grid');
-    grid.style.gridTemplateColumns = `repeat(${side}, 74px)`;
-    grid.innerHTML = '';
+    Hero.draw($('walker'));
+    measureRoom();
+    place();
 
-    run.rooms.forEach((room, i) => {
-      const seen = room.done || i === run.pos || near.indexOf(i) !== -1;
+    // doors, only where there is somewhere to go
+    [...document.querySelectorAll('.door')].forEach((d) => d.remove());
+    const r = Math.floor(run.pos / side), c = run.pos % side;
+    const blocked = room && (room.t === 'monster' || room.t === 'elite') && !room.done;
+    const add = (cls, on) => {
+      if (!on) return;
       const el = document.createElement('div');
-      const art = ART[room.t] || ART.empty;
-      el.className = 'room'
-        + (seen ? '' : ' shut')
-        + (i === run.pos ? ' here' : '')
-        + (room.done && i !== run.pos ? ' done' : '')
-        + (!stuck && near.indexOf(i) !== -1 ? ' step' : '');
-      el.innerHTML = (i === run.pos ? '<span class="hero">🧍</span>' : '')
-        + (seen ? art[0] : '🚪')
-        + (seen && art[1] ? `<span class="sub">${art[1]}</span>` : '');
-      if (!stuck && near.indexOf(i) !== -1) {
-        el.onclick = () => { Sound.click(); Save.dungeonMove(i); render(); };
-      }
-      grid.appendChild(el);
+      el.className = 'door ' + cls + (blocked ? ' shut' : '');
+      $('room').appendChild(el);
+    };
+    add('n', r > 0); add('s', r < side - 1);
+    add('w', c > 0); add('e', c < side - 1);
+
+    // the thing in this room
+    const art = ART[room.t] || ART.empty;
+    const prop = $('prop');
+    prop.className = 'prop' + (room.done ? ' done' : '') + (near === 'prop' ? ' near' : '');
+    prop.innerHTML = art[0]
+      ? art[0] + '<span class="cap">' + art[1] + '</span>' : '';
+
+    // the minimap
+    const mini = $('mini');
+    mini.style.gridTemplateColumns = `repeat(${side}, 11px)`;
+    mini.innerHTML = '';
+    run.rooms.forEach((rm, i) => {
+      const cell = document.createElement('i');
+      if (rm.done || i === run.pos) cell.classList.add('seen');
+      if (rm.t === 'stairs' && (rm.done || i === run.pos)) cell.classList.add('stairs');
+      if (i === run.pos) cell.classList.add('here');
+      mini.appendChild(cell);
     });
 
-    renderRoom(run, here, stuck);
+    renderCard();
   }
 
   /* ---------- what you can do where you stand ---------- */
-  function renderRoom(run, room, stuck) {
+  function renderCard() {
+    const run = Save.dungeonRun();
+    if (!run) return;
+    const room = run.rooms[run.pos];
     const card = $('roomCard');
     const fight = Save.dungeonFight();
 
@@ -190,7 +422,19 @@
       return;
     }
 
-    if (room.t === 'treasure' && !room.done) {
+    if (near !== 'prop' || room.done) {
+      card.innerHTML = room.done && room.t !== 'stairs'
+        ? '<h3>Nothing left here</h3><p>Try another door.</p>'
+        : '<h3>Have a look around</h3><p>Walk into things. Doors are on the walls.</p>';
+      const out = document.createElement('button');
+      out.className = 'btn ghost';
+      out.textContent = '🚪 Climb out';
+      out.onclick = () => finish('left');
+      card.appendChild(out);
+      return;
+    }
+
+    if (room.t === 'treasure') {
       card.innerHTML = `<h3>💰 Treasure</h3><p>Something is glinting in the corner.</p>`;
       const b = document.createElement('button');
       b.className = 'btn';
@@ -198,17 +442,18 @@
       b.onclick = () => {
         const got = Save.dungeonLoot('treasure');
         Sound.coin();
+        card.innerHTML = `<h3>💰 ${got ? got.gold : 0} gold</h3><p>${lootLine(got)}</p>`;
         if (got && got.card) Hud.cardDrop(got.card);
-        card.innerHTML = `<h3>💰 ${got ? got.gold : 0} gold</h3>
-          <p>${got && got.card ? 'And a card: ' + got.card.emoji + ' ' + got.card.name
-                               : 'Nothing else in there.'}</p>`;
-        Hud.render(); Hud.flush(render);
+        if (got && got.gear && got.gear.better) Hero.draw($('walker'));
+        Hud.render();
+        render();
+        Hud.flush();
       };
       card.appendChild(b);
       return;
     }
 
-    if (room.t === 'shrine' && !room.done) {
+    if (room.t === 'shrine') {
       const offer = Save.dungeonOffer(run);
       card.innerHTML = `<h3>✨ A shrine</h3><p>Take one. It lasts until you come back up.</p>`;
       const row = document.createElement('div');
@@ -231,7 +476,12 @@
       const down = document.createElement('button');
       down.className = 'btn';
       down.textContent = '⬇️ Go deeper';
-      down.onclick = () => { Sound.click(); Save.dungeonDescend(); render(); };
+      down.onclick = () => {
+        Sound.click();
+        Save.dungeonDescend();
+        me.x = 50; me.y = 74; near = null;
+        render(); startLoop();
+      };
       const out = document.createElement('button');
       out.className = 'btn ghost';
       out.textContent = '🪜 Climb out';
@@ -241,16 +491,23 @@
       return;
     }
 
-    card.innerHTML = `<h3>Nothing here</h3><p>Just dust and old air. Pick a door.</p>`;
-    const out = document.createElement('button');
-    out.className = 'btn ghost';
-    out.textContent = '🚪 Give up and climb out';
-    out.onclick = () => finish('left');
-    card.appendChild(out);
+    card.innerHTML = '<h3>Nothing here</h3><p>Just dust and old air.</p>';
+  }
+
+  function lootLine(got) {
+    if (!got) return '';
+    const bits = [];
+    if (got.card) bits.push('a card: ' + got.card.emoji + ' ' + got.card.name);
+    if (got.gear && got.gear.better) {
+      bits.push('and ' + got.gear.item.emoji + ' ' + got.gear.item.name +
+                ' ' + '⭐'.repeat(got.gear.stars));
+    }
+    return bits.length ? bits.join(', ') : 'Nothing else in there.';
   }
 
   function finish(reason) {
     const out = Save.dungeonEnd(reason);
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
     if (!out) return showScreen('startScreen');
     $('endTitle').textContent = reason === 'lost' ? 'The way back up' : 'Back in the daylight';
     $('endText').textContent = reason === 'lost'
@@ -265,7 +522,41 @@
     Hud.render();
   }
 
+  /* ---------- controls ---------- */
+  const KEYS = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    w: 'up', s: 'down', a: 'left', d: 'right',
+    W: 'up', S: 'down', A: 'left', D: 'right'
+  };
+  addEventListener('keydown', (e) => {
+    const dir = KEYS[e.key];
+    if (!dir) return;
+    held[dir] = true;
+    e.preventDefault();
+  });
+  addEventListener('keyup', (e) => {
+    const dir = KEYS[e.key];
+    if (dir) held[dir] = false;
+  });
+
+  document.querySelectorAll('.pad button').forEach((b) => {
+    const dir = b.dataset.dir;
+    const on = (e) => { e.preventDefault(); held[dir] = true; };
+    const off = (e) => { e.preventDefault(); held[dir] = false; };
+    b.addEventListener('pointerdown', on);
+    b.addEventListener('pointerup', off);
+    b.addEventListener('pointerleave', off);
+    b.addEventListener('pointercancel', off);
+  });
+
   /* ---------- coming back from a fight ---------- */
+  function begin() {
+    showScreen('floorScreen');
+    me.x = 50; me.y = 74; near = null;
+    render();
+    startLoop();
+  }
+
   (function resume() {
     let won = null;
     try {
@@ -276,23 +567,29 @@
     if (won === 'won') {
       const got = Save.dungeonWin();
       Hud.render();
-      render();
+      begin();
       if (got && got.card) Hud.cardDrop(got.card);
+      if (got && got.gear && got.gear.better) Hero.draw($('walker'));
       Hud.flush();
       return;
     }
-    if (Save.dungeonRun()) { showScreen('floorScreen'); render(); }
-    else showScreen('startScreen');
+    if (Save.dungeonRun()) begin();
+    else {
+      showScreen('startScreen');
+      Hero.draw($('startHero'));
+      const k = Hero.kit();
+      $('startKit').textContent = [k.helm, k.weapon, k.armor, k.boots, k.pet]
+        .filter(Boolean).join('  ') || 'Nothing but the clothes you stand in.';
+    }
   })();
 
   $('goBtn').onclick = () => {
     if (!Save.me()) { location.href = HOME; return; }
     Save.dungeonStart();
     Sound.click();
-    showScreen('floorScreen');
-    render();
+    begin();
   };
-  $('againBtn').onclick = () => { Save.dungeonStart(); showScreen('floorScreen'); render(); };
+  $('againBtn').onclick = () => { Save.dungeonStart(); begin(); };
   $('homeBtn').onclick = () => (location.href = HOME);
   $('outBtn').onclick = () => (location.href = HOME);
 
@@ -301,15 +598,15 @@
     $('muteBtn').classList.toggle('muted', Sound.muted);
   }
   $('muteBtn').addEventListener('click', () => {
-    Sound.muted = !Sound.muted;   // shared/sound.js persists the preference
+    Sound.muted = !Sound.muted;
     renderMute();
   });
   renderMute();
-
   Hud.render();
 
-  // Test seam — the harness drives the real screen, same as every other game.
-  window.TEST = { render, finish, showScreen };
+  // Test seam — the harness walks the hero the same way a child does.
+  window.TEST = { render, finish, showScreen, me, held, begin,
+                  atProp, doorUnder, startLoop, tick };
 })();
 </script>
 </body>

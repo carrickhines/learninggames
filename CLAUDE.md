@@ -133,6 +133,7 @@ into the other's tracks.
 index.html          the hub: who's playing, the map, shop, cards, trader,
                     the grown-ups' progress report, settings
 shared/
+  hero.js           the hero drawn as a figure, wearing what they own
   tokens.css        design tokens — the one place colors and fonts are set
   ui.css            app frame, screens, buttons, HP pips, reward panel
   battle.css        arena, attack animations, timer bar (math + language only)
@@ -769,6 +770,30 @@ the trail, which is where the harder modes live.
 **Shrines** offer three blessings drawn from the seed. They are all fields
 `loadout()` already sums, so a blessing costs the battle games nothing to
 honour, and they last the descent and no longer.
+
+**You walk it.** A room fills the screen and the hero is a figure you move
+with the arrows, WASD, or the on-screen pad — not a tile you tap. Doorways sit
+in the middle of each wall that has a room beyond it, and walking into one puts
+you at the opposite wall of the next room, so a floor feels joined up rather
+than teleported. The grid survives as a minimap in the corner.
+
+Two things about the loop are worth knowing before touching it. Position is
+kept in **percent of the room**, so nothing needs recalculating when the iPad
+rotates — but `place()` must not read `clientWidth` inside the loop: doing that
+forces a synchronous reflow every frame and drops the walk to eight percent of
+the room per second. The size is cached and re-measured on resize. And door and
+prop hit zones are checked **per axis, not by distance** — a percent of the
+width and a percent of the height are different numbers of pixels in a 4:3
+room, so `hypot()` over the two draws a squashed ellipse, which is why walking
+to the east wall slightly above centre used to slide along it forever.
+
+**`shared/hero.js` draws the hero wearing what they own** — helm, weapon,
+armour, boots, and the pet alongside. It reads `Save.loadout()`, so new gear
+draws itself the moment it exists. It is a paper doll: pieces anchored to the
+floor line and overlapping the body. The first version hung each piece off its
+own edge and the result read as five emoji standing near each other. It shows
+the weapon *item*, not its slash effect, because the Wooden Stick's slash is 💥
+— an explosion floating in your hand rather than the stick you are holding.
 
 **Fights are played in the real games.** A monster room sends you to
 `math/index.html?dungeon=1` (or language), which locks to the picked track and,
