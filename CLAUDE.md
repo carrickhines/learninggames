@@ -1,10 +1,13 @@
 # Learning Games
 
-Three browser games for two kids, one site, one shared character.
+Three browser games and a dungeon, for two kids, one site, one shared
+character.
 
 - **🔢 Math RPG** — counting, adding, times tables, algebra, and pattern-finding
 - **🔤 Language RPG** — letters, spelling, grammar, and word play
 - **📖 Story Quest** — reading comprehension as an adventure
+- **⛏️ The Dungeon** — a floor that builds itself, walked in 2D; the fights are
+  played in the two battle games and come back
 
 They were three separate repos with three separate bookmarks and no memory
 between sessions. They're now one site with a hub, a shared design system,
@@ -71,7 +74,7 @@ content silently repoints a saved reference at something else:
 - **Never remove or reorder a step in `MAP`.** `progress.map` is an index into
   that array — deleting step 4 teleports every hero past it backwards. Append
   to the end, or add a whole new trail. `save-test.html` freezes the first road
-  of all 22 steps that shipped before this rule existed and fails if one moves.
+  of every one of the 80 steps on each trail and fails if one moves.
 - **When a `MAP` step gains a fork, the road that was already there must stay
   option 0.** `activeNode` stores `{ trail, i, o }`, so a stop half-played at
   deploy time resumes as `o: 0` and must land in the same game, track and mode.
@@ -124,8 +127,10 @@ undo that exists.
   tables, spelling, grammar, and finding the rule behind a pattern. His are
   the "big hero" rows.
 
-The split is by row on each menu, not by profile, so either kid can wander
-into the other's tracks.
+The split is by row on each menu, not by profile. A menu opens showing only
+this hero's row, with the other one tap away — see "Which kid is this?" below.
+Either kid can still wander into the other's tracks; they just are not shown
+eleven of them by default.
 
 ## Layout
 
@@ -156,7 +161,7 @@ no build step and the games still open straight from `file://`.
 
 ## The map
 
-A landscape the hero walks, not a menu. The trail climbs through seven regions,
+A landscape the hero walks, not a menu. The trail climbs through sixteen regions,
 each with its own sky, hills and scenery, and the hero token slides along the
 path when a stop is beaten — that walk is the moment the screen exists for.
 
@@ -308,8 +313,8 @@ applied at the start of the next run via `Save.loadout()`:
 - **Armor** — up to +5 hearts.
 - **Pets** — a companion in the arena, plus a passive (thinking time, or
   blocked hits per run).
-- **Trinkets** — the fourth slot, with effects that never touch damage: gold
-  bonus, card luck, a wider DOUBLE window.
+- **Trinkets** — effects that never touch damage: gold bonus, card luck, a
+  wider DOUBLE window.
 - **Helms** — the DOUBLE window is the helm's identity, so it pays a child who
   is quick rather than one who is lucky. A heart or two at the top, in ones, so
   helm and armor together top out at twelve pips rather than running away.
@@ -693,7 +698,7 @@ gets you hurt and careful reading wins.
 **There is deliberately no timer.** Comprehension is the one skill where time
 pressure is counterproductive — the whole point is slowing down. Don't add one.
 
-## Big hero quests (16 quests · 173 scenes · 87 chests)
+## Big hero quests (16 quests · 173 scenes · 93 chests)
 
 🌉 The Troll Bridge · 🐉 The Dragon's Library · 👻 The Ghost Ship ·
 🧙 The Wizard's Maze · 🤖 The Robot Bakery · 🧊 The Yeti's Birthday ·
@@ -798,7 +803,21 @@ the weapon *item*, not its slash effect, because the Wooden Stick's slash is �
 **Fights are played in the real games.** A monster room sends you to
 `math/index.html?dungeon=1` (or language), which locks to the picked track and,
 on the end screen, offers *⛏️ Back down* instead of *Play Again*. The result
-crosses back in `sessionStorage` under `lg_dungeon_result`.
+crosses back in `sessionStorage` under `lg_dungeon_result`. That reuses the
+whole battle engine — gear, pets, allies, card drops, the log — for about
+fifteen lines in each game, and means the dungeon cannot drift away from how
+the rest of the site plays.
+
+**The rooms a floor can hold** are `entrance`, `stairs`, `monster`, `elite`,
+`treasure`, `shrine` and `empty`. There is no forge or merchant room yet; the
+Forge is a hub screen. Adding a type means the generator, the `ART` table in
+`dungeon/index.html`, and a branch in `renderCard()` — and the save-test's list
+of known types, which is what stops a typo becoming an invisible blank room.
+
+**It is reached from beside the map**, not from the row of tools. Both are
+places you travel to — one is the journey you are on, the other is the one that
+builds itself — and `smoke.py` keeps them on the same row, adjacent, above the
+utilities.
 
 # Difficulty modes
 
@@ -960,7 +979,7 @@ geckodriver), then:
 | Script | Run it when | ~ |
 |---|---|---|
 | `smoke.py` | after any change | 1 min |
-| `run-save-test.py` | after touching `save.js` / `log.js` (397 + 65 assertions) | 10 s |
+| `run-save-test.py` | after touching `save.js` / `log.js` (571 + 65 assertions) | 10 s |
 | `tracks.py` | after touching a question generator | 1 min |
 | `content.py` | after touching content, prices, card odds, or the hub's claims | 30 s |
 | `playthrough.py` | before shipping | 3 min |
@@ -976,7 +995,42 @@ number silently drifted to being wrong by twelve once already.
 New drawing code gets a **screenshot looked at**, not just a passing assertion.
 The clock face, fraction bars, number blocks and the map landscape all needed
 real review at iPad size, and two of them shipped looking wrong despite green
-tests.
+tests. Three more since: Frostfall's first palette was near-white hills that
+made the stop labels unreadable; the dungeon's hero was five emoji standing
+near each other rather than one character wearing things; and the dungeon's
+mute button sat in the wrong corner as a gold slab. Nothing in the suite could
+see any of them, because contrast, composition and "that looks wrong" are not
+assertions.
+
+**What the suite now covers beyond the obvious**, all added by breaking the
+thing first and watching the message name the fault:
+
+- **9,600 generated dungeon floors** — one staircase each, something to fight,
+  no unknown room type, no elite too shallow, and a flood fill proving no room
+  can be walled off. A generated floor cannot be reviewed by reading it, so the
+  only honest test is to make a great deal of it and assert what must hold.
+- **Every map stop names a track its game really has.** `save.js` has no idea
+  what the games declare, so `t: 'onelesss'` passes every shape check and then
+  opens a game with nothing to ask. `content.py` reads both registries off the
+  real pages and holds all 205 battle stops against them.
+- **The dungeon draws only from the hero's own row** — a five-year-old must
+  never meet algebra in a monster room.
+- **The forge cannot overtake the ladder**: every rung of the weapon ladder,
+  lower tier forged to the ceiling, compared as a whole weapon rather than on
+  crit alone (the shop does not climb on crit — the Flame Blade beats the Axe
+  on DOUBLE damage).
+- **The menus open on your own row**, and one tap brings the rest back.
+- **The sound toggle is in the top-right on all five pages** — a wrong class
+  name put it bottom-left and gold.
+- **The map and the dungeon stay side by side** on the hub.
+
+**Two timing flakes were seen and not explained.** `run-save-test.py` once
+reported *4 FAILED* and has not repeated it in twenty-plus runs; the runner
+printed the failing lines with Selenium's `.text`, which returns empty
+mid-fade, so it named nothing — it reads `textContent` now. And the wild-ally
+checks in `playthrough.py` failed once and passed twice immediately after,
+untouched; they lean on fixed sleeps around the run loop. Both are worth a hard
+look if they recur.
 
 ## A test that can't fail isn't a test
 
@@ -994,7 +1048,11 @@ deployed build said the armed stop was, not a hardcoded `math/rule/normal`.
 ## How the harness sees inside the games
 
 Each game assigns `window.TEST` on the last line of its script (state, the
-current answer, the foe lineup, the track registry). It costs nothing in play,
+current answer, the foe lineup, the track registry). The dungeon does too, and
+exposes the walk — `me` (the hero's position in room percent), `held` (which
+directions are pressed) and `tick` (frames and the last `dt`), so the harness
+can drive the character the way a child does and prove the loop is really
+running. It costs nothing in play,
 and doubles as a **boot check**: if `window.TEST` is missing, the script threw
 on its way down. A throw *during parse* leaves no error for a `window.onerror`
 trap installed after load, so "no JS errors" alone would report a completely
@@ -1082,23 +1140,59 @@ eat words. Use `git commit -F -` with a quoted heredoc.
   aloud stays a parent-at-bedtime activity by design.
 - **The streak grants nothing**, so it can take nothing away. Don't attach a
   reward to it — the daily's double gold is the reason to come back.
-- **`profile.row` is not a content gate.** Both menus stay fully open to both
-  kids and free play is never restricted; it only decides what the site picks
-  *for* them.
+- **`profile.row` is not a content gate.** A menu opens showing only this
+  hero's row, but the other is one tap away and nothing is ever locked. It
+  decides what the site picks *for* them and what it shows *first* — never
+  what they are allowed to play. Don't turn the reveal button into a
+  permission.
+- **The dungeon's gamble is soft, on purpose.** Losing costs nothing that was
+  already found — not gold, not cards, not gear — because "nothing is ever
+  taken away" outranks roguelike tension. What you risk is the rest of the
+  descent and the depth record. It is a weaker dare than a real roguelike and
+  that is the correct trade for a five-year-old; don't "fix" it by adding
+  stakes.
+- **There is no bottom to the dungeon.** Floors climb until the hero stops.
+  Don't add a final floor — the record *is* the ending.
 
 ---
 
 # Where the project stands
 
-Round 4 shipped and is live (schema **v4**, `57a1acc`). It added seven tracks
-(Make 10, Coins, Clock, Sound It Out, Fractions, Word Problems, Big Numbers,
-Everyday Maths), The Rematch, wild allies, boss weaknesses, pets that grow, the
-daily challenge and streak, two new map regions, and `profile.row`.
+**Round 5 shipped and is live** (schema **v5**). It was asked for as "expand
+the map" and turned into something larger once the real complaint surfaced —
+*"the game is lacking other things to do"*. A longer corridor is still a
+corridor, so the round split between more world and more to do in it.
+
+| | Round 4 | Round 5 |
+|---|---|---|
+| Map stops per trail | 32 | **80** |
+| Regions | 7 | **16** |
+| Worlds | 5 | **16** |
+| Monster cards | 55 | **162** |
+| Gear pieces | 22 | **44** (36 bought, 8 found) |
+| Gear slots | 4 | **6** |
+| Story Quest quests | 8 | **16** |
+| Save-test assertions | 397 | **571** |
+
+New in it: nine new lands, helms and boots, gear that only drops underground,
+the Forge, **the Dungeon**, and a hero you can actually see wearing their kit.
 
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
-80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear
-slots.** Suite: 571 save checks, 65 log checks, plus smoke / tracks / content /
-playthrough / upgrade.
+80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear slots
+(44 pieces), and a dungeon with no bottom.** Suite: 571 save checks, 65 log
+checks, 177 smoke checks, plus tracks / content / playthrough / upgrade.
+
+**Four bugs were found and fixed on the way**, all of them silent:
+
+- The frozen-roads list protected 22 of 32 map steps — ten shipped stops had no
+  protection at all against being reordered under a hero standing past them.
+- `REGIONS` summed to 33 against 32-step trails, so Market Town's first stop
+  was painted *and looted* as Ember Peak. The check that should have caught it
+  read `>=`, and 33 >= 32 is perfectly true.
+- Market Town and The Observatory borrowed the Reef's and the Peak's monsters,
+  so their boss chests paid out cards the kids had held for weeks.
+- `foesFor()` ignored the map entirely: every stop fought whatever world you
+  had last bought, which made the map's places cosmetic.
 
 **Outstanding, in rough priority order:**
 
@@ -1110,12 +1204,29 @@ playthrough / upgrade.
    `P_opposite` (plus their word clips) are not in `voice.js` and need
    recording in `record.html`, on the device the kids play on. mp4/AAC records
    and plays everywhere; Chrome-recorded webm may not play on iPads.
-4. **Watch the maths menu.** Nineteen tracks is a lot for a six-year-old even
-   grouped; worth checking with the kids before adding more.
+3. **The economy has not been re-simulated against the dungeon.** `content.py`
+   still passes, but its day-of-play model does not know about dungeon loot,
+   80 stops of chests, or the Forge as a sink. It is the highest-risk number
+   in the round: if gold inflates, the gear ladder collapses from months into
+   a fortnight and the progression that actually motivates them stops working.
+4. **Three new Story Quest challenge types were planned and not built** —
+   riddle gates, who-said-it, and big-hero sequencing. The 16 quests use the
+   existing scene-and-chest format.
+5. **The dungeon has no forge or merchant rooms.** Both are in the room
+   vocabulary in spirit but not in the generator; the Forge is a hub screen.
+6. **Watch the maths menu.** Nineteen tracks is a lot even grouped — the
+   row-filtered menu helps, but worth checking with the kids.
 
 **Tuning knobs**, all in `ECONOMY` in `shared/save.js`: `dailyGold`,
 `dailyReach`, `weaknessDamage`, `allyJoinChance` / `allyKnownBonus` /
 `allyStrikeChance` / `maxAllies`, `petGrowth` / `petStageTimeScale` /
-`petStageShield`, the card odds and the pity counter, and the whole gear ladder.
-`RETIRE` (3, how many corrects retire a Rematch question) lives in
+`petStageShield`, the card odds and the pity counter, the whole gear ladder,
+and `dungeon` (grid size per row, how much of a floor fights, when elites
+start, treasure and card and gear odds, how many blessings a shrine offers).
+A knob that nothing reads is worse than no knob — `floorClearGold` sat in
+there for a day looking like tuning and paying nobody, which is the same
+trap `loot: 'boss'` is still sitting in on 28 map options.
+The forge's own numbers — `STAR_SCALE`, `FORGE_STEP`, `FORGE_MAX` — sit beside
+`FOUND` rather than in `ECONOMY`, because they scale gear rather than pay it
+out. `RETIRE` (3, how many corrects retire a Rematch question) lives in
 `shared/log.js`.

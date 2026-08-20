@@ -119,7 +119,6 @@ var Save = (function () {
       treasureGold: 45,             // per treasure room, multiplied by floor
       treasureCard: 0.18,           // and its chance of a card
       eliteCard: 0.60,              // an elite is the reliable card
-      floorClearGold: 25,           // for taking the stairs rather than leaving
       blessings: 3                  // how many are offered at a shrine
     }
   };
