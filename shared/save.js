@@ -454,6 +454,8 @@ var Save = (function () {
     { id: 's-sower',   name: 'The Sower',     emoji: '🌱' },
     { id: 's-tortoise', name: 'The Old Judge', emoji: '⚖️' },
     { id: 's-forecast', name: 'The Forecaster', emoji: '🌦️' },
+    { id: 's-baker',   name: 'The Ribbon Baker', emoji: '🥐' },
+    { id: 's-keeper',  name: 'The Keeper of Lost Things', emoji: '🧦' },
     /* New quest cards go HERE, before the mini-game pair. The quest cards are
        read positionally — `STORY_CARDS[state.questIdx]` — so appending one at
        the end instead would hand a new quest the Story Sorter card and share
