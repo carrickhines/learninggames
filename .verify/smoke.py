@@ -611,6 +611,31 @@ try:
             check("menu (%s/%s): one tap brings the rest back" % (name, row),
                   both[0] and both[1], str(both))
 
+    # ------------------------------------------------- the two places to go
+    # The dungeon spent its first day filed with the shop and the settings,
+    # which reads as housekeeping rather than a game. It belongs beside the
+    # map: both are places you travel to, and they should stay together.
+    print("\nThe map and the dungeon travel together")
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Sam', 'S');")
+    load("index.html")
+    box = d.execute_script("""
+        var m = document.getElementById('mapBtn');
+        var g = document.getElementById('dungeonBtn');
+        if (!m || !g) return null;
+        var mr = m.getBoundingClientRect(), gr = g.getBoundingClientRect();
+        var util = document.getElementById('shopBtn').getBoundingClientRect();
+        return {sameRow: Math.abs(mr.top - gr.top) < 6,
+                adjacent: Math.abs(gr.left - mr.right) < 40,
+                aboveTheGames: gr.bottom < util.top};
+    """)
+    check("hub: both places are on the page", box is not None)
+    if box:
+        check("hub: the dungeon sits on the map's row", box["sameRow"], str(box))
+        check("hub: and right next to it", box["adjacent"], str(box))
+        check("hub: not down among the shop and the settings",
+              box["aboveTheGames"], str(box))
+
     # ------------------------------------------------------- the mute button
     # The dungeon shipped its mute button with class="mute", a class that does
     # not exist. It fell through to the generic gold button style and sat in
