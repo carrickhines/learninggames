@@ -213,6 +213,7 @@
     elite:    ['👑', 'something bigger'],
     treasure: ['💰', 'treasure'],
     shrine:   ['✨', 'a shrine'],
+    puzzle:   ['🤖', 'a stuck robot'],
     empty:    ['', '']
   };
 
@@ -448,6 +449,24 @@
         Hud.render();
         render();
         Hud.flush();
+      };
+      card.appendChild(b);
+      return;
+    }
+
+    /* A room that has to be thought at rather than fought. It opens the real
+       Robot Workshop, exactly the way a monster room opens the real battle
+       game — which is what stops the dungeon drifting away from how the rest
+       of the site plays. */
+    if (room.t === 'puzzle') {
+      card.innerHTML = `<h3>🤖 A stuck robot</h3>
+        <p>It has forgotten the way out. Write it a plan.</p>`;
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.textContent = '🤖 Help it';
+      b.onclick = () => {
+        try { sessionStorage.setItem('lg_dungeon', '1'); } catch (e) {}
+        location.href = '../robot/index.html?dungeon=1';
       };
       card.appendChild(b);
       return;

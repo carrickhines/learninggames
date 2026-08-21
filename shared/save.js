@@ -32,6 +32,23 @@ var Save = (function () {
     storyChest:   { gold: 5,  xp: 3 },
     questDone:    { gold: 30, xp: 30 },
 
+    /* ---- The Robot Workshop ----
+       A level is worth rather more than a single right answer and rather less
+       than a whole quest: it is a few minutes of thinking, and a pack of six
+       is the sitting. `robotPar` is paid on top for solving it in as few
+       commands as the level can be solved in — the skill reward, and the only
+       thing here that rewards doing it *well* rather than doing it.
+
+       Deliberately modest, and paid on the FIRST solve only (see solved() in
+       robot/index.html). A battle run is six minutes and a quest fifteen, so
+       neither can be ground; a three-tap level is ten seconds, and paying it
+       every time came to roughly seven times the battle rate. content.py models
+       a half hour in minutes across all four places to earn, and bounds what
+       the whole workshop is worth over its life. */
+    robotSolved:  { gold: 12, xp: 8 },
+    robotPar:     { gold: 8,  xp: 6 },   // paid on top, for the shortest program
+    packDone:     { gold: 30, xp: 30 },  // a pack of six, same as a quest
+
     // Wrong answers cost nothing. Progress only ever goes up — the games are
     // already punishing enough with lost hearts.
 
@@ -119,7 +136,13 @@ var Save = (function () {
       treasureGold: 45,             // per treasure room, multiplied by floor
       treasureCard: 0.18,           // and its chance of a card
       eliteCard: 0.60,              // an elite is the reliable card
-      blessings: 3                  // how many are offered at a shrine
+      blessings: 3,                 // how many are offered at a shrine
+      /* A floor usually holds one room that has to be thought at rather than
+         fought. It is dealt from the same leftover pool the treasure rooms
+         come from, so it displaces a chest rather than adding one — a descent
+         already pays better than anything else on the site, and this is not
+         the place to add another purse. */
+      puzzleChance: 0.7
     }
   };
 
@@ -482,6 +505,21 @@ var Save = (function () {
     // still lines up with QUESTS by index
     { id: 's-order',   name: 'Story Sorter',  emoji: '🃏' },
     { id: 's-finish',  name: 'Storyteller',   emoji: '🌱' }
+  ];
+
+  /* The Robot Workshop has no combat either, so like Story Quest each pack
+     awards its own card. Looked up by id rather than by position — the packs
+     are much more likely to be re-cut than the quests are, and STORY_CARDS
+     already carries a warning comment about exactly that hazard. */
+  var ROBOT_CARDS = [
+    { id: 'r-scout',      name: 'Scout Unit',    emoji: '🤖' },
+    { id: 'r-pebble',     name: 'Pebble Bot',    emoji: '🪨' },
+    { id: 'r-magpie',     name: 'Magpie Drone',  emoji: '💎' },
+    { id: 'r-hopper',     name: 'Gap Hopper',    emoji: '🦿' },
+    { id: 'r-compass',    name: 'Compass Core',  emoji: '🧭' },
+    { id: 'r-surveyor',   name: 'The Surveyor',  emoji: '🛰️' },
+    { id: 'r-loopsmith',  name: 'Loopsmith',     emoji: '🔁' },
+    { id: 'r-architect',  name: 'The Architect', emoji: '📐' }
   ];
 
   /* ---------- The shop ----------------------------------------------------
@@ -1577,6 +1615,9 @@ var Save = (function () {
     if (rng() < D.shrineChance && at < free.length) {
       rooms[free[at++]] = { t: 'shrine', done: false };
     }
+    if (rng() < D.puzzleChance && at < free.length) {
+      rooms[free[at++]] = { t: 'puzzle', done: false };
+    }
     // whatever is left over is treasure, up to a third of the floor
     var treasure = Math.max(1, Math.round((n - 2) * 0.22));
     for (var r = 0; r < treasure && at < free.length; r++, at++) {
@@ -1727,6 +1768,25 @@ var Save = (function () {
     return { g: pick.g, t: pick.t, m: pick.m, label: pick.label };
   }
 
+  /* The puzzle waiting in this room, or null if there isn't one.
+
+     This deliberately does NOT know what the Robot Workshop contains. It
+     hands back the hero's row and a seeded number, and the workshop resolves
+     that against its own packs — so there is no second copy of the level list
+     for the two to drift apart on, which is the trap the language game's
+     TRACKS array was built to close. Deeper floors reach further along the
+     packs, the same way a fight reaches further along the trail. */
+  function dungeonPuzzle() {
+    var run = dungeonRun();
+    if (!run) return null;
+    var room = run.rooms[run.pos];
+    if (!room || room.done || room.t !== 'puzzle') return null;
+    var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 40503) ^ (run.pos * 23));
+    return { row: run.row, floor: run.floor,
+             n: Math.floor(rng() * 1000000),
+             reach: Math.min(1, (run.floor + 2) / 10) };
+  }
+
   /* The fight waiting in this room, or null if there isn't one. */
   function dungeonFight() {
     var run = dungeonRun();
@@ -1754,13 +1814,14 @@ var Save = (function () {
     var run = dungeonRun();
     if (!p || !run) return null;
     var D = ECONOMY.dungeon;
-    var mult = kind === 'elite' ? 2.2 : kind === 'monster' ? 0.9 : 1;
+    var mult = kind === 'elite' ? 2.2
+            : (kind === 'monster' || kind === 'puzzle') ? 0.9 : 1;
     var gold = Math.round(D.treasureGold * run.floor * mult);
     var paid = award(gold, Math.round(gold / 4));
     run.gold += paid.gold;
 
     var odds = kind === 'elite' ? D.eliteCard
-             : kind === 'treasure' ? D.treasureCard : 0;
+             : (kind === 'treasure' || kind === 'puzzle') ? D.treasureCard : 0;
     var got = null;
     if (odds > 0) {
       var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 65599) ^ (run.pos * 7) ^ 0x5bf0);
@@ -1799,7 +1860,8 @@ var Save = (function () {
     if (!run) return null;
     var room = run.rooms[run.pos];
     if (!room) return null;
-    return dungeonLoot(room.t === 'elite' ? 'elite' : 'monster');
+    return dungeonLoot(room.t === 'elite' ? 'elite'
+                     : room.t === 'puzzle' ? 'puzzle' : 'monster');
   }
 
   function dungeonBless(id) {
@@ -1902,6 +1964,9 @@ var Save = (function () {
         activeNode: null,                // the map stop being played, if any
         dungeon: null,                   // the descent in progress, if any
         dungeonBest: 0,                  // deepest floor ever reached
+        // The Robot Workshop: levels beaten, the shortest program managed on
+        // each, and the packs finished. Keyed by level id, not by index.
+        robot: { solved: {}, par: {}, packs: [] },
         world: 'meadow',
         unlockedWorlds: ['meadow'],
         runsWon: {},                 // game id -> wins
@@ -1916,7 +1981,7 @@ var Save = (function () {
     };
   }
 
-  var VERSION = 5;
+  var VERSION = 6;
   var V2_GOLD_SCALE = 20;   // see migrate(): the v2 price rebalance factor
 
   function blankSave() {
@@ -2007,6 +2072,27 @@ var Save = (function () {
         if (!p.progress) p.progress = {};
         if (p.progress.dungeon === undefined) p.progress.dungeon = null;
         if (!p.progress.dungeonBest) p.progress.dungeonBest = 0;
+      });
+    }
+
+    if (v < 6) {
+      /* v6 makes room for the Robot Workshop. Every field here is new and
+         empty: `solved` is which levels have been beaten, `par` the shortest
+         program the hero has managed on each (so a level solved the long way
+         can still be improved on later), and `packs` the packs finished, which
+         is what has already paid its card.
+
+         Keyed by level id rather than by index, deliberately. `progress.map`
+         is an index into MAP and that is exactly why a map step can never be
+         reordered; there is no reason to inherit that constraint twice, and
+         packs are much more likely to be re-cut than the trail is. */
+      Object.keys(d.profiles).forEach(function (id) {
+        var p = d.profiles[id];
+        if (!p.progress) p.progress = {};
+        if (!p.progress.robot) p.progress.robot = { solved: {}, par: {}, packs: [] };
+        if (!p.progress.robot.solved) p.progress.robot.solved = {};
+        if (!p.progress.robot.par) p.progress.robot.par = {};
+        if (!p.progress.robot.packs) p.progress.robot.packs = [];
       });
     }
 
@@ -2211,6 +2297,10 @@ var Save = (function () {
     STORY_CARDS.forEach(function (c) {
       m[c.id] = { id: c.id, name: c.name, emoji: c.emoji, r: c.r || 2,
                   from: 'Story Quest', world: null, game: 'story' };
+    });
+    ROBOT_CARDS.forEach(function (c) {
+      m[c.id] = { id: c.id, name: c.name, emoji: c.emoji, r: c.r || 2,
+                  from: 'Robot Workshop', world: null, game: 'robot' };
     });
     return m;
   })();
@@ -2845,6 +2935,59 @@ var Save = (function () {
     });
   }
 
+  /* ---------- The Robot Workshop ------------------------------------------
+
+     Levels are keyed by id, not by index. `progress.map` is an index into MAP
+     and that is precisely why a map step can never be reordered under a hero
+     standing past it; there is no reason to buy that constraint a second time
+     for content far more likely to be re-cut. A pack that is renamed loses its
+     stars, which is a shrug — a pack that is reordered would otherwise hand
+     out somebody else's. */
+
+  function robotBook(p) {
+    if (!p.progress.robot) p.progress.robot = { solved: {}, par: {}, packs: [] };
+    var r = p.progress.robot;
+    if (!r.solved) r.solved = {};
+    if (!r.par) r.par = {};
+    if (!r.packs) r.packs = [];
+    return r;
+  }
+
+  function robotProgress() {
+    var p = me();
+    return p ? robotBook(p) : { solved: {}, par: {}, packs: [] };
+  }
+
+  /* A level beaten in `tokens` commands. Keeps the SHORTEST program ever
+     managed rather than the most recent one: a level solved tidily and then
+     replayed sloppily must not lose the star it already earned. Progress only
+     ever goes up. */
+  function robotSolve(levelId, tokens) {
+    var out = { first: false, improved: false, best: tokens };
+    update(function (p) {
+      var r = robotBook(p);
+      if (!r.solved[levelId]) { r.solved[levelId] = 1; out.first = true; }
+      var was = r.par[levelId];
+      if (!was || tokens < was) { r.par[levelId] = tokens; out.improved = true; }
+      out.best = r.par[levelId];
+    });
+    return out;
+  }
+
+  /* Every level in a pack beaten. True only the first time, so replaying a
+     finished pack cannot pay its card twice. */
+  function robotFinishPack(packId, levelIds) {
+    var p = me();
+    if (!p) return false;
+    var r = robotBook(p);
+    if (r.packs.indexOf(packId) !== -1) return false;
+    for (var i = 0; i < levelIds.length; i++) {
+      if (!r.solved[levelIds[i]]) return false;
+    }
+    update(function (pp) { robotBook(pp).packs.push(packId); });
+    return true;
+  }
+
   function remember(game, track, mode) {
     update(function (p) {
       if (track) p.settings.lastTrack[game] = track;
@@ -2966,6 +3109,11 @@ var Save = (function () {
     hasSet: hasSet,
     setsHeld: setsHeld,
     setContext: setContext,
+    dungeonPuzzle: dungeonPuzzle,
+    ROBOT_CARDS: ROBOT_CARDS,
+    robotProgress: robotProgress,
+    robotSolve: robotSolve,
+    robotFinishPack: robotFinishPack,
     goldRate: goldRate,
     equip: equip,
     unequipPet: unequipPet,

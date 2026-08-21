@@ -11,6 +11,7 @@ notices. This reads the real arrays out of the pages and checks them.
 Exit code 0 only if every rule holds.
 """
 import os, re, sys, time
+from collections import deque
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -373,12 +374,13 @@ try:
           world_costs == sorted(world_costs), str(world_costs))
 
     # days to afford everything, letting the rate rise as worlds are bought
-    def days_to(target_gold):
+    def days_to(target_gold, per_day=None):
+        per_day = day if per_day is None else per_day
         gold, days, rate, pending = 0, 0, 1.0, sorted(
             [(i["cost"], w["gold"]) for i in shop if i["kind"] == "world"
              for w in worlds if w["id"] == i.get("world")])
         while gold < target_gold and days < 3000:
-            gold += day * rate
+            gold += per_day * rate
             days += 1
             while pending and gold >= pending[0][0]:
                 cost, mult = pending.pop(0)
@@ -410,6 +412,55 @@ try:
     first = min(i["cost"] for i in shop if i["kind"] == "weapon" and i["cost"] > 0)
     check("economy: something is affordable in the first day or two",
           first <= day * 2, "first weapon %d vs %d/day" % (first, day))
+
+    # ---- four places to earn, not two ----
+    # The prices above were tuned when a half hour meant five battle runs. It
+    # can now mean map stops, a descent, or an afternoon in the workshop, and
+    # the danger is not any one of them on its own: it is that the best-paying
+    # half hour quietly becomes several times the one the prices assume, at
+    # which point the gear ladder collapses from months into a fortnight and
+    # the progression that actually motivates them stops working.
+    #
+    # Modelled in MINUTES rather than in counts, because that is the thing a
+    # child actually spends. A dungeon monster room is a whole battle run --
+    # it opens the real game and fights a real lineup -- so it costs the same
+    # time as a run and pays the run plus its loot.
+    HALF_HOUR, RUN_MIN, LEVEL_MIN = 30.0, 6.0, 2.0
+    runs_per_day = HALF_HOUR / RUN_MIN
+
+    battle_day = run_gold * runs_per_day
+    map_day = (run_gold + econ["chestGold"]) * runs_per_day
+    # a plausible typical depth; treasure rooms pay on top of this
+    deep = 3
+    dungeon_day = (run_gold + round(econ["dungeon"]["treasureGold"] * deep * 0.9)) \
+        * runs_per_day
+    levels_per_day = HALF_HOUR / LEVEL_MIN
+    robot_day = (levels_per_day
+                 * (econ["robotSolved"]["gold"] + econ["robotPar"]["gold"])
+                 + (levels_per_day / 6) * econ["packDone"]["gold"])
+
+    # The workshop is a change of pace, never the best way to get rich. It also
+    # takes no world multiplier (Save.setContext('robot')), so the gap only
+    # widens as worlds are bought -- which is the right shape.
+    check("economy: the workshop never out-earns battling",
+          robot_day <= battle_day,
+          "workshop %d/day vs battle %d/day" % (robot_day, battle_day))
+    # ...but a reward nothing pays is worse than no reward at all.
+    check("economy: the workshop is still worth playing",
+          robot_day >= 0.4 * battle_day,
+          "workshop %d/day vs battle %d/day" % (robot_day, battle_day))
+    check("economy: a map chest is a bonus, not a multiplier",
+          map_day <= 2 * battle_day,
+          "map %d/day vs battle %d/day" % (map_day, battle_day))
+    check("economy: the descent pays better, within reason",
+          dungeon_day <= 3 * battle_day,
+          "dungeon(f%d) %d/day vs battle %d/day" % (deep, dungeon_day, battle_day))
+
+    # And the ladder has to survive the best of them, not just the baseline.
+    best_day = max(battle_day, map_day, dungeon_day, robot_day)
+    fast = days_to(sum(tier4.values()), best_day)
+    check("economy: even the richest half hour leaves the ladder months long",
+          fast >= 30, "%d days at %d gold/day" % (fast, best_day))
 
     # ---- card rarity ----
     # Expected drops per day of play, so a tweak to the odds can't quietly
@@ -482,13 +533,170 @@ try:
     claims = js("Array.prototype.map.call("
                 "document.querySelectorAll('.games .game-card .who-for'),"
                 "function (e) { return e.textContent; })")
-    check("hub: it claims a count for each game", len(claims) == 3, str(claims))
+    d.get("file://" + os.path.join(ROOT, "robot/index.html"))
+    time.sleep(1.0)
+    n_packs = js("TEST.PACKS.length")
+
+    d.get("file://" + os.path.join(ROOT, "index.html"))
+    time.sleep(0.8)
+    claims = js("Array.prototype.map.call("
+                "document.querySelectorAll('.games .game-card .who-for'),"
+                "function (e) { return e.textContent; })")
+    check("hub: it claims a count for each game", len(claims) == 4, str(claims))
     check("hub: the maths track count is right",
           str(n_math) in claims[0], "%s vs %d tracks" % (claims[0], n_math))
     check("hub: the language track count is right",
           str(n_lang) in claims[1], "%s vs %d tracks" % (claims[1], n_lang))
     check("hub: the quest count is right",
           str(n_quest) in claims[2], "%s vs %d quests" % (claims[2], n_quest))
+    check("hub: the robot pack count is right",
+          str(n_packs) in claims[3], "%s vs %d packs" % (claims[3], n_packs))
+
+    # =================== Robot Workshop ===================
+    # A puzzle cannot be reviewed by reading it. Every level is checked two
+    # ways instead: an independent BFS here proves it is solvable at all and
+    # works out the true shortest straight-line program, and the level's own
+    # reference solution is run through the GAME's interpreter -- not a copy of
+    # it -- to prove the plan the level ships with really wins.
+    #
+    # Four levels were authored with walls that did not actually force the long
+    # way round, and the loop they were built to teach was longer than just
+    # walking it. That is invisible in the grid and obvious to this check.
+    print("\nRobot Workshop")
+    d.get("file://" + os.path.join(ROOT, "robot/index.html"))
+    time.sleep(1.0)
+    packs = js("TEST.PACKS")
+
+    DIRS = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
+    ORDER = ["N", "E", "S", "W"]
+
+    def shortest(level, mode):
+        """The fewest straight-line commands this level can be solved in."""
+        grid = level["grid"]
+        w, h = len(grid[0]), len(grid)
+        start = goal = None
+        gems = []
+        for y, rowstr in enumerate(grid):
+            for x, ch in enumerate(rowstr):
+                if ch == "R": start = (x, y)
+                elif ch == "G": goal = (x, y)
+                elif ch == "*": gems.append((x, y))
+        gi = {g: i for i, g in enumerate(sorted(gems))}
+        full = (1 << len(gems)) - 1
+        blocked = lambda x, y: (not (0 <= x < w and 0 <= y < h)) or grid[y][x] in "#~"
+        s0 = (start[0], start[1], level["face"], 0)
+        seen = {s0: 0}
+        queue = deque([s0])
+        while queue:
+            x, y, f, mask = queue.popleft()
+            dist = seen[(x, y, f, mask)]
+            if (x, y) == goal and mask == full:
+                return dist
+            if mode == "abs":
+                moves = [(x + DIRS[dd][0], y + DIRS[dd][1], dd)
+                         for dd in ("N", "S", "W", "E")]
+            else:
+                dx, dy = DIRS[f]
+                i = ORDER.index(f)
+                moves = [(x + dx, y + dy, f),
+                         (x, y, ORDER[(i - 1) % 4]), (x, y, ORDER[(i + 1) % 4])]
+            for nx, ny, nf in moves:
+                if (nx, ny) != (x, y) and blocked(nx, ny):
+                    continue
+                nmask = mask | (1 << gi[(nx, ny)]) if (nx, ny) in gi else mask
+                st = (nx, ny, nf, nmask)
+                if st not in seen:
+                    seen[st] = dist + 1
+                    queue.append(st)
+        return None
+
+    ids = []
+    unsolvable, wrong_par, sol_fails, budget_fails, no_point = [], [], [], [], []
+    for pack in packs:
+        for level in pack["levels"]:
+            ids.append(level["id"])
+            best = shortest(level, pack["mode"])
+            if best is None:
+                unsolvable.append(level["id"])
+                continue
+            if best != level["par"]:
+                wrong_par.append("%s: says %d, really %d" % (level["id"], level["par"], best))
+            # the reference solution, run through the real interpreter
+            res = d.execute_script("""
+                var l = arguments[0], packId = arguments[1];
+                TEST.startPack(packId);
+                TEST.state.level = l;
+                TEST.state.map = TEST.parseGrid(l.grid);
+                TEST.state.prog = JSON.parse(JSON.stringify(l.sol));
+                TEST.resetRobot();
+                var steps = TEST.flatten(TEST.state.prog, []), bad = null;
+                for (var i = 0; i < steps.length && !bad; i++) bad = TEST.step(steps[i].tok);
+                var m = TEST.state.map;
+                return { won: !bad && TEST.state.x === m.goal[0] && TEST.state.y === m.goal[1] &&
+                              m.gems.every(function (g) { return TEST.state.got[g[0] + ',' + g[1]]; }),
+                         bad: bad, tokens: TEST.countTokens(l.sol) };
+            """, level, pack["id"])
+            if not res["won"]:
+                sol_fails.append("%s: %s" % (level["id"], res["bad"] or "stopped short"))
+            if res["tokens"] > level["slots"]:
+                budget_fails.append("%s: needs %d, has %d slots"
+                                    % (level["id"], res["tokens"], level["slots"]))
+            # A loop level exists to make a loop worth writing. If the budget
+            # is big enough to just walk it, the lesson is optional.
+            if pack["rung"] >= 4 and level["slots"] >= best:
+                no_point.append("%s: %d slots, walks in %d" % (level["id"], level["slots"], best))
+
+    check("robot: every level is solvable", not unsolvable, str(unsolvable[:4]))
+    check("robot: every par is the true shortest program",
+          not wrong_par, "; ".join(wrong_par[:4]))
+    check("robot: every reference solution really wins",
+          not sol_fails, "; ".join(sol_fails[:4]))
+    check("robot: every reference solution fits its budget",
+          not budget_fails, "; ".join(budget_fails[:4]))
+    check("robot: a loop level cannot simply be walked",
+          not no_point, "; ".join(no_point[:4]))
+    check("robot: level ids are unique", len(set(ids)) == len(ids),
+          "%d ids, %d unique" % (len(ids), len(set(ids))))
+
+    # The workshop draws from no track registry at all, so the only thing that
+    # could put the wrong work in front of a child is the row on the pack.
+    rows = set(p["row"] for p in packs)
+    check("robot: both heroes have packs", rows == {"little", "big"}, str(rows))
+    check("robot: the little hero is never asked to hold a heading",
+          all(p["mode"] == "abs" for p in packs if p["row"] == "little"),
+          str([p["id"] for p in packs if p["row"] == "little" and p["mode"] != "abs"]))
+    check("robot: only the big hero gets loops",
+          all(p["rung"] < 4 for p in packs if p["row"] == "little"),
+          str([p["id"] for p in packs if p["row"] == "little" and p["rung"] >= 4]))
+
+    # Every pack pays a card, and a card two packs share is a card one pack
+    # never pays -- the same positional hazard STORY_CARDS carries a warning
+    # about, arrived at from the other side.
+    d.get("file://" + os.path.join(ROOT, "index.html"))
+    time.sleep(0.8)
+    known = set(js("Save.ROBOT_CARDS.map(function (c) { return c.id; })"))
+    pack_cards = [p["card"] for p in packs]
+    check("robot: every pack names a card that exists",
+          all(c in known for c in pack_cards),
+          str([c for c in pack_cards if c not in known]))
+    check("robot: no two packs award the same card",
+          len(set(pack_cards)) == len(pack_cards), str(pack_cards))
+
+    # A level pays for being solved, not for being replayed -- the same rule the
+    # map already follows, where a beaten stop's chest only ever pays once. That
+    # makes the workshop a finite purse rather than a daily one, so the number
+    # worth holding still is what the WHOLE of it is worth. A three-tap level is
+    # about ten seconds; if replays ever start paying, this is what catches it.
+    e2 = js("Save.ECONOMY")
+    n_levels = sum(len(p["levels"]) for p in packs)
+    lifetime = (n_levels * e2["robotSolved"]["gold"]
+                + n_levels * e2["robotPar"]["gold"]
+                + len(packs) * e2["packDone"]["gold"])
+    battle_day2 = (e2["correct"]["gold"] * 15 + e2["foeDefeated"]["gold"] * 4
+                   + e2["runWon"]["gold"]) * 5
+    check("robot: the whole workshop is worth a few days of battling, not months",
+          battle_day2 <= lifetime <= battle_day2 * 6,
+          "%d gold in total vs %d a day battling" % (lifetime, battle_day2))
 
     # ---- every map stop points at a track that exists ----
     # save.js has no idea what tracks the games actually declare, so a typo

@@ -1,11 +1,12 @@
 # Learning Games
 
-Three browser games and a dungeon, for two kids, one site, one shared
+Four browser games and a dungeon, for two kids, one site, one shared
 character.
 
 - **🔢 Math RPG** — counting, adding, times tables, algebra, and pattern-finding
 - **🔤 Language RPG** — letters, spelling, grammar, and word play
 - **📖 Story Quest** — reading comprehension as an adventure
+- **🤖 Robot Workshop** — write a plan, run it, find your own mistake
 - **⛏️ The Dungeon** — a floor that builds itself, walked in 2D; the fights are
   played in the two battle games and come back
 
@@ -36,7 +37,7 @@ Renaming a key is indistinguishable from wiping the save.
 
 ## Schema changes go through `migrate()`, and only ever add
 
-Bump `VERSION` in `shared/save.js` (currently **5**) and add an `if (v < N)`
+Bump `VERSION` in `shared/save.js` (currently **6**) and add an `if (v < N)`
 block. Inside it:
 
 - **Add missing fields; never remove, rename or re-key an existing one.** Old
@@ -54,7 +55,7 @@ block. Inside it:
 ## Every shipped version keeps a fixture
 
 `.verify/save-test.html` holds a `FIXTURES` map: one realistic save blob per
-schema version that has ever been deployed (currently v2, v3 and v4). Each is
+schema version that has ever been deployed (currently v2, v3, v4 and v5). Each is
 loaded and checked for gold, XP, gear, owned items, tokens, cards, foils,
 worlds, map position, roads already taken, quests, stats, pity counter,
 remembered track and mode, and that a half-played stop still resumes into the
@@ -151,6 +152,8 @@ shared/
 math/index.html
 language/index.html + record.html (Voice Studio) + voice.js (generated clips)
 story/index.html
+robot/index.html     the Robot Workshop: a grid, a robot, and a plan you
+                     write before anything moves
 dungeon/index.html   a floor that builds itself; fights are played in the
                      battle games and come back here
 .verify/            the test harness — see "Testing"
@@ -744,6 +747,137 @@ Both run `MINI_ROUNDS` rounds and share the hearts, panel, and end screens.
 
 ---
 
+# The Robot Workshop
+
+The map is a journey and the dungeon builds itself; both are still *answer a
+thing, hit a thing*. This one is a different kind of thinking: you write a whole
+plan before anything moves, run it, watch it fail, and find your own mistake.
+The enhancement spec named sequencing the priority skill — *"high carryover to
+math, reading, planning, cause-and-effect, self-control"* — and nothing else on
+the site trains it.
+
+It is also the only game where the five-year-old and the eight-year-old do the
+**same activity** at different depths, and the bottom rung asks for no reading
+at all.
+
+**There is deliberately no timer.** Like Story Quest, thinking *is* the
+mechanic. Don't add one.
+
+## The two command sets, and the jump between them
+
+| Rung | Commands | Grid | What it teaches |
+|---|---|---|---|
+| 1 | ⬆️⬇️⬅️➡️ absolute | 4×4 | a plan is a list, run in order |
+| 2 | + 💎 collect every gem | 4×4 | order matters, not just arrival |
+| 3 | 🔼 forward, ↩️ ↪️ turn | 5×5 | **mental rotation** — the real idiom |
+| 4 | + 🔁 repeat N | 5×5 | a loop is a shorter plan |
+| 5 | a slot budget below the straight line | 6×6 | now the loop is the only way |
+
+Little hero gets rungs 1–2, big hero 3–5. Mental rotation — "left" meaning the
+*robot's* left — is the whole ladder, and it is worth its own rung.
+
+**Everything is tapping.** A palette button appends a command; tapping a command
+in the strip takes it out. Drag-and-drop is fiddly on an iPad and hopeless at
+five. A 🔁 block is opened by tapping it (new commands drop inside, shown by a
+bright ring) and its count cycles 2→5 by tapping the number. **One level of
+nesting only** — no repeat inside a repeat — which keeps the interpreter, the
+renderer and the strip all readable.
+
+## Levels are authored, and proved twice
+
+A generated puzzle can be unsolvable or trivially solvable, and "par" needs a
+known optimum, so the 48 levels across 8 packs are authored — as grid strings,
+`.` floor `#` rock `~` pit `R` start `G` flag `*` gem.
+
+Every level ships with **`sol`, its reference solution**, and is checked two
+independent ways in `content.py`:
+
+- a **BFS in the harness** proves it is solvable and works out the true shortest
+  straight-line program, which must equal the level's `par`;
+- **`sol` is run through the game's own interpreter** — `TEST.step()`, not a
+  copy — and must win inside `slots`.
+
+`best` is *derived* (`countTokens(level.sol)`), never stored again, so the star
+target and the reference solution cannot disagree. For rungs 1–3 `sol` is the
+BFS optimum so `best === par`; for rungs 4–5 `sol` is the looped solution and
+`slots < par`, which is what makes a loop compulsory rather than optional.
+
+**Four levels were authored with walls that did not actually force the long way
+round**, so the loop they existed to teach was longer than simply walking it.
+That is invisible in the grid and obvious to the check — hence
+`robot: a loop level cannot simply be walked`.
+
+## How it hangs off everything else
+
+- **Gold and XP** — `Save.setContext('robot')`, so like Story Quest there is no
+  world multiplier (there is no world), but trinket and boots `goldBonus` still
+  apply. `ECONOMY.robotSolved`, `robotPar` (the shortest program, paid on top)
+  and `packDone`.
+- **Gear becomes hearts, and hearts become attempts.** There is no combat, so
+  crit, thinking time and the DOUBLE window mean nothing here. A **crash** costs
+  a heart; **stopping short does not** — an unfinished plan is not a wrong one,
+  and charging for it would punish the exact experiment the game teaches.
+  Hearts are the pack's budget and come from `loadout().maxHp`, with the pet's
+  shield catching the first crash. Running out ends the pack with everything
+  already banked.
+- **Cards** — `ROBOT_CARDS` in `save.js`, one per pack, guaranteed on the first
+  finish (`awardCard(id, true)`). Six levels and then "the dice said no" would
+  be miserable. Looked up **by id, not by position** — packs are far more likely
+  to be re-cut than quests are. They shelve under "Robot Workshop" via
+  `allCards()`'s `from`, and stay **outside** the world sets, so `SET_PERKS` and
+  the tier-5 gear gate are untouched.
+- **The record** — `Log.startSession({ game: 'robot', … })` and one
+  `Log.answer()` per level, deliberately **with no `right` field**: `Log.due()`
+  only serves questions that have one, so a robot level can never turn up in the
+  Rematch. A level's "answer" is a program, and no log line can ask for one.
+- **`profile.row`** — the menu opens on this hero's packs with the other one tap
+  away, exactly like the other three.
+- **Progress** lives in `progress.robot` (`solved`, `par`, `packs`), **keyed by
+  level id, not index**. `progress.map` is an index and that is precisely why a
+  map step can never be reordered; there was no reason to buy that constraint
+  twice. `par` keeps the *shortest* program ever managed, never the newest — a
+  level solved tidily and replayed sloppily must not lose its star.
+
+## The economy now has four purses, not two
+
+The prices were tuned when a half hour meant five battle runs. `content.py`
+models a half hour **in minutes** rather than in counts — a dungeon monster room
+opens the real battle game, so it costs a run and pays a run plus its loot:
+
+| A half hour spent on | gold |
+|---|---|
+| battle runs (the tuning baseline) | ~475 |
+| the workshop, every star | ~375 |
+| map stops, chest included | ~775 |
+| a descent around floor 3 | ~1,085 |
+
+(The workshop row is a half hour of **new** levels — see below.)
+
+So **the workshop pays less than battling** and can never become the gold farm —
+and because it takes no world multiplier, the gap only widens as worlds are
+bought, which is the right shape. The checks assert exactly that, plus that it
+is still worth playing at all (a reward nothing pays is worse than no reward),
+and that the ladder survives the *richest* half hour rather than only the
+baseline.
+
+**A level pays for being solved, not for being replayed.** This is the one place
+the workshop could have become a farm, and it very nearly was: a battle run is
+six minutes and a quest is fifteen, so neither can be ground, but a three-tap
+level is about ten seconds — and paying it every time worked out at roughly
+**seven times** what battling pays. So the first solve pays, and after that only
+genuinely *shortening* your plan does. That is the same rule the map already
+follows, where a beaten stop's chest only ever pays once (`completeNode`'s
+`advanced` gate), and it makes the workshop a **finite purse**: all 48 levels,
+all their stars and all 8 packs come to about 1,200 gold — two or three days of
+battling, against a shop that runs to six figures. `content.py` holds that total
+in a band, which is what would catch a replay quietly starting to pay again.
+Nothing is taken away: the ✅ and the ⭐ stay, and the level is still there.
+
+**The descent is the outlier, not the workshop** — that is the pre-existing
+"economy not re-simulated" risk, now measured rather than guessed.
+
+---
+
 # The dungeon
 
 The map is authored and fixed — that is its job. The dungeon is the opposite:
@@ -809,10 +943,25 @@ fifteen lines in each game, and means the dungeon cannot drift away from how
 the rest of the site plays.
 
 **The rooms a floor can hold** are `entrance`, `stairs`, `monster`, `elite`,
-`treasure`, `shrine` and `empty`. There is no forge or merchant room yet; the
-Forge is a hub screen. Adding a type means the generator, the `ART` table in
-`dungeon/index.html`, and a branch in `renderCard()` — and the save-test's list
-of known types, which is what stops a typo becoming an invisible blank room.
+`treasure`, `shrine`, `puzzle` and `empty`. There is no forge or merchant room
+yet; the Forge is a hub screen. Adding a type means the generator, the `ART`
+table in `dungeon/index.html`, and a branch in `renderCard()` — and the
+save-test's list of known types, which is what stops a typo becoming an
+invisible blank room.
+
+**A `puzzle` room is a stuck robot**, and it opens the real Robot Workshop the
+same way a monster room opens the real battle game — one level, the hero's own
+hearts, and the result crosses back in `lg_dungeon_result`. It is dealt from the
+same leftover pool the chests come from, so it **displaces a treasure rather
+than adding one**: a descent already pays better than anything else on the site.
+`save-test.html` asserts never more than one a floor, and that one turns up on
+most floors but not all — a room type that almost never appears is a room type
+nobody has tested.
+
+`dungeonPuzzle()` deliberately **does not know what the workshop contains**. It
+hands back the hero's row and a seeded number, and `robot/index.html` resolves
+that against its own packs, so there is no second copy of the level list for the
+two to drift apart on.
 
 **It is reached from beside the map**, not from the row of tools. Both are
 places you travel to — one is the journey you are on, the other is the one that
@@ -979,7 +1128,7 @@ geckodriver), then:
 | Script | Run it when | ~ |
 |---|---|---|
 | `smoke.py` | after any change | 1 min |
-| `run-save-test.py` | after touching `save.js` / `log.js` (571 + 65 assertions) | 10 s |
+| `run-save-test.py` | after touching `save.js` / `log.js` (611 + 65 assertions) | 10 s |
 | `tracks.py` | after touching a question generator | 1 min |
 | `content.py` | after touching content, prices, card odds, or the hub's claims | 30 s |
 | `playthrough.py` | before shipping | 3 min |
@@ -1020,9 +1169,19 @@ thing first and watching the message name the fault:
   crit alone (the shop does not climb on crit — the Flame Blade beats the Axe
   on DOUBLE damage).
 - **The menus open on your own row**, and one tap brings the rest back.
-- **The sound toggle is in the top-right on all five pages** — a wrong class
+- **The sound toggle is in the top-right on all six pages** — a wrong class
   name put it bottom-left and gold.
 - **The map and the dungeon stay side by side** on the hub.
+- **Every robot level is solvable, and every par is really the optimum** — an
+  independent BFS says so, and the level's own reference solution is run through
+  the game's interpreter to prove the plan it ships with really wins. Four
+  levels were authored whose walls did not force the long way round, so the loop
+  they existed to teach was pointless; nothing but this could see it.
+- **A crash costs a spare part and stopping short does not**, and the star goes
+  to the shortest plan rather than to any win — a win by the scenic route comes
+  back without one.
+- **The workshop can never out-earn battling**, checked against the real payout
+  table in a half hour modelled in minutes.
 
 **Two timing flakes were seen and not explained.** `run-save-test.py` once
 reported *4 FAILED* and has not repeated it in twenty-plus runs; the runner
@@ -1177,10 +1336,46 @@ corridor, so the round split between more world and more to do in it.
 New in it: nine new lands, helms and boots, gear that only drops underground,
 the Forge, **the Dungeon**, and a hero you can actually see wearing their kit.
 
+**Round 6 added a fourth game** (schema **v6**): the **🤖 Robot Workshop**,
+asked for as "another game" with the deciding question attached — *"How does
+this intertwine with the other mechanics though?"* The weave was the brief, not
+the game.
+
+48 authored levels across 8 packs, on a five-rung ladder from absolute arrows to
+a slot budget only a loop fits. It pays into the same purse, spends the same
+hearts (a crash costs one, an unfinished plan does not), awards a card a pack,
+files into the same parent record, and puts a **stuck robot** in the dungeon —
+which is the piece that pays on floor one, today.
+
+**Three bugs were found on the way, none of which any test was watching for
+until it was written:**
+
+- **`robotSolved` paid on every solve**, and a three-tap level is ten seconds —
+  about seven times the battle gold rate. Found by reading the payout path, not
+  by a failing test. Fixed by paying the first solve and genuine improvements
+  only, and `content.py` now bounds the workshop's whole lifetime payout.
+- **The solved panel sat above the reward banner** (z-index 40 against
+  `.levelup`'s 30), so a card a child had just won rendered *behind* the
+  "Solved!" they had already read. The test could not see it: the banner element
+  existed and was the right size, it was simply covered. Found by screenshot.
+- **Tapping Next while a banner was still on screen** dropped a fresh puzzle
+  underneath it — the one thing the reward queue exists to prevent.
+  `playthrough.py` caught this one with *"6 frames with a banner over the
+  board"*. The next level now waits for the queue exactly as the next monster
+  does.
+
+**What Round 6 deliberately left out:** the workshop is **not on the map**. Map
+stops can only be appended, both trails are 80 steps, and the kids are nowhere
+near the end — so new ground would be months from being seen and would need a
+whole new world with its own foes for the chests to draw from. **Today's
+challenge depends on that same ground** (`daily()` draws from map stops), so it
+does not offer robot packs either. Both are one job, not two.
+
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
-80 map steps per trail through 16 regions, 16 worlds, 162 cards, 6 gear slots
-(44 pieces), and a dungeon with no bottom.** Suite: 571 save checks, 65 log
-checks, 177 smoke checks, plus tracks / content / playthrough / upgrade.
+8 robot packs (48 levels), 80 map steps per trail through 16 regions, 16 worlds,
+170 cards, 6 gear slots (44 pieces), and a dungeon with no bottom.** Suite: 611
+save checks, 65 log checks, ~200 smoke checks, plus tracks / content /
+playthrough / upgrade.
 
 **Four bugs were found and fixed on the way**, all of them silent:
 
@@ -1204,16 +1399,26 @@ checks, 177 smoke checks, plus tracks / content / playthrough / upgrade.
    `P_opposite` (plus their word clips) are not in `voice.js` and need
    recording in `record.html`, on the device the kids play on. mp4/AAC records
    and plays everywhere; Chrome-recorded webm may not play on iPads.
-3. **The economy has not been re-simulated against the dungeon.** `content.py`
-   still passes, but its day-of-play model does not know about dungeon loot,
-   80 stops of chests, or the Forge as a sink. It is the highest-risk number
-   in the round: if gold inflates, the gear ladder collapses from months into
-   a fortnight and the progression that actually motivates them stops working.
+3. **The descent pays about 2.3x a battle run, and nobody chose that number.**
+   `content.py` now models a half hour in *minutes* across all four places to
+   earn (see "The Robot Workshop"), so this is measured rather than guessed:
+   battling ~475, the workshop ~375, map stops ~775, a descent around floor 3
+   ~1,085. The workshop is fine — it pays less than battling and takes no world
+   multiplier. **The dungeon is the outlier**, because a monster room is a whole
+   battle run *plus* its loot, and a deep floor multiplies that loot by the
+   floor. The ladder still measures in months at that rate, so this is a
+   question rather than a fire: is a descent *meant* to be the best-paying half
+   hour on the site? The Forge as a sink is still not modelled at all.
 4. **Three new Story Quest challenge types were planned and not built** —
    riddle gates, who-said-it, and big-hero sequencing. The 16 quests use the
    existing scene-and-chest format.
 5. **The dungeon has no forge or merchant rooms.** Both are in the room
    vocabulary in spirit but not in the generator; the Forge is a hub screen.
+6. **The Robot Workshop is not on the map and not in the daily.** See Round 6
+   above — one job: a new world with its own foes, a region appended past The
+   Star Road, robot stops among its steps, its roads frozen in
+   `save-test.html`, and then `daily()` and `dungeonPickFor()` can stop
+   filtering to `math`/`language`.
 6. **Watch the maths menu.** Nineteen tracks is a lot even grouped — the
    row-filtered menu helps, but worth checking with the kids.
 

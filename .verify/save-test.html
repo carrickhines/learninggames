@@ -454,9 +454,18 @@ try {
      Save.setProgress().filter(function (sp) { return sp.id === 'ember'; })[0].got === 0);
 
   var cards = Save.allCards();
-  ok('every world+story card is listed',
-     cards.length === Save.WORLDS.length * 9 + Save.STORY_CARDS.length,
+  ok('every world, story and robot card is listed',
+     cards.length === Save.WORLDS.length * 9 + Save.STORY_CARDS.length +
+                      Save.ROBOT_CARDS.length,
      'got ' + cards.length);
+  // Every card must say where it came from, because the Cards screen shelves
+  // them by exactly that string and a card with no home is a card nobody can
+  // find. The two combat-free games are the ones that have to say it out loud.
+  ok('the robot cards shelve under the Robot Workshop',
+     Save.ROBOT_CARDS.every(function (c) {
+       var got = cards.filter(function (x) { return x.id === c.id; })[0];
+       return got && got.from === 'Robot Workshop' && got.game === 'robot';
+     }));
   var ids = cards.map(function (c) { return c.id; });
   ok('card ids are unique across the site', new Set(ids).size === ids.length);
   ok('every card carries its rarity',
@@ -1216,6 +1225,53 @@ try {
                     lastTrack: { math: 'rule', language: 'twins' } },
         stats: { correct: 9100, wrong: 980, streak: 22, bestStreak: 88 }
       } }
+    },
+
+    /* A v5 hero: the shape that was on the iPads the day the Robot Workshop
+       landed. Round 5 is all over this one — the far trail part-walked, a
+       dungeon record set, gear that only drops underground both equipped and
+       forged, and a helm and boots in the two slots v5 added. Unlike the
+       older fixtures this hero HAS been down a staircase, which is exactly
+       what makes it worth freezing: the v5 block's fields have real values in
+       them here, and a later migration that "tidies" one would wipe a record
+       rather than fill in a blank. */
+    5: {
+      v: 5, active: 'kid',
+      profiles: { kid: {
+        name: 'Wren', avatar: '🦖', xp: 26400, gold: 133500, level: 24, row: 'little',
+        inventory: { owned: ['flame', 'plate', 'drake', 'hourglass', 'ironhelm',
+                             'hideboots', 'ipad'],
+                     weapon: 'f-gloom', armor: 'plate', pet: 'drake',
+                     trinket: 'hourglass', helm: 'ironhelm', boots: 'f-treads',
+                     tokens: 4,
+                     petXp: { drake: 143, cat: 61 },
+                     found: { 'f-gloom': 3, 'f-treads': 2, 'f-lantern': 1 },
+                     forge: { 'f-gloom': 2, ironhelm: 1 } },
+        cards: { 'm-slime': 6, 'm-bat': 3, 'm-ghost': 2, 'm-dragon': 1,
+                 'l-slime': 4, 'l-imp': 2, 'l-ghost': 3, 'l-rex': 1, 'l-dragon': 1,
+                 'm-crab': 3, 'm-spider': 1, 'l-troll': 2,
+                 'm-sprout': 2, 'l-whisper': 1, 'b-meadow': 1, 'b-cave': 1,
+                 's-troll': 1, 's-dragon': 1, 's-order': 2 },
+        foils: { 'm-dragon': 1, 'l-dragon': 1, 's-order': 1 },
+        progress: { world: 'ember',
+                    unlockedWorlds: ['meadow', 'cave', 'sky', 'reef', 'ember'],
+                    runsWon: { math: 210, language: 137 },
+                    questsDone: [0, 1, 2, 3, 4, 5, 6],
+                    seqTier: 5, koSinceCard: 8, skipMastered: true,
+                    map: { little: 34, big: 12 },
+                    mapPicks: { little: { 2: 1, 5: 0, 7: 1, 10: 0, 13: 1,
+                                          16: 0, 21: 1, 26: 0, 31: 1 },
+                                big: { 2: 0, 5: 1, 10: 0 } },
+                    mapWalk: null,
+                    activeNode: { trail: 'little', i: 34, o: 0 },
+                    dungeon: null,
+                    dungeonBest: 9,
+                    dailyDone: '2026-08-19',
+                    streak: { days: 26, last: '2026-08-19' } },
+        settings: { modeByGame: { math: 'normal', language: 'easy' },
+                    lastTrack: { math: 'skip', language: 'rhyme' } },
+        stats: { correct: 24800, wrong: 2600, streak: 15, bestStreak: 104 }
+      } }
     }
   };
 
@@ -1277,19 +1333,43 @@ try {
                          ? 'big' : 'little'),
        Save.rowOf() + ' with map ' + JSON.stringify(was.progress.map));
 
-    /* v5 opened the dungeon and the forge. Every field it adds must arrive
-       present and EMPTY — an old hero has never been underground, so a
-       dungeonBest of anything but zero would be a record they never set, and
-       a `dungeon` that is not null would drop them into a descent they never
-       started. The whole point of this migration is that it is invisible. */
-    ok(tag + 'the dungeon fields arrived', p.progress.dungeon === null,
+    /* v5 opened the dungeon and the forge. These used to assert the fields
+       arrived EMPTY, which was true of every fixture back then because none of
+       them predated the dungeon by less than a version. A real v5 save has
+       been underground, so the honest assertion is the general one: whatever
+       was there is still there, and whatever wasn't arrives as the empty
+       default. That covers both eras, and it is strictly the stronger claim —
+       a migration that reset `dungeonBest` to 0 now wipes a record instead of
+       quietly agreeing with a test that expected a blank. */
+    var wantDungeon = was.progress.dungeon === undefined ? null : was.progress.dungeon;
+    ok(tag + 'the dungeon in progress is exactly as it was',
+       JSON.stringify(p.progress.dungeon) === JSON.stringify(wantDungeon),
        JSON.stringify(p.progress.dungeon));
-    ok(tag + 'no deepest floor is invented', p.progress.dungeonBest === 0,
-       'best ' + p.progress.dungeonBest);
-    ok(tag + 'found gear starts empty',
-       !!p.inventory.found && Object.keys(p.inventory.found).length === 0);
-    ok(tag + 'nothing arrives pre-forged',
-       !!p.inventory.forge && Object.keys(p.inventory.forge).length === 0);
+    ok(tag + 'the deepest floor is neither invented nor forgotten',
+       p.progress.dungeonBest === (was.progress.dungeonBest || 0),
+       'best ' + p.progress.dungeonBest +
+       ' vs ' + (was.progress.dungeonBest || 0));
+    ok(tag + 'found gear survived, star rolls and all',
+       JSON.stringify(p.inventory.found) ===
+       JSON.stringify(was.inventory.found || {}),
+       JSON.stringify(p.inventory.found));
+    ok(tag + 'the forge levels survived',
+       JSON.stringify(p.inventory.forge) ===
+       JSON.stringify(was.inventory.forge || {}),
+       JSON.stringify(p.inventory.forge));
+
+    /* v6 makes room for the Robot Workshop. Nothing that has ever shipped had
+       a robot to remember, so every fixture must come out with the fields
+       present and empty — a pack marked finished would pay a card for work
+       nobody did. */
+    var rb = p.progress.robot;
+    ok(tag + 'the robot fields arrived', !!rb && !!rb.solved && !!rb.par && !!rb.packs,
+       JSON.stringify(rb));
+    ok(tag + 'no robot level is invented as solved',
+       rb && Object.keys(rb.solved).length === 0 && Object.keys(rb.par).length === 0,
+       JSON.stringify(rb && rb.solved));
+    ok(tag + 'no robot pack arrives pre-finished',
+       rb && rb.packs.length === 0, JSON.stringify(rb && rb.packs));
 
     ok(tag + 'it is stamped with the current schema afterwards',
        JSON.parse(localStorage.getItem(Save._key)).v === Save._version);
@@ -1511,16 +1591,19 @@ try {
      deal of it and assert the things that must hold every single time. */
 
   var floorsChecked = 0, noStairs = [], noFight = [], badType = [], earlyElite = [];
-  var KNOWN = ['entrance', 'stairs', 'monster', 'elite', 'shrine', 'treasure', 'empty'];
+  var tooManyPuzzles = [], puzzleFloors = 0;
+  var KNOWN = ['entrance', 'stairs', 'monster', 'elite', 'shrine', 'treasure',
+               'puzzle', 'empty'];
   ['little', 'big'].forEach(function (row) {
     for (var seed = 1; seed <= 400; seed++) {
       for (var fl = 1; fl <= 12; fl++) {
         var rooms = Save.dungeonFloor(seed * 7919, fl, row);
         floorsChecked++;
-        var stairs = 0, fights = 0;
+        var stairs = 0, fights = 0, puzzles = 0;
         rooms.forEach(function (r) {
           if (r.t === 'stairs') stairs++;
           if (r.t === 'monster' || r.t === 'elite') fights++;
+          if (r.t === 'puzzle') puzzles++;
           if (KNOWN.indexOf(r.t) === -1) badType.push(row + ' ' + seed + '/' + fl + ': ' + r.t);
           if (r.t === 'elite' && fl < Save.ECONOMY.dungeon.eliteFrom) {
             earlyElite.push(row + ' floor ' + fl);
@@ -1528,6 +1611,8 @@ try {
         });
         if (stairs !== 1) noStairs.push(row + ' ' + seed + '/' + fl + ': ' + stairs);
         if (fights < 1) noFight.push(row + ' ' + seed + '/' + fl);
+        if (puzzles > 1) tooManyPuzzles.push(row + ' ' + seed + '/' + fl + ': ' + puzzles);
+        if (puzzles) puzzleFloors++;
         if (rooms[0].t !== 'entrance') badType.push(row + ' ' + seed + '/' + fl + ': no entrance');
       }
     }
@@ -1542,6 +1627,14 @@ try {
      badType.slice(0, 3).join('; '));
   ok('dungeon: elites keep away from the shallow floors', earlyElite.length === 0,
      earlyElite.slice(0, 3).join('; '));
+  /* The puzzle room is dealt from the same leftover pool the chests come from,
+     so more than one on a floor would be quietly eating the treasure. And a
+     room type that almost never appears is a room type nobody has tested. */
+  ok('dungeon: never more than one stuck robot on a floor',
+     tooManyPuzzles.length === 0, tooManyPuzzles.slice(0, 3).join('; '));
+  ok('dungeon: a stuck robot turns up on most floors, not all',
+     puzzleFloors > floorsChecked * 0.5 && puzzleFloors < floorsChecked,
+     puzzleFloors + ' of ' + floorsChecked + ' floors');
 
   /* Every room must be walkable to from the entrance. The grid has no walls
      precisely so this can never fail — but "can never fail" is exactly the

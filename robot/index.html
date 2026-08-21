@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Robot Workshop">
+<title>Robot Workshop</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/ui.css">
+<style>
+  /* The Robot Workshop only. The frame, buttons, heart pips and reward panel
+     all come from the shared stylesheets above. There is no combat here, so
+     this game does not load shared/battle.css — same as Story Quest. */
+
+  .pack-card { padding: 13px 18px; min-width: 200px; }
+  .pack-card .stars { display: block; font-size: 15px; color: var(--accent);
+                      letter-spacing: 2px; margin-top: 3px; }
+
+  /* ---- the room -------------------------------------------------------
+     The grid is sized in percent of its own box and never measured in JS.
+     The dungeon learned this the hard way: reading clientWidth inside a
+     loop forces a reflow every frame. Nothing here needs a pixel. */
+  #board {
+    position: relative;
+    /* The frame is 720px tall and the whole workshop has to fit inside it —
+       board, plan, palette and Run. A board any bigger pushes Run below the
+       fold, which is the one thing that makes this game unusable. */
+    width: min(100%, 300px);
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(8, 4, 18, .55);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.10), 0 8px 22px rgba(0,0,0,.35);
+  }
+  #cells { display: grid; width: 100%; height: 100%; }
+  .cell {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 25px; line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .cell.odd  { background: rgba(255,255,255,.035); }
+  .cell.rock { background: rgba(255,255,255,.10); }
+  .cell.pit  { background: #05030c; box-shadow: inset 0 0 14px rgba(0,0,0,.9); }
+  .cell.goal { background: rgba(92,232,160,.14); }
+  .cell.gem.taken { opacity: .18; }
+
+  #bot {
+    position: absolute; left: 0; top: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 27px; line-height: 1;
+    transition: left .22s ease, top .22s ease;
+    will-change: left, top;
+    pointer-events: none;
+  }
+  #bot .nose {
+    position: absolute; font-size: 15px; color: var(--accent);
+    text-shadow: 0 0 5px rgba(0,0,0,.8);
+    transition: transform .18s ease;
+    /* the chevron sits above the robot and swings round it, which is the only
+       readable way to show facing: a rotated 🤖 just looks broken */
+    transform: rotate(0deg) translateY(-15px);
+  }
+  #board.shake { animation: shake .38s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-7px); } 40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); } 80% { transform: translateX(5px); }
+  }
+
+  /* ---- the program ---------------------------------------------------- */
+  .strip-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    width: 100%; max-width: 340px; margin: 9px auto 4px;
+    font-family: var(--display); font-size: 15px;
+    color: rgba(255,255,255,.66);
+  }
+  .strip-label b { color: var(--accent); font-size: 17px; }
+  #strip {
+    display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start;
+    width: 100%; max-width: 340px; min-height: 52px;
+    margin: 0 auto; padding: 7px;
+    border-radius: 14px;
+    background: rgba(15, 8, 30, .5);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.09);
+  }
+  #strip.empty::before {
+    content: 'Tap the buttons below to build your plan';
+    font-size: 14px; color: rgba(255,255,255,.38); padding: 6px 4px;
+  }
+  .tok {
+    font-size: 21px; line-height: 1;
+    padding: 7px 9px; border: 0; border-radius: 10px;
+    background: linear-gradient(180deg, #4a3a80, #35275e);
+    box-shadow: 0 2px 0 rgba(0,0,0,.4);
+    color: #fff; cursor: pointer;
+  }
+  .tok.on   { background: linear-gradient(180deg, var(--accent), var(--accent-2));
+              color: var(--ink); transform: translateY(1px); }
+  .tok.bad  { background: linear-gradient(180deg, #ff8199, var(--bad)); color: #fff; }
+  .rep {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 6px; border-radius: 12px;
+    background: rgba(255,210,63,.13);
+    box-shadow: inset 0 0 0 2px rgba(255,210,63,.45);
+  }
+  .rep.open { box-shadow: inset 0 0 0 3px var(--accent); }
+  .rep-head {
+    font-family: var(--display); font-size: 17px; color: var(--accent);
+    background: none; border: 0; cursor: pointer; padding: 3px 4px;
+  }
+  .rep-body { display: flex; gap: 5px; flex-wrap: wrap; min-width: 26px; }
+  .rep-body:empty::before {
+    content: '…'; color: rgba(255,255,255,.35); font-size: 17px; padding: 0 5px;
+  }
+
+  #pal { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+         margin-top: 10px; }
+  .pal-btn {
+    font-size: 25px; line-height: 1; padding: 9px 12px;
+    border: 0; border-radius: 13px;
+    background: linear-gradient(180deg, #6c58ab, #4a3a80);
+    box-shadow: 0 3px 0 rgba(0,0,0,.42);
+    color: #fff; cursor: pointer;
+  }
+  .pal-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.42); }
+  .pal-btn:disabled { opacity: .38; }
+  .pal-btn[data-cmd="rep"] {
+    background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  }
+
+  .run-row { display: flex; gap: 12px; justify-content: center; margin-top: 11px; }
+  #runBtn { font-size: 21px; padding: 11px 28px; }
+
+  .work-stats { display: flex; gap: 14px; align-items: center;
+                font-family: var(--display); font-size: 16px;
+                color: rgba(255,255,255,.8); }
+
+  /* ---- the message that lands when a plan runs out or crashes ---------- */
+  #note {
+    max-width: 340px; margin: 9px auto 0; min-height: 1.4em;
+    font-size: 16px; color: rgba(255,255,255,.8);
+  }
+  #note.bad { color: var(--bad); }
+  #note.good { color: var(--good); }
+
+  /* ---- the level-solved panel ----------------------------------------- */
+  #solved {
+    /* Below .levelup (z-index 30 in shared/hud.js), on purpose. The queued
+       reward banners are flushed the moment this panel appears — that is the
+       whole point of holding them — so a panel above them would hide the card
+       a child just won behind the "Solved!" they already read. Above the hero
+       chip (20), below the banner. */
+    position: absolute; inset: 0; z-index: 25;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(6, 3, 14, .82); backdrop-filter: blur(4px);
+  }
+  #solved.show { display: flex; }
+  .solved-card {
+    text-align: center; padding: 26px 30px; border-radius: 20px;
+    background: var(--panel); box-shadow: 0 0 0 2px rgba(255,255,255,.12);
+  }
+  .solved-card .big { font-size: 54px; }
+  .solved-card h2 { font-family: var(--display); font-size: 27px; margin: 6px 0; }
+  .solved-star { font-size: 19px; color: var(--accent); min-height: 1.5em; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- ================= MENU ================= -->
+  <section class="screen show scrolls" id="menu">
+    <div class="screen-inner">
+      <h1>Robot Workshop</h1>
+      <div class="subtitle">Write the plan. Run it. Fix it.</div>
+
+      <div class="group-label" id="littleLabel">Little hero packs</div>
+      <div class="btn-row" id="littleRow"></div>
+
+      <div class="group-label" id="bigLabel">Big hero packs</div>
+      <div class="btn-row" id="bigRow"></div>
+
+      <div class="btn-row">
+        <button id="showAllBtn" class="ghost-btn"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= THE WORKSHOP ================= -->
+  <section class="screen scrolls" id="work">
+    <div class="screen-inner">
+      <div class="topbar">
+        <div class="pips" id="heartPips"></div>
+        <div class="work-stats">
+          <span id="lvlStat">🤖 1 / 6</span>
+        </div>
+      </div>
+
+      <div class="subtitle" id="lvlName" style="margin:2px 0 7px"></div>
+
+      <div id="board"><div id="cells"></div><div id="bot">🤖<span class="nose">▲</span></div></div>
+
+      <div class="strip-label">
+        <span>Your plan</span>
+        <span><b id="used">0</b> / <span id="slots">12</span></span>
+      </div>
+      <div id="strip" class="empty"></div>
+
+      <div id="pal"></div>
+
+      <div class="run-row">
+        <button id="runBtn">▶️ Run</button>
+        <button id="clearBtn" class="ghost-btn">🧹 Clear</button>
+      </div>
+
+      <div id="note"></div>
+
+      <div class="btn-row back-row" style="margin-top:12px">
+        <button id="quitBtn" class="ghost-btn">Back to the packs</button>
+      </div>
+    </div>
+
+    <div id="solved">
+      <div class="solved-card">
+        <div class="big" id="solvedArt">🏁</div>
+        <h2 id="solvedTitle">Solved!</h2>
+        <div class="solved-star" id="solvedStar"></div>
+        <div class="btn-row" style="margin-top:16px">
+          <button id="nextBtn">Next ▶️</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PACK COMPLETE ================= -->
+  <section class="screen scrolls" id="win">
+    <div class="screen-inner">
+      <div class="end-emoji">🏆</div>
+      <h1>Pack Complete!</h1>
+      <div class="subtitle" id="winText"></div>
+      <div id="earned" class="reward"></div>
+      <button id="winBackBtn" class="ghost-btn">Back to the packs</button>
+    </div>
+  </section>
+
+  <!-- ================= OUT OF SPARES ================= -->
+  <section class="screen scrolls" id="out">
+    <div class="screen-inner">
+      <div class="end-emoji">🔧</div>
+      <h1>Out of spare parts</h1>
+      <div class="subtitle" id="outText">The robot needs a rest — but everything
+        you earned is already safe.</div>
+      <div id="outEarned" class="reward"></div>
+      <div class="btn-row">
+        <button id="retryBtn">Try the pack again</button>
+        <button id="outBackBtn" class="ghost-btn">Back to the packs</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="../shared/sound.js"></script>
+<script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
+<script src="../shared/hud.js"></script>
+<script>
+"use strict";
+/* ==================================================================
+   The Robot Workshop
+
+   A grid, a robot, and a plan you write before anything moves. The point
+   is not the walking — it is that you commit to a whole plan, watch it
+   fail, and find your own mistake. Nothing here has a timer: like Story
+   Quest, thinking IS the mechanic.
+
+   Two command sets, and the jump between them is the whole ladder:
+
+     'abs'  ⬆️⬇️⬅️➡️   move one square that way. No mental rotation at all,
+                       which is what makes it work at five.
+     'rel'  🔼↩️↪️      forward, and turn. Now "left" means the ROBOT's left,
+                       and you have to hold its heading in your head.
+
+   Levels are authored, never generated. A generated puzzle can be
+   unsolvable or trivially solvable, and `par` needs a known optimum —
+   so every level ships with `sol`, the reference program, and the test
+   harness runs all 48 of them through this very interpreter.
+   ================================================================== */
+
+  var PACKS = [
+    { id: 'steps', row: 'little', rung: 1, emoji: '👣',
+      name: "First Steps", sub: "A plan is a list",
+      mode: 'abs', card: 'r-scout',
+      levels: [
+      { id: 'steps-1', name: "Straight there",
+        grid: ['R..G', '....', '....', '....'],
+        face: 'E', par: 3, slots: 7,
+        sol: ['right', 'right', 'right'] },
+      { id: 'steps-2', name: "Down we go",
+        grid: ['R...', '....', '....', 'G...'],
+        face: 'S', par: 3, slots: 7,
+        sol: ['down', 'down', 'down'] },
+      { id: 'steps-3', name: "Round the corner",
+        grid: ['R...', '....', '....', '...G'],
+        face: 'E', par: 6, slots: 10,
+        sol: ['down', 'down', 'down', 'right', 'right', 'right'] },
+      { id: 'steps-4', name: "Up and over",
+        grid: ['...G', '....', '....', 'R...'],
+        face: 'N', par: 6, slots: 10,
+        sol: ['up', 'up', 'up', 'right', 'right', 'right'] },
+      { id: 'steps-5', name: "The middle",
+        grid: ['R...', '....', '..G.', '....'],
+        face: 'E', par: 4, slots: 8,
+        sol: ['down', 'down', 'right', 'right'] },
+      { id: 'steps-6', name: "All the way back",
+        grid: ['...R', '....', '....', 'G...'],
+        face: 'W', par: 6, slots: 10,
+        sol: ['down', 'down', 'down', 'left', 'left', 'left'] }
+      ] },
+
+    { id: 'rocks', row: 'little', rung: 1, emoji: '🪨',
+      name: "Rocks in the Road", sub: "Go around, not through",
+      mode: 'abs', card: 'r-pebble',
+      levels: [
+      { id: 'rocks-1', name: "One rock",
+        grid: ['R#.G', '....', '....', '....'],
+        face: 'E', par: 5, slots: 9,
+        sol: ['down', 'right', 'right', 'up', 'right'] },
+      { id: 'rocks-2', name: "The wall",
+        grid: ['R...', '.##.', '.##.', '...G'],
+        face: 'S', par: 6, slots: 10,
+        sol: ['down', 'down', 'down', 'right', 'right', 'right'] },
+      { id: 'rocks-3', name: "The long column",
+        grid: ['R.#.', '..#.', '..#.', '...G'],
+        face: 'S', par: 6, slots: 10,
+        sol: ['down', 'down', 'down', 'right', 'right', 'right'] },
+      { id: 'rocks-4', name: "Mind the hole",
+        grid: ['R~.G', '....', '....', '....'],
+        face: 'E', par: 5, slots: 9,
+        sol: ['down', 'right', 'right', 'up', 'right'] },
+      { id: 'rocks-5', name: "Rocks and holes",
+        grid: ['R.~.', '.#..', '..#.', '~..G'],
+        face: 'S', par: 6, slots: 10,
+        sol: ['down', 'down', 'right', 'down', 'right', 'right'] },
+      { id: 'rocks-6', name: "The narrow way",
+        grid: ['R#..', '.#.#', '...#', '#..G'],
+        face: 'S', par: 6, slots: 10,
+        sol: ['down', 'down', 'right', 'down', 'right', 'right'] }
+      ] },
+
+    { id: 'gems', row: 'little', rung: 2, emoji: '💎',
+      name: "Gem Hunt", sub: "Every gem, then the flag",
+      mode: 'abs', card: 'r-magpie',
+      levels: [
+      { id: 'gems-1', name: "One gem",
+        grid: ['R.*.', '....', '....', '...G'],
+        face: 'E', par: 6, slots: 10,
+        sol: ['right', 'right', 'down', 'down', 'down', 'right'] },
+      { id: 'gems-2', name: "Two on the way",
+        grid: ['R...', '.*..', '..*.', '...G'],
+        face: 'S', par: 6, slots: 10,
+        sol: ['down', 'right', 'down', 'right', 'down', 'right'] },
+      { id: 'gems-3', name: "Go back for it",
+        grid: ['R.*.', '....', '*...', '...G'],
+        face: 'E', par: 10, slots: 14,
+        sol: ['down', 'down', 'up', 'up', 'right', 'right', 'down', 'down', 'down', 'right'] },
+      { id: 'gems-4', name: "Around the block",
+        grid: ['R#*.', '....', '.##.', '...G'],
+        face: 'E', par: 8, slots: 12,
+        sol: ['down', 'right', 'right', 'up', 'down', 'right', 'down', 'down'] },
+      { id: 'gems-5', name: "Careful now",
+        grid: ['R.~*', '....', '..#.', '...G'],
+        face: 'E', par: 8, slots: 12,
+        sol: ['down', 'right', 'right', 'right', 'up', 'down', 'down', 'down'] },
+      { id: 'gems-6', name: "Both of them",
+        grid: ['R.*.', '....', '.*..', '...G'],
+        face: 'E', par: 8, slots: 12,
+        sol: ['right', 'right', 'down', 'down', 'left', 'down', 'right', 'right'] }
+      ] },
+
+    { id: 'gaps', row: 'little', rung: 2, emoji: '🕳️',
+      name: "Mind the Gap", sub: "Holes do not forgive",
+      mode: 'abs', card: 'r-hopper',
+      levels: [
+      { id: 'gaps-1', name: "Step aside",
+        grid: ['R~..G', '.....', '.....', '.....'],
+        face: 'E', par: 6, slots: 10,
+        sol: ['down', 'right', 'right', 'up', 'right', 'right'] },
+      { id: 'gaps-2', name: "The ditch",
+        grid: ['R....', '~~~..', '.....', '....G'],
+        face: 'S', par: 7, slots: 11,
+        sol: ['right', 'right', 'right', 'down', 'down', 'down', 'right'] },
+      { id: 'gaps-3', name: "In and out",
+        grid: ['R.*..', '.~.~.', '.....', '..*.G'],
+        face: 'E', par: 7, slots: 11,
+        sol: ['right', 'right', 'down', 'down', 'down', 'right', 'right'] },
+      { id: 'gaps-4', name: "Pick your way",
+        grid: ['R.~..', '..#..', '.~...', '....G'],
+        face: 'S', par: 7, slots: 11,
+        sol: ['down', 'down', 'down', 'right', 'right', 'right', 'right'] },
+      { id: 'gaps-5', name: "The bridge",
+        grid: ['R....', '.~~~.', '.....', '*...G'],
+        face: 'S', par: 7, slots: 11,
+        sol: ['down', 'down', 'down', 'right', 'right', 'right', 'right'] },
+      { id: 'gaps-6', name: "Both sides",
+        grid: ['R..*.', '.~.~.', '.....', '....G'],
+        face: 'E', par: 7, slots: 11,
+        sol: ['right', 'right', 'right', 'right', 'down', 'down', 'down'] }
+      ] },
+
+    { id: 'turns', row: 'big', rung: 3, emoji: '🧭',
+      name: "Turn and Go", sub: "Left and right are the robot\u2019s, not yours",
+      mode: 'rel', card: 'r-compass',
+      levels: [
+      { id: 'turns-1', name: "Facing right",
+        grid: ['R...G', '.....', '.....', '.....', '.....'],
+        face: 'E', par: 4, slots: 8,
+        sol: ['fwd', 'fwd', 'fwd', 'fwd'] },
+      { id: 'turns-2', name: "Turn once",
+        grid: ['R....', '.....', '.....', '.....', '....G'],
+        face: 'E', par: 9, slots: 13,
+        sol: ['fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd'] },
+      { id: 'turns-3', name: "Facing away",
+        grid: ['G...R', '.....', '.....', '.....', '.....'],
+        face: 'E', par: 6, slots: 10,
+        sol: ['turnL', 'turnL', 'fwd', 'fwd', 'fwd', 'fwd'] },
+      { id: 'turns-4', name: "Round the rock",
+        grid: ['R.#..', '..#..', '..#..', '.....', '....G'],
+        face: 'E', par: 10, slots: 14,
+        sol: ['fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd', 'turnL', 'fwd', 'fwd', 'fwd'] },
+      { id: 'turns-5', name: "The outside lane",
+        grid: ['R....', '.###.', '.#...', '.#.#.', '...#G'],
+        face: 'E', par: 9, slots: 13,
+        sol: ['fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd'] },
+      { id: 'turns-6', name: "Backwards start",
+        grid: ['....G', '.....', '.....', '.....', 'R....'],
+        face: 'W', par: 10, slots: 14,
+        sol: ['turnR', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd'] }
+      ] },
+
+    { id: 'longway', row: 'big', rung: 3, emoji: '🌀',
+      name: "The Long Way Round", sub: "Turning costs a step too",
+      mode: 'rel', card: 'r-surveyor',
+      levels: [
+      { id: 'longway-1', name: "Gem then flag",
+        grid: ['R..*.', '.....', '.....', '.....', 'G....'],
+        face: 'E', par: 12, slots: 16,
+        sol: ['fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd'] },
+      { id: 'longway-2', name: "Two detours",
+        grid: ['R....', '.*.*.', '.....', '.....', '....G'],
+        face: 'E', par: 11, slots: 15,
+        sol: ['fwd', 'turnR', 'fwd', 'turnL', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd'] },
+      { id: 'longway-3', name: "Behind the wall",
+        grid: ['R.#..', '..#*.', '.....', '..#G.'],
+        face: 'E', par: 13, slots: 17,
+        sol: ['fwd', 'turnR', 'fwd', 'fwd', 'turnL', 'fwd', 'fwd', 'turnL', 'fwd', 'turnL', 'turnL', 'fwd', 'fwd'] },
+      { id: 'longway-4', name: "Zigzag",
+        grid: ['R....', '.####', '.....', '####.', '....G'],
+        face: 'E', par: 11, slots: 15,
+        sol: ['turnR', 'fwd', 'fwd', 'turnL', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd'] },
+      { id: 'longway-5', name: "The far corner",
+        grid: ['R....', '.....', '..*..', '.....', '....G'],
+        face: 'S', par: 10, slots: 14,
+        sol: ['fwd', 'fwd', 'turnL', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd'] },
+      { id: 'longway-6', name: "Everything",
+        grid: ['R..*.', '.###.', '.....', '.###.', 'G..*.'],
+        face: 'S', par: 15, slots: 19,
+        sol: ['turnL', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd', 'turnR', 'fwd', 'fwd', 'fwd', 'fwd'] }
+      ] },
+
+    { id: 'again', row: 'big', rung: 4, emoji: '🔁',
+      name: "Again and Again", sub: "A loop is a shorter plan",
+      mode: 'rel', card: 'r-loopsmith',
+      levels: [
+      { id: 'again-1', name: "Four the same",
+        grid: ['R...G', '.....', '.....', '.....', '.....'],
+        face: 'E', par: 4, slots: 3,
+        sol: [{ n: 4, body: ['fwd'] }] },
+      { id: 'again-2', name: "There and down",
+        grid: ['R....', '.....', '.....', '.....', '....G'],
+        face: 'E', par: 9, slots: 6,
+        sol: [{ n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }] },
+      { id: 'again-3', name: "The long way",
+        grid: ['R....', '####.', '####.', '####.', 'G....'],
+        face: 'E', par: 14, slots: 10,
+        sol: [{ n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }] },
+      { id: 'again-4', name: "Three quarters",
+        grid: ['R....', '####.', '####.', 'G###.', '.....'],
+        face: 'E', par: 16, slots: 12,
+        sol: [{ n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }, 'turnR', 'fwd'] },
+      { id: 'again-5', name: "The staircase",
+        grid: ['R#...', '..#..', '...#.', '....#', '....G'],
+        face: 'S', par: 9, slots: 6,
+        sol: [{ n: 4, body: ['fwd', 'turnL', 'fwd', 'turnR'] }] },
+      { id: 'again-6', name: "Comb it",
+        grid: ['R....', '.#.#.', '.#.#.', '.#.#.', '....G'],
+        face: 'E', par: 9, slots: 7,
+        sol: [{ n: 4, body: ['fwd'] }, 'turnR', { n: 4, body: ['fwd'] }] }
+      ] },
+
+    { id: 'budget', row: 'big', rung: 5, emoji: '📏',
+      name: "Tight Budget", sub: "Only a loop will fit",
+      mode: 'rel', card: 'r-architect',
+      levels: [
+      { id: 'budget-1', name: "Five and five",
+        grid: ['R....G', '......', '......', '......', '......', '......'],
+        face: 'E', par: 5, slots: 3,
+        sol: [{ n: 5, body: ['fwd'] }] },
+      { id: 'budget-2', name: "The big corner",
+        grid: ['R.....', '......', '......', '......', '......', '.....G'],
+        face: 'E', par: 11, slots: 7,
+        sol: [{ n: 5, body: ['fwd'] }, 'turnR', { n: 5, body: ['fwd'] }] },
+      { id: 'budget-3', name: "All the way round",
+        grid: ['R.....', '#####.', '#####.', '#####.', '#####.', 'G.....'],
+        face: 'E', par: 17, slots: 10,
+        sol: [{ n: 5, body: ['fwd'] }, 'turnR', { n: 5, body: ['fwd'] }, 'turnR', { n: 5, body: ['fwd'] }] },
+      { id: 'budget-4', name: "The big staircase",
+        grid: ['R#....', '..#...', '...#..', '....#.', '.....#', '.....G'],
+        face: 'S', par: 11, slots: 7,
+        sol: [{ n: 5, body: ['fwd', 'turnL', 'fwd', 'turnR'] }] },
+      { id: 'budget-5', name: "There and back",
+        grid: ['R.....', '#####.', '......', '.#####', '.....G'],
+        face: 'E', par: 23, slots: 16,
+        sol: [{ n: 5, body: ['fwd'] }, 'turnR', { n: 2, body: ['fwd'] }, 'turnR', { n: 5, body: ['fwd'] }, 'turnL', { n: 2, body: ['fwd'] }, 'turnL', { n: 5, body: ['fwd'] }] },
+      { id: 'budget-6', name: "The long comb",
+        grid: ['R.....', '.#.#..', '.#.#..', '.#.#..', '.#.#..', '.....G'],
+        face: 'E', par: 11, slots: 7,
+        sol: [{ n: 5, body: ['fwd'] }, 'turnR', { n: 5, body: ['fwd'] }] }
+      ] }
+  ];
+
+  /* ---------- The world model ------------------------------------------
+     Grid characters: '.' floor  '#' rock  '~' pit  'R' start  'G' flag
+     '*' gem. Rocks and pits are the only things that can end a run, and
+     both do it the same way: the robot tried to go somewhere it cannot be. */
+
+  var DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
+  var ORDER = ['N', 'E', 'S', 'W'];
+  var TURN = { N: 0, E: 90, S: 180, W: 270 };
+
+  var PAL = {
+    abs: [['up', '⬆️'], ['left', '⬅️'], ['right', '➡️'], ['down', '⬇️']],
+    rel: [['fwd', '🔼'], ['turnL', '↩️'], ['turnR', '↪️']]
+  };
+  var GLYPH = { up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️',
+                fwd: '🔼', turnL: '↩️', turnR: '↪️' };
+  var ABS_DIR = { up: 'N', down: 'S', left: 'W', right: 'E' };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var allLevels = function (p) { return p.levels; };
+  var packById = function (id) {
+    return PACKS.filter(function (p) { return p.id === id; })[0];
+  };
+
+  /* How many commands a plan costs. A repeat costs one for itself plus what
+     is inside it — which is the whole reason a loop is worth writing. */
+  function countTokens(prog) {
+    var n = 0;
+    prog.forEach(function (it) {
+      n += (typeof it === 'string') ? 1 : 1 + countTokens(it.body);
+    });
+    return n;
+  }
+
+  /* The fewest commands this level can be solved in. For a plain level that
+     is the straight-line optimum; for a loop level it is the authored looped
+     solution, which is shorter than the straight line by design. Derived from
+     `sol` rather than stored again, so the two can never disagree. */
+  function bestFor(level) { return countTokens(level.sol); }
+
+  /* Flatten a plan into the steps it actually runs, each carrying the chip it
+     came from so the runner can light up the command it is on. A repeat's body
+     lights the same chips again on every pass, which is exactly the point. */
+  function flatten(prog, path, out) {
+    out = out || [];
+    prog.forEach(function (it, i) {
+      var here = path.concat([i]);
+      if (typeof it === 'string') out.push({ tok: it, path: here });
+      else for (var r = 0; r < it.n; r++) flatten(it.body, here, out);
+    });
+    return out;
+  }
+
+  function parseGrid(grid) {
+    var m = { w: grid[0].length, h: grid.length, rock: {}, pit: {},
+              gems: [], start: null, goal: null };
+    grid.forEach(function (row, y) {
+      row.split('').forEach(function (ch, x) {
+        var k = x + ',' + y;
+        if (ch === '#') m.rock[k] = 1;
+        else if (ch === '~') m.pit[k] = 1;
+        else if (ch === 'R') m.start = [x, y];
+        else if (ch === 'G') m.goal = [x, y];
+        else if (ch === '*') m.gems.push([x, y]);
+      });
+    });
+    return m;
+  }
+
+  /* ---------- State ----------------------------------------------------- */
+  var state = {
+    pack: null,
+    lvlIdx: 0,
+    level: null,
+    map: null,
+    prog: [],           // the plan: strings, or { n, body: [strings] }
+    open: null,         // index of the repeat new commands drop into, or null
+    hearts: 5,
+    maxHearts: 5,
+    shield: 0,          // a pet blocks the first crash
+    x: 0, y: 0, face: 'N',
+    got: {},            // gems picked up on this run
+    running: false,
+    goldAtStart: 0,
+    solvedThisPack: 0,
+    dungeon: null       // a stuck robot down a staircase, if that's why we're here
+  };
+
+  Hud.mount({ home: '../index.html' });
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) {
+      s.classList.remove('show');
+    });
+    $(id).classList.add('show');
+  }
+
+  function renderMute() {
+    $('muteBtn').textContent = Sound.muted ? '🔇' : '🔊';
+    $('muteBtn').classList.toggle('muted', Sound.muted);
+  }
+  $('muteBtn').addEventListener('click', function () {
+    Sound.muted = !Sound.muted;
+    renderMute();
+  });
+  renderMute();
+
+  /* ==================================================================
+     The menu
+     ================================================================== */
+  function renderMenu() {
+    var book = Save.robotProgress();
+    [['little', 'littleRow'], ['big', 'bigRow']].forEach(function (pair) {
+      var host = $(pair[1]);
+      host.innerHTML = '';
+      PACKS.filter(function (p) { return p.row === pair[0]; })
+           .forEach(function (p) {
+        var done = 0, starred = 0;
+        p.levels.forEach(function (l) {
+          if (book.solved[l.id]) done++;
+          if (book.par[l.id] && book.par[l.id] <= bestFor(l)) starred++;
+        });
+        var b = document.createElement('button');
+        b.className = 'choice pack-card';
+        b.dataset.pack = p.id;
+        var tick = done === p.levels.length ? ' ✅' : '';
+        b.innerHTML = '<span class="emoji">' + p.emoji + '</span>' + p.name + tick +
+                      '<span class="sub">' + p.sub + '</span>' +
+                      '<span class="stars">' +
+                      new Array(starred + 1).join('⭐') +
+                      new Array(p.levels.length - starred + 1).join('·') +
+                      ' ' + done + '/' + p.levels.length + '</span>';
+        b.addEventListener('click', function () {
+          Sound.click();
+          startPack(p.id);
+        });
+        host.appendChild(b);
+      });
+    });
+  }
+
+  /* Show this hero's own packs first. Hidden, not removed — one tap brings the
+     rest back, because profile.row decides what the site offers first, never
+     what a child is allowed to play. */
+  window.__showAll = false;
+  function applyRowFilter() {
+    var mine = Save.heroTrail();
+    var other = mine === 'big' ? 'little' : 'big';
+    var show = function (label, host, on) {
+      $(label).style.display = on ? '' : 'none';
+      $(host).style.display = on ? '' : 'none';
+    };
+    show('littleLabel', 'littleRow', window.__showAll || mine === 'little');
+    show('bigLabel', 'bigRow', window.__showAll || mine === 'big');
+    $('showAllBtn').textContent = window.__showAll
+      ? 'Just my packs'
+      : (other === 'big' ? '\u{1F440} Show the big hero packs too'
+                         : '\u{1F440} Show the little hero packs too');
+  }
+  $('showAllBtn').addEventListener('click', function () {
+    Sound.click();
+    window.__showAll = !window.__showAll;
+    applyRowFilter();
+  });
+
+  /* ==================================================================
+     A pack
+     ================================================================== */
+  function startPack(id) {
+    var p = packById(id);
+    if (!p) return;
+    var gear = Save.loadout();
+    state.pack = p;
+    state.lvlIdx = 0;
+    state.solvedThisPack = 0;
+    // Hearts are the pack's budget, and they come from what the hero is
+    // wearing. There is no combat here, so armour and a pet buy the one thing
+    // a puzzle can actually spend: room to get it wrong.
+    state.maxHearts = gear.maxHp;
+    state.hearts = gear.maxHp;
+    state.shield = gear.shield || 0;
+    state.goldAtStart = (Save.me() || { gold: 0 }).gold;
+    Save.setContext('robot');   // no world multiplier — there is no world here
+    Log.startSession({ game: 'robot', track: p.name, mode: 'rung ' + p.rung });
+    loadLevel();
+    showScreen('work');
+  }
+
+  /* ---------- A stuck robot, down a staircase ---------------------------
+
+     The dungeon hands over the hero's row and a seeded number and nothing
+     else — it has no idea what is in this file. Resolving that number here
+     means there is no second copy of the pack list for the two to drift apart
+     on, which is exactly the drift the language game's TRACKS array was
+     rebuilt to close.
+
+     One level, the hero's own hearts, and the result crosses back in
+     sessionStorage — the same fifteen lines the battle games use. */
+  function startDungeon(pick) {
+    var mine = PACKS.filter(function (p) { return p.row === pick.row; });
+    if (!mine.length) mine = PACKS;
+    // deeper floors reach further along the packs, the way a fight reaches
+    // further along the trail
+    var reach = Math.max(1, Math.round(mine.length * pick.reach));
+    var pack = mine[pick.n % reach];
+    var gear = Save.loadout();
+    state.pack = pack;
+    state.lvlIdx = pick.n % pack.levels.length;
+    state.solvedThisPack = 0;
+    state.maxHearts = gear.maxHp;
+    state.hearts = gear.maxHp;
+    state.shield = gear.shield || 0;
+    state.goldAtStart = (Save.me() || { gold: 0 }).gold;
+    state.dungeon = pick;
+    Save.setContext('robot');
+    Log.startSession({ game: 'robot', track: pack.name, mode: 'dungeon' });
+    loadLevel();
+    $('quitBtn').textContent = '🪜 Back up';
+    showScreen('work');
+  }
+
+  function loadLevel() {
+    var l = state.pack.levels[state.lvlIdx];
+    state.level = l;
+    state.map = parseGrid(l.grid);
+    state.prog = [];
+    state.open = null;
+    resetRobot();
+    $('lvlName').textContent = l.name;
+    $('lvlStat').textContent = '\u{1F916} ' + (state.lvlIdx + 1) + ' / ' +
+                               state.pack.levels.length;
+    $('slots').textContent = l.slots;
+    buildBoard();
+    renderPalette();
+    renderStrip();
+    renderHearts();
+    note('');
+  }
+
+  function resetRobot() {
+    state.x = state.map.start[0];
+    state.y = state.map.start[1];
+    state.face = state.level.face;
+    state.got = {};
+  }
+
+  /* ==================================================================
+     Drawing the room
+
+     Everything is positioned in percent of the board, so a rotation costs
+     nothing and no layout is ever measured. The board's height is set from
+     the grid's own shape once, when the level loads.
+     ================================================================== */
+  function buildBoard() {
+    var m = state.map;
+    var cells = $('cells');
+    cells.style.gridTemplateColumns = 'repeat(' + m.w + ', 1fr)';
+    cells.style.gridTemplateRows = 'repeat(' + m.h + ', 1fr)';
+    $('board').style.aspectRatio = m.w + ' / ' + m.h;
+    cells.innerHTML = '';
+    for (var y = 0; y < m.h; y++) {
+      for (var x = 0; x < m.w; x++) {
+        var k = x + ',' + y;
+        var d = document.createElement('div');
+        d.className = 'cell' + ((x + y) % 2 ? ' odd' : '');
+        d.id = 'c' + k;
+        if (m.rock[k]) { d.className += ' rock'; d.textContent = '🪨'; }
+        else if (m.pit[k]) { d.className += ' pit'; }
+        else if (m.goal[0] === x && m.goal[1] === y) {
+          d.className += ' goal'; d.textContent = '🏁';
+        } else if (isGem(x, y)) { d.className += ' gem'; d.textContent = '💎'; }
+        cells.appendChild(d);
+      }
+    }
+    $('bot').style.width = (100 / m.w) + '%';
+    $('bot').style.height = (100 / m.h) + '%';
+    placeBot();
+  }
+
+  function isGem(x, y) {
+    return state.map.gems.some(function (g) { return g[0] === x && g[1] === y; });
+  }
+
+  function placeBot() {
+    var m = state.map;
+    var b = $('bot');
+    b.style.left = (state.x * 100 / m.w) + '%';
+    b.style.top = (state.y * 100 / m.h) + '%';
+    b.querySelector('.nose').style.transform =
+      'rotate(' + TURN[state.face] + 'deg) translateY(-17px)';
+  }
+
+  function renderGems() {
+    state.map.gems.forEach(function (g) {
+      var el = $('c' + g[0] + ',' + g[1]);
+      if (el) el.classList.toggle('taken', !!state.got[g[0] + ',' + g[1]]);
+    });
+  }
+
+  function renderHearts() {
+    var pips = $('heartPips');
+    pips.innerHTML = '';
+    pips.className = 'pips' + (state.maxHearts > 7 ? ' many' : '');
+    for (var i = 0; i < state.maxHearts; i++) {
+      var s = document.createElement('span');
+      s.className = 'pip heart' + (i < state.hearts ? '' : ' empty');
+      pips.appendChild(s);
+    }
+  }
+
+  function note(msg, kind) {
+    var n = $('note');
+    n.textContent = msg;
+    n.className = kind || '';
+  }
+
+  /* ==================================================================
+     Building a plan
+
+     Every input is a tap. Drag-and-drop is fiddly on an iPad and hopeless
+     for a five-year-old; tapping a palette button appends, and tapping a
+     command in the strip takes it out again.
+     ================================================================== */
+  function renderPalette() {
+    var pal = $('pal');
+    pal.innerHTML = '';
+    PAL[state.pack.mode].forEach(function (pair) {
+      var b = document.createElement('button');
+      b.className = 'pal-btn';
+      b.dataset.cmd = pair[0];
+      b.textContent = pair[1];
+      b.addEventListener('click', function () { addToken(pair[0]); });
+      pal.appendChild(b);
+    });
+    if (state.pack.rung >= 4) {
+      var r = document.createElement('button');
+      r.className = 'pal-btn';
+      r.dataset.cmd = 'rep';
+      r.textContent = '🔁';
+      r.addEventListener('click', addRepeat);
+      pal.appendChild(r);
+    }
+  }
+
+  function target() {
+    return state.open === null ? state.prog : state.prog[state.open].body;
+  }
+
+  function addToken(cmd) {
+    if (state.running) return;
+    if (countTokens(state.prog) >= state.level.slots) return tooLong();
+    Sound.click();
+    target().push(cmd);
+    renderStrip();
+    note('');
+  }
+
+  /* A repeat block always goes at the top level — one level of nesting is
+     plenty for a 6x6 room, and it keeps the strip readable at a glance. New
+     commands drop inside the open block until you close it again. */
+  function addRepeat() {
+    if (state.running) return;
+    if (countTokens(state.prog) >= state.level.slots) return tooLong();
+    Sound.click();
+    state.prog.push({ n: 2, body: [] });
+    state.open = state.prog.length - 1;
+    renderStrip();
+  }
+
+  function tooLong() {
+    Sound.wrong();
+    note('That is all the room you have — try a shorter plan.', 'bad');
+  }
+
+  function renderStrip() {
+    var strip = $('strip');
+    strip.innerHTML = '';
+    strip.classList.toggle('empty', state.prog.length === 0);
+    state.prog.forEach(function (it, i) {
+      strip.appendChild(typeof it === 'string' ? chip(it, [i]) : repBlock(it, i));
+    });
+    $('used').textContent = countTokens(state.prog);
+    var full = countTokens(state.prog) >= state.level.slots;
+    $('pal').querySelectorAll('.pal-btn').forEach(function (b) {
+      b.disabled = full;
+    });
+  }
+
+  function chip(tok, path) {
+    var b = document.createElement('button');
+    b.className = 'tok';
+    b.textContent = GLYPH[tok];
+    b.dataset.path = path.join('.');
+    b.addEventListener('click', function (e) {
+      // a chip inside a repeat sits inside the block's own click target, and
+      // without this, taking a command out also opens or closes the block
+      e.stopPropagation();
+      removeAt(path);
+    });
+    return b;
+  }
+
+  function repBlock(it, i) {
+    var wrap = document.createElement('div');
+    wrap.className = 'rep' + (state.open === i ? ' open' : '');
+    var head = document.createElement('button');
+    head.className = 'rep-head';
+    head.textContent = '🔁 ×' + it.n;
+    // one tap cycles how many times; a long-lived habit from the shop's
+    // tier buttons, and far fewer controls than a stepper
+    head.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (state.running) return;
+      Sound.click();
+      it.n = it.n >= 5 ? 2 : it.n + 1;
+      renderStrip();
+    });
+    wrap.appendChild(head);
+    var body = document.createElement('div');
+    body.className = 'rep-body';
+    it.body.forEach(function (t, j) { body.appendChild(chip(t, [i, j])); });
+    wrap.appendChild(body);
+    // tapping the block itself opens or closes it — which is where new
+    // commands go, shown by the bright ring
+    wrap.addEventListener('click', function () {
+      if (state.running) return;
+      Sound.click();
+      state.open = state.open === i ? null : i;
+      renderStrip();
+    });
+    return wrap;
+  }
+
+  function removeAt(path) {
+    if (state.running) return;
+    Sound.click();
+    if (path.length === 1) {
+      state.prog.splice(path[0], 1);
+      if (state.open !== null) {
+        if (state.open === path[0]) state.open = null;
+        else if (state.open > path[0]) state.open--;
+      }
+    } else {
+      state.prog[path[0]].body.splice(path[1], 1);
+    }
+    renderStrip();
+    note('');
+  }
+
+  $('clearBtn').addEventListener('click', function () {
+    if (state.running) return;
+    Sound.click();
+    state.prog = [];
+    state.open = null;
+    resetRobot();
+    placeBot();
+    renderGems();
+    renderStrip();
+    note('');
+  });
+
+  /* ==================================================================
+     Running the plan
+
+     One step at a time, with the command being run lit up. When it goes
+     wrong the chip that did it turns red and stays red — finding your own
+     mistake is the entire lesson, so the game points at it rather than
+     just saying no.
+     ================================================================== */
+  var STEP_MS = 300;
+
+  function chipAt(path) {
+    return $('strip').querySelector('[data-path="' + path.join('.') + '"]');
+  }
+
+  $('runBtn').addEventListener('click', function () {
+    if (state.running) return;
+    if (!state.prog.length) {
+      Sound.wrong();
+      return note('Build a plan first, then press Run.', 'bad');
+    }
+    Sound.click();
+    runPlan();
+  });
+
+  function runPlan() {
+    var steps = flatten(state.prog, []);
+    if (!steps.length) {
+      Sound.wrong();
+      return note('That plan does not do anything yet.', 'bad');
+    }
+    state.running = true;
+    setBusy(true);
+    resetRobot();
+    placeBot();
+    renderGems();
+    note('');
+    $('strip').querySelectorAll('.tok').forEach(function (c) {
+      c.classList.remove('on', 'bad');
+    });
+
+    var i = 0;
+    var tick = function () {
+      if (i > 0) {
+        var prev = chipAt(steps[i - 1].path);
+        if (prev) prev.classList.remove('on');
+      }
+      if (i >= steps.length) return finish(null);
+      var st = steps[i];
+      var el = chipAt(st.path);
+      if (el) el.classList.add('on');
+      var bad = step(st.tok);
+      placeBot();
+      renderGems();
+      if (bad) {
+        if (el) { el.classList.remove('on'); el.classList.add('bad'); }
+        return finish(bad);
+      }
+      i++;
+      setTimeout(tick, STEP_MS);
+    };
+    setTimeout(tick, 160);
+  }
+
+  /* Move once. Returns null if fine, or why it went wrong. */
+  function step(tok) {
+    var m = state.map, nx = state.x, ny = state.y;
+    if (tok === 'turnL' || tok === 'turnR') {
+      var i = ORDER.indexOf(state.face);
+      state.face = ORDER[(i + (tok === 'turnL' ? 3 : 1)) % 4];
+      Sound.page();
+      return null;
+    }
+    var d = tok === 'fwd' ? state.face : ABS_DIR[tok];
+    // an absolute move turns the robot as well, so the little hero still
+    // sees which way it is looking
+    state.face = d;
+    nx += DIRS[d][0];
+    ny += DIRS[d][1];
+    var k = nx + ',' + ny;
+    if (nx < 0 || ny < 0 || nx >= m.w || ny >= m.h) return 'edge';
+    if (m.rock[k]) return 'rock';
+    if (m.pit[k]) { state.x = nx; state.y = ny; return 'pit'; }
+    state.x = nx;
+    state.y = ny;
+    if (isGem(nx, ny) && !state.got[k]) {
+      state.got[k] = 1;
+      Sound.coin();
+    }
+    return null;
+  }
+
+  function setBusy(on) {
+    $('runBtn').disabled = on;
+    $('clearBtn').disabled = on;
+    $('pal').querySelectorAll('.pal-btn').forEach(function (b) {
+      b.disabled = on || countTokens(state.prog) >= state.level.slots;
+    });
+  }
+
+  /* The plan has run out, one way or another.
+
+     A CRASH costs a heart: the robot was driven into a rock, a hole or the
+     edge, and that is a real mistake. Simply STOPPING SHORT costs nothing —
+     an unfinished plan is not a wrong one, and charging for it would punish
+     exactly the experiment the game is trying to teach. */
+  function finish(bad) {
+    state.running = false;
+    setBusy(false);
+    var m = state.map;
+    var won = state.x === m.goal[0] && state.y === m.goal[1] &&
+              m.gems.every(function (g) { return state.got[g[0] + ',' + g[1]]; });
+
+    if (bad) return crash(bad);
+    if (won) return solved();
+
+    if (m.gems.length && state.x === m.goal[0] && state.y === m.goal[1]) {
+      Sound.denied();
+      return note('You reached the flag, but there are still gems to collect.');
+    }
+    Sound.denied();
+    note('The robot stopped here. Add to your plan and run it again.');
+  }
+
+  function crash(why) {
+    var msg = { edge: 'The robot walked off the edge!',
+                rock: 'The robot bumped into a rock!',
+                pit:  'The robot fell down a hole!' }[why];
+    $('board').classList.add('shake');
+    setTimeout(function () { $('board').classList.remove('shake'); }, 400);
+
+    if (state.shield > 0) {
+      state.shield--;
+      Sound.blockTap();
+      return note(msg + ' Your pet caught it — no spare part lost.', 'bad');
+    }
+    Sound.hurt();
+    state.hearts--;
+    renderHearts();
+    Save.recordAnswer(false);
+    if (state.hearts <= 0) return outOfHearts();
+    note(msg + ' Look at the red command.', 'bad');
+  }
+
+  /* ==================================================================
+     Winning a level
+     ================================================================== */
+  function solved() {
+    var l = state.level;
+    var used = countTokens(state.prog);
+    var best = bestFor(l);
+    var star = used <= best;
+
+    Sound.victory();
+    Save.recordAnswer(true);
+    state.solvedThisPack++;
+
+    /* A level pays for being SOLVED, not for being replayed.
+
+       This is the one place the workshop could have become a gold farm. A
+       battle run is six minutes and a quest is fifteen, so neither can be
+       ground; a three-tap level is about ten seconds, and paying it every time
+       works out at roughly seven times what battling pays. So the first solve
+       pays, and after that only genuinely shortening your plan does — which is
+       the thing worth coming back for anyway. Nothing is taken away: the ✅ and
+       the ⭐ stay, and the level is still there to play. */
+    var res = Save.robotSolve(l.id, used);
+    var paid = res.first ? Save.awardEvent('robotSolved')
+                         : { gold: 0, xp: 0, leveledTo: null };
+    if (star && res.improved) {
+      var bonus = Save.awardEvent('robotPar');
+      paid = { gold: paid.gold + bonus.gold, xp: paid.xp + bonus.xp,
+               leveledTo: bonus.leveledTo || paid.leveledTo };
+    }
+    Hud.applied(paid);
+
+    /* For the grown-ups: which level, and how long the plan was. Recorded with
+       NO right answer on purpose — Log.due() only serves questions that have
+       one, so a robot level can never turn up in the Rematch. A level's
+       "answer" is a program, and there is no way to ask for one of those from
+       a log line. */
+    Log.answer({ q: state.pack.name + ': ' + l.name,
+                 given: used + ' commands', ok: true });
+
+    $('solvedArt').textContent = star ? '⭐' : '🏁';
+    $('solvedTitle').textContent = star ? 'Perfect plan!' : 'Solved!';
+    $('solvedStar').textContent = star
+      ? (res.improved ? 'The shortest plan there is — ' + used + ' commands.'
+                      : 'Still the shortest plan there is — ' + used + ' commands.')
+      : 'You used ' + used + '. It can be done in ' + best + '.';
+    if (state.dungeon) {
+      // the dungeon pays its own loot and draws its own chest; all this has to
+      // do is say the room was cleared
+      try { sessionStorage.setItem('lg_dungeon_result', 'won'); } catch (e) {}
+    }
+    $('nextBtn').textContent = state.dungeon ? '⛏️ Back down'
+      : state.lvlIdx + 1 >= state.pack.levels.length ? 'Finish the pack 🏆' : 'Next ▶️';
+    $('work').scrollTop = 0;
+    $('solved').classList.add('show');
+    // nothing is being read behind this panel, so anything held can land now
+    Hud.flush();
+    armNext();
+    return res;
+  }
+
+  /* The next level waits for the banners, exactly as the next monster does in
+     the battle games. Without this, tapping Next while a card was still on
+     screen dropped a fresh puzzle underneath it — the banner was then covering
+     a live board, which is the one thing the queue exists to prevent.
+
+     Polled rather than hung off Hud.flush's callback on purpose: flush() drops
+     its callback if a drain is already running, and a Next button that never
+     comes back is worse than one that comes back a frame late. */
+  function armNext() {
+    var waiting = Hud.pending() > 0 || !!document.querySelector('.levelup');
+    $('nextBtn').style.visibility = waiting ? 'hidden' : '';
+    if (waiting) setTimeout(armNext, 150);
+  }
+
+  $('nextBtn').addEventListener('click', function () {
+    if (Hud.pending() > 0 || document.querySelector('.levelup')) return;
+    Sound.click();
+    $('solved').classList.remove('show');
+    if (state.dungeon) return backDown();
+    if (state.lvlIdx + 1 >= state.pack.levels.length) return packComplete();
+    state.lvlIdx++;
+    loadLevel();
+  });
+
+  /* ==================================================================
+     The end of a pack
+     ================================================================== */
+  function earnedThisRun() {
+    return Math.max(0, (Save.me() || { gold: 0 }).gold - state.goldAtStart);
+  }
+
+  function showEarnings(id, verb) {
+    $(id).innerHTML =
+      '<div class="reward-line">\u{1FA99} You earned <b></b> gold ' + verb + '</div>' +
+      '<div class="reward-hint">Spend it in the shop — swords, armor, pets, ' +
+      'new worlds, and iPad game time.</div>';
+    $(id).querySelector('b').textContent = earnedThisRun();
+  }
+
+  function packComplete() {
+    var p = state.pack;
+    var ids = allLevels(p).map(function (l) { return l.id; });
+    var firstTime = Save.robotFinishPack(p.id, ids);
+
+    var bonus = firstTime ? Save.awardEvent('packDone') : { gold: 0, xp: 0 };
+    // A pack always pays its card the first time it is finished. Six levels of
+    // thinking and then "the dice said no" would be miserable — rarity is for
+    // monsters you can meet again in a minute, which is why Story Quest's
+    // cards are guaranteed too.
+    var drop = firstTime ? Save.awardCard(p.card, true) : null;
+
+    Sound.victory();
+    Log.endSession({ won: true, gold: earnedThisRun() });
+    $('winText').textContent = firstTime
+      ? 'You finished ' + p.name + ' — all ' + p.levels.length + ' levels!'
+      : 'You finished ' + p.name + ' again.';
+    showEarnings('earned', 'in the workshop!');
+    showScreen('win');
+    Hud.applied(bonus);
+    Hud.cardDrop(drop);
+    Hud.flush();          // an end screen covers nothing
+  }
+
+  function outOfHearts() {
+    // Everything earned on the way is already banked — the dungeon's rule, and
+    // for the same reason: "nothing is ever taken away" outranks the tension.
+    Sound.gameover();
+    state.running = false;
+    setBusy(false);
+    Log.endSession({ won: false, gold: earnedThisRun() });
+    if (state.dungeon) {
+      try { sessionStorage.setItem('lg_dungeon_result', 'lost'); } catch (e) {}
+      $('outText').textContent = 'The robot is still stuck — but everything you ' +
+        'found down here is already yours.';
+      $('retryBtn').style.display = 'none';
+      $('outBackBtn').textContent = '🪜 Back up';
+      showEarnings('outEarned', 'on the way down.');
+      showScreen('out');
+      Hud.flush();
+      return;
+    }
+    $('outText').textContent = state.solvedThisPack
+      ? 'You solved ' + state.solvedThisPack +
+        (state.solvedThisPack === 1 ? ' level' : ' levels') +
+        ' — and everything you earned is already safe.'
+      : 'The robot needs a rest — nothing you earned is lost.';
+    showEarnings('outEarned', 'before the robot stopped.');
+    showScreen('out');
+    Hud.flush();
+  }
+
+  $('winBackBtn').addEventListener('click', function () {
+    Sound.click();
+    toMenu();
+  });
+  $('outBackBtn').addEventListener('click', function () {
+    Sound.click();
+    if (state.dungeon) return backDown();
+    toMenu();
+  });
+
+  function backDown() { location.href = '../dungeon/index.html'; }
+  $('retryBtn').addEventListener('click', function () {
+    Sound.click();
+    startPack(state.pack.id);
+  });
+  $('quitBtn').addEventListener('click', function () {
+    Sound.click();
+    Log.endSession({ won: false, gold: earnedThisRun() });
+    // walking away from a stuck robot leaves the room as it was: no result is
+    // written, so the dungeon simply puts you back in it
+    if (state.dungeon) return backDown();
+    toMenu();
+  });
+
+  function toMenu() {
+    renderMenu();
+    applyRowFilter();
+    showScreen('menu');
+  }
+
+  renderMenu();
+  applyRowFilter();
+
+  /* Arrived from a staircase? Play exactly that, and skip the menu. */
+  (function fromDungeon() {
+    if (!/[?&]dungeon=1/.test(location.search)) return;
+    var pick = Save.dungeonPuzzle();
+    if (pick) startDungeon(pick);
+  })();
+
+  /* Test seam: the harness drives the real page, and needs to see the levels,
+     the plan being built and the interpreter itself — the reference solutions
+     are run through THIS code rather than a copy, so a level and the game can
+     never quietly disagree. Assigning it last also makes it a boot check: if
+     window.TEST is missing, the script threw on its way down, and a throw
+     during parse leaves nothing for a window.onerror trap to catch. */
+  window.TEST = { state: state, PACKS: PACKS, packById: packById,
+                  countTokens: countTokens, bestFor: bestFor, flatten: flatten,
+                  parseGrid: parseGrid, startPack: startPack, loadLevel: loadLevel,
+                  runPlan: runPlan, step: step, resetRobot: resetRobot,
+                  renderStrip: renderStrip, STEP_MS: STEP_MS,
+                  startDungeon: startDungeon };
+</script>
+</body>
+</html>

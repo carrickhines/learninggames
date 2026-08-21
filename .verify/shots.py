@@ -447,5 +447,41 @@ try:
     """)
     time.sleep(0.6)
     shot("story-win")
+
+    # ---- The Robot Workshop ----
+    # All of this is new drawing: a grid, a robot that has to show which way it
+    # is looking, a plan strip with a repeat block inside it, and the red mark
+    # on the command that crashed. Contrast and composition are not assertions,
+    # so these get looked at.
+    load("robot/index.html")
+    shot("robot-menu")
+
+    d.execute_script("TEST.startPack('gems'); TEST.state.lvlIdx = 4; TEST.loadLevel();")
+    d.execute_script("TEST.state.prog = ['down','right','right']; TEST.renderStrip();")
+    time.sleep(0.5)
+    d.execute_script(NO_ANIM)
+    shot("robot-work-little")
+
+    # the crash, with the offending command marked
+    d.execute_script("TEST.startPack('rocks'); TEST.state.prog = ['right']; TEST.renderStrip();")
+    time.sleep(0.4)
+    d.find_element(By.CSS_SELECTOR, "#runBtn").click()
+    time.sleep(1.6)
+    shot("robot-crash")
+
+    # a big-hero loop level, with the repeat block open
+    d.execute_script("TEST.startPack('budget'); TEST.state.lvlIdx = 3; TEST.loadLevel();")
+    d.execute_script("TEST.state.prog = [{ n: 5, body: ['fwd','turnL','fwd','turnR'] }];"
+                     "TEST.state.open = 0; TEST.renderStrip();")
+    time.sleep(0.5)
+    shot("robot-work-loop")
+
+    # the panel that lands on a solve
+    d.execute_script("TEST.startPack('steps');"
+                     "TEST.state.prog = ['right','right','right']; TEST.renderStrip();")
+    time.sleep(0.4)
+    d.find_element(By.CSS_SELECTOR, "#runBtn").click()
+    time.sleep(2.4)
+    shot("robot-solved")
 finally:
     d.quit()

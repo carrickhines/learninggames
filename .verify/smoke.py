@@ -59,6 +59,17 @@ def errs():
     return d.execute_script("return window.__errs || []")
 
 
+def next_on():
+    """The Robot Workshop holds its Next button back while a reward banner is
+    on screen, so that a fresh puzzle is never dropped underneath one. Clicking
+    through would be testing something the game does not do."""
+    for _ in range(40):
+        if d.execute_script("var b = document.getElementById('nextBtn');"
+                            "return !b || b.style.visibility !== 'hidden';"):
+            return
+        time.sleep(0.25)
+
+
 def click(sel):
     """Prefer a real click; fall back to a scripted one.
 
@@ -185,8 +196,11 @@ try:
     check("hub: the hero card shows the name", text("#hcName") == "Tester")
     check("hub: the hero starts at level 1", "Level 1" in text("#hcLevel"))
     check("hub: the hero starts broke", text("#hcGold") == "🪙 0")
-    check("hub: all three games are linked",
-          len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 3)
+    check("hub: all four games are linked",
+          len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 4)
+    check("hub: the Robot Workshop is one of them",
+          any("robot/index.html" in (a.get_attribute("href") or "")
+              for a in d.find_elements(By.CSS_SELECTOR, ".game-card")))
     check("hub: no JS errors", errs() == [], str(errs()))
 
     print("\nThe map")
@@ -490,6 +504,209 @@ try:
             if (cards[i].textContent === ok.t) { cards[i].click(); break; }
         }
     """)
+    # --------------------------------------------------------- robot workshop
+    # The fourth game, and the only one with no questions in it. What matters
+    # here is that the plan a child taps out is the plan that runs, that a
+    # crash costs a spare part while an unfinished plan does not, and that the
+    # star goes to the shortest program rather than to any win.
+    print("\nRobot Workshop")
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Bot', 'B');"
+                     "Save.update(function (p) { p.row = 'little'; });")
+    load("robot/index.html")
+    check("robot: the page booted", d.execute_script("return !!window.TEST"))
+    check("robot: every pack is on the menu",
+          len(d.find_elements(By.CSS_SELECTOR, ".pack-card")) ==
+          d.execute_script("return TEST.PACKS.length"))
+    check("robot: no JS errors on the menu", errs() == [], str(errs()))
+
+    # tap a plan out the way a child does: palette buttons, not a scripted array
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.5)
+    check("robot: tapping a pack opens the workshop", d.execute_script(
+        "return document.getElementById('work').classList.contains('show');"))
+    for _ in range(3):
+        click('#pal .pal-btn[data-cmd="right"]')
+    check("robot: the plan is what was tapped",
+          d.execute_script("return TEST.state.prog.join(',');") == "right,right,right")
+    check("robot: the counter follows the plan", text("#used") == "3")
+
+    gold_before = d.execute_script("return Save.me().gold;")
+    click("#runBtn")
+    time.sleep(0.3 * 6 + 1.2)
+    check("robot: a correct plan solves the level", d.execute_script(
+        "return document.getElementById('solved').classList.contains('show');"))
+    check("robot: the shortest plan earns the star",
+          "Perfect" in text("#solvedTitle"), text("#solvedTitle"))
+    check("robot: solving a level pays gold",
+          d.execute_script("return Save.me().gold;") > gold_before)
+    check("robot: the level is remembered as solved",
+          d.execute_script("return !!Save.robotProgress().solved['steps-1'];"))
+    check("robot: and so is how short the plan was",
+          d.execute_script("return Save.robotProgress().par['steps-1'];") == 3)
+
+    # A three-tap level takes about ten seconds. Paying it every time works out
+    # at roughly seven times what battling pays, which is the one way this game
+    # could have become a gold farm -- a battle run is six minutes and a quest
+    # is fifteen, so neither can be ground like that. The first solve pays;
+    # after that only genuinely shortening the plan does.
+    next_on()
+    d.execute_script("document.getElementById('nextBtn').click();")
+    time.sleep(0.4)
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.4)
+    gold_before = d.execute_script("return Save.me().gold;")
+    d.execute_script("TEST.state.prog = ['right','right','right']; TEST.renderStrip();")
+    click("#runBtn")
+    time.sleep(0.3 * 3 + 1.4)
+    check("robot: replaying a solved level still solves it", d.execute_script(
+        "return document.getElementById('solved').classList.contains('show');"))
+    check("robot: but replaying it pays nothing, so it cannot be farmed",
+          d.execute_script("return Save.me().gold;") == gold_before,
+          "%d vs %d" % (d.execute_script("return Save.me().gold;"), gold_before))
+
+    # The star is for the SHORTEST plan, not for any win. A win by the scenic
+    # route reaches the flag and must still come back without one, or the whole
+    # skill reward is just a participation prize.
+    next_on()
+    d.execute_script("document.getElementById('nextBtn').click();")
+    time.sleep(0.4)
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.4)
+    d.execute_script("TEST.state.prog = ['right','right','down','up','right'];"
+                     "TEST.renderStrip();")
+    click("#runBtn")
+    time.sleep(0.3 * 5 + 1.4)
+    check("robot: a win by the scenic route solves it", d.execute_script(
+        "return document.getElementById('solved').classList.contains('show');"))
+    check("robot: but the scenic route earns no star",
+          "Perfect" not in text("#solvedTitle"), text("#solvedTitle"))
+    check("robot: and the shortest plan already found is kept",
+          d.execute_script("return Save.robotProgress().par['steps-1'];") == 3,
+          str(d.execute_script("return Save.robotProgress().par['steps-1'];")))
+
+    # A plan that simply runs out is not a mistake — charging a spare part for
+    # it would punish the very experiment the game is trying to teach. Driving
+    # into a rock is a different thing, and that one costs.
+    next_on()
+    d.execute_script("document.getElementById('nextBtn').click();")
+    time.sleep(0.5)
+    hearts = d.execute_script("return TEST.state.hearts;")
+    d.execute_script("TEST.state.prog = ['down']; TEST.renderStrip();")
+    click("#runBtn")
+    time.sleep(1.4)
+    check("robot: stopping short costs nothing",
+          d.execute_script("return TEST.state.hearts;") == hearts,
+          str(d.execute_script("return TEST.state.hearts;")))
+
+    d.execute_script("TEST.startPack('rocks'); TEST.state.prog=['right']; TEST.renderStrip();")
+    time.sleep(0.4)
+    hearts = d.execute_script("return TEST.state.hearts;")
+    click("#runBtn")
+    time.sleep(1.4)
+    check("robot: driving into a rock costs a spare part",
+          d.execute_script("return TEST.state.hearts;") == hearts - 1,
+          str(d.execute_script("return TEST.state.hearts;")))
+    check("robot: and the command that did it is marked",
+          d.execute_script("return !!document.querySelector('#strip .tok.bad');"))
+
+    # The repeat block is the one control with more than one thing to tap: the
+    # block itself opens and closes it, the number cycles the count, and a chip
+    # inside comes out. They all sit inside each other, so without a stopped
+    # propagation, taking a command out of a loop also closes the loop.
+    d.execute_script("Save.update(function (p) { p.row = 'big'; });")
+    load("robot/index.html")
+    d.execute_script("TEST.startPack('again');")
+    time.sleep(0.5)
+    click('#pal .pal-btn[data-cmd="rep"]')
+    click('#pal .pal-btn[data-cmd="fwd"]')
+    click('#pal .pal-btn[data-cmd="fwd"]')
+    check("robot: commands drop inside the open loop",
+          d.execute_script("return JSON.stringify(TEST.state.prog);")
+          == '[{"n":2,"body":["fwd","fwd"]}]',
+          d.execute_script("return JSON.stringify(TEST.state.prog);"))
+    check("robot: a loop of two forwards costs three commands",
+          text("#used") == "3", text("#used"))
+    click('#strip .rep-body .tok')
+    check("robot: a command can be taken back out of the loop",
+          d.execute_script("return JSON.stringify(TEST.state.prog);")
+          == '[{"n":2,"body":["fwd"]}]',
+          d.execute_script("return JSON.stringify(TEST.state.prog);"))
+    check("robot: and taking one out does not close the loop",
+          d.execute_script("return TEST.state.open;") == 0,
+          str(d.execute_script("return TEST.state.open;")))
+    click("#strip .rep-head")
+    check("robot: tapping the number cycles how many times",
+          d.execute_script("return TEST.state.prog[0].n;") == 3,
+          str(d.execute_script("return TEST.state.prog[0].n;")))
+
+    # Hearts are the one thing gear can buy in a game with no combat.
+    d.execute_script("Save.update(function (p) {"
+                     "  p.inventory.owned.push('scale'); p.inventory.armor = 'scale'; });")
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.4)
+    check("robot: armour buys room to get it wrong",
+          d.execute_script("return TEST.state.maxHearts;") ==
+          d.execute_script("return Save.loadout().maxHp;"))
+    check("robot: no JS errors in the workshop", errs() == [], str(errs()))
+
+    # A stuck robot down a staircase: the dungeon opens the REAL workshop, the
+    # same way a monster room opens the real battle game. What matters is that
+    # it comes back — a room that sends a child away and cannot take them back
+    # eats the descent.
+    for row in ("little", "big"):
+        load("index.html")
+        d.execute_script("var r = arguments[0];"
+                         "Save.reset(); Save.createProfile('Delver', 'D');"
+                         "Save.update(function (p) { p.row = r; });", row)
+        d.get("file://" + os.path.join(ROOT, "dungeon/index.html"))
+        time.sleep(1.0)
+        # A stuck robot turns up on most floors, not all (puzzleChance is 0.7),
+        # so keep starting descents until one has one. Asserting that floor 1
+        # always does would be a test that fails three times in ten for a
+        # reason that is not a bug -- and the save-test already holds the
+        # generator to "most floors, not all" across 9,600 of them.
+        at = d.execute_script("""
+            for (var tries = 0; tries < 40; tries++) {
+              Save.dungeonStart();
+              var run = Save.dungeonRun();
+              for (var i = 0; i < run.rooms.length; i++)
+                if (run.rooms[i].t === 'puzzle') return i;
+            }
+            return -1;
+        """)
+        check("dungeon (%s): a descent finds a stuck robot" % row, at >= 0, str(at))
+        if at < 0:
+            continue
+        d.execute_script("var i = arguments[0];"
+                         "Save.update(function (p) { p.progress.dungeon.pos = i; });", at)
+        gold0 = d.execute_script("return Save.me().gold;")
+        d.get("file://" + os.path.join(ROOT, "robot/index.html?dungeon=1"))
+        time.sleep(1.2)
+        check("dungeon (%s): it opens the real workshop" % row, d.execute_script(
+            "return document.getElementById('work').classList.contains('show');"))
+        # a five-year-old must never be handed the mental-rotation packs
+        check("dungeon (%s): the puzzle comes from the hero's own row" % row,
+              d.execute_script("return TEST.state.pack.row;") == row,
+              d.execute_script("return TEST.state.pack.id;"))
+        d.execute_script("TEST.state.prog = JSON.parse(JSON.stringify(TEST.state.level.sol));"
+                         "TEST.renderStrip();")
+        steps = d.execute_script("return TEST.flatten(TEST.state.prog, []).length;")
+        click("#runBtn")
+        time.sleep(0.3 * steps + 2.0)
+        check("dungeon (%s): solving it says the room was cleared" % row,
+              d.execute_script("return sessionStorage.getItem('lg_dungeon_result');") == "won")
+        next_on()
+        d.execute_script("document.getElementById('nextBtn').click();")
+        time.sleep(1.6)
+        check("dungeon (%s): and it puts you back underground" % row,
+              "dungeon" in d.execute_script("return location.pathname;"),
+              d.execute_script("return location.pathname;"))
+        check("dungeon (%s): the room is finished with" % row, d.execute_script(
+            "var r = Save.dungeonRun(); return !!(r && r.rooms[r.pos].done);"))
+        check("dungeon (%s): and it paid for the trouble" % row,
+              d.execute_script("return Save.me().gold;") > gold0)
+
     # ---------------------------------------------------------------- dungeon
     print("\nThe dungeon")
     load("index.html")
@@ -582,7 +799,8 @@ try:
     print("\nThe menus open on your own row")
     ROWS = {"math/index.html": ("trackRow", "trackRow2"),
             "language/index.html": ("trackGrid", "trackGrid2"),
-            "story/index.html": ("miniRow", "questRow")}
+            "story/index.html": ("miniRow", "questRow"),
+            "robot/index.html": ("littleRow", "bigRow")}
     for row in ("little", "big"):
         d.get("file://" + os.path.join(ROOT, "index.html"))
         time.sleep(0.6)
@@ -645,7 +863,7 @@ try:
     load("index.html")
     d.execute_script("Save.reset(); Save.createProfile('Sam', 'S');")
     for page in ("index.html", "math/index.html", "language/index.html",
-                 "story/index.html", "dungeon/index.html"):
+                 "story/index.html", "dungeon/index.html", "robot/index.html"):
         load(page)
         box = d.execute_script("""
             var b = document.getElementById('muteBtn');

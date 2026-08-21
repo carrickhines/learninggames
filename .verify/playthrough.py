@@ -928,6 +928,101 @@ try:
     check("allies: a new run starts alone again",
           d.execute_script("return document.querySelectorAll('#allies .ally').length;") == 0)
 
+    print("\nA whole robot pack")
+
+    def next_ready():
+        """The Next button is held back while a reward banner is on screen, the
+        same way the next monster waits in the battle games. Waiting for it here
+        is not politeness -- clicking through would drop a fresh puzzle under a
+        banner, which is the bug this section exists to catch."""
+        for _ in range(40):
+            if d.execute_script(
+                    "return document.getElementById('nextBtn').style.visibility"
+                    " !== 'hidden';"):
+                return True
+            time.sleep(0.25)
+        return False
+
+    # Six levels end to end, played through the real interpreter, to prove the
+    # pack pays its card exactly once and that a banner never lands on top of a
+    # puzzle a child is still reading. The workshop flushes only on the solved
+    # panel and the end screens, which is the same rule the battle games follow
+    # -- and the only way to know it is honoured is to watch for it.
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Packer', 'P');"
+                     "Save.update(function (p) { p.row = 'little'; p.xp = 99; });")
+    load("robot/index.html")
+    d.execute_script("""
+        window.__overlap = 0; window.__seen = 0;
+        window.__watch = setInterval(function () {
+            if (!document.querySelector('.levelup')) return;
+            window.__seen++;
+            var live = document.getElementById('work').classList.contains('show') &&
+                       !document.getElementById('solved').classList.contains('show');
+            if (live && !TEST.state.running) window.__overlap++;
+        }, 60);
+    """)
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.6)
+    card_before = d.execute_script("return (Save.me().cards['r-scout'] || 0);")
+    held_forever = False
+
+    for _ in range(6):
+        steps = d.execute_script(
+            "TEST.state.prog = JSON.parse(JSON.stringify(TEST.state.level.sol));"
+            "TEST.renderStrip();"
+            "return TEST.flatten(TEST.state.prog, []).length;")
+        click("#runBtn")
+        time.sleep(0.3 * steps + 1.6)
+        if d.execute_script(
+                "return document.getElementById('solved').classList.contains('show');"):
+            if not next_ready():
+                held_forever = True
+            d.execute_script("document.getElementById('nextBtn').click();")
+            time.sleep(0.8)
+
+    res = d.execute_script(
+        "clearInterval(window.__watch);"
+        "return { overlap: window.__overlap, seen: window.__seen };")
+    check("robot: the pack was finished",
+          d.execute_script("return document.getElementById('win').classList.contains('show');"))
+    check("robot: every level is remembered", d.execute_script(
+        "return TEST.packById('steps').levels.every(function (l) {"
+        "  return !!Save.robotProgress().solved[l.id]; });"))
+    check("robot: the pack is marked done once", d.execute_script(
+        "return Save.robotProgress().packs.filter(function (x) {"
+        "  return x === 'steps'; }).length;") == 1)
+    check("robot: finishing the pack paid its card",
+          d.execute_script("return (Save.me().cards['r-scout'] || 0);") == card_before + 1)
+    check("robot: a banner did appear during the pack", res["seen"] > 0,
+          "never saw one, so the check proves nothing")
+    check("robot: no banner ever covered a live puzzle", res["overlap"] == 0,
+          "%d frames with a banner over the board" % res["overlap"])
+    check("robot: nothing is left waiting at the end",
+          d.execute_script("return Hud.pending();") == 0)
+    check("robot: the next level is never held back for good", not held_forever)
+
+    # Replaying a finished pack must not pay the card a second time.
+    d.execute_script("document.getElementById('winBackBtn').click();")
+    time.sleep(0.5)
+    d.execute_script("TEST.startPack('steps');")
+    time.sleep(0.5)
+    for _ in range(6):
+        steps = d.execute_script(
+            "TEST.state.prog = JSON.parse(JSON.stringify(TEST.state.level.sol));"
+            "TEST.renderStrip();"
+            "return TEST.flatten(TEST.state.prog, []).length;")
+        click("#runBtn")
+        time.sleep(0.3 * steps + 1.6)
+        if d.execute_script(
+                "return document.getElementById('solved').classList.contains('show');"):
+            next_ready()
+            d.execute_script("document.getElementById('nextBtn').click();")
+            time.sleep(0.8)
+    check("robot: replaying a finished pack pays no second card",
+          d.execute_script("return (Save.me().cards['r-scout'] || 0);") == card_before + 1,
+          str(d.execute_script("return (Save.me().cards['r-scout'] || 0);")))
+
     print("\nProgress survives")
     before = gold()
     load("index.html")

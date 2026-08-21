@@ -688,6 +688,11 @@
           <span class="sub">Read carefully — the story tells you what to do</span>
           <span class="who-for">16 quests + 2 games</span>
         </a>
+        <a class="game-card" href="robot/index.html">
+          <span class="emoji">🤖</span>Robot Workshop
+          <span class="sub">Write the plan, run it, find your own mistake</span>
+          <span class="who-for">8 packs</span>
+        </a>
       </div>
 
       <div class="btn-row" style="margin-top:22px">
@@ -1944,7 +1949,8 @@ $('cardsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
 /* ---------- The progress report ----------
    Written for a parent skimming it on a phone: the headline numbers, then
    where he's struggling, then what he actually got wrong. */
-const GAME_NAME = { math: 'Math RPG', language: 'Language RPG', story: 'Story Quest' };
+const GAME_NAME = { math: 'Math RPG', language: 'Language RPG',
+                    story: 'Story Quest', robot: 'Robot Workshop' };
 
 function renderParent() {
   const me = Save.me();

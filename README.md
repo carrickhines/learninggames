@@ -1,20 +1,27 @@
 # Learning Games
 
-Three browser games for two kids, sharing one hero.
+Four browser games and a dungeon, for two kids, sharing one hero.
 
 **▶ Play: https://carrickhines.github.io/learninggames/**
 
-- **🔢 Math RPG** — counting, adding, times tables, algebra, pattern-finding
+- **🔢 Math RPG** — counting, adding, times tables, fractions, algebra, pattern-finding
 - **🔤 Language RPG** — letters, spelling, grammar, word play
 - **📖 Story Quest** — reading comprehension as an adventure
+- **🤖 Robot Workshop** — write a plan, run it, find your own mistake
+- **⛏️ The Dungeon** — a floor that builds itself, walked in 2D, with no bottom
 
 Pick a hero on the hub — each one says which of the two kids they are, which
 sets their map trail and their daily challenge — and every game feeds the same
 character. There's a
-**map** — a 32-stop winding trail through seven regions that opens as you beat
-it, one trail for each kid, with boss fights that tell you what they fear. Right answers earn gold and XP; gold buys swords, armor, pets, trinkets,
+**map** — an 80-stop winding trail through sixteen regions that opens as you
+beat it, one trail for each kid, with boss fights that tell you what they fear.
+The **Robot Workshop** is the odd one out and deliberately so: no timer, no
+monsters, just a grid and a robot and a plan you write before anything moves —
+from four arrows in a row up to a command budget only a loop will fit. Right
+answers earn gold and XP; gold buys swords, armor, pets, trinkets, helms, boots,
 new worlds to fight in, and iPad game time, priced so the best gear takes
-months. Beaten monsters rarely drop a collectible card, sometimes shiny;
+months. Gear you can't buy at all drops underground, and the **Forge** pours
+gold into what you already own. Beaten monsters rarely drop a collectible card, sometimes shiny;
 spares trade at the Card Trader, and finishing a world's set is the only way
 to the top tier of each gear slot. Beaten monsters also sometimes **join you**
 for the rest of a run and fight at your side — more often if you already hold
