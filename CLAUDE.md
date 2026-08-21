@@ -342,6 +342,36 @@ dearest item is gold-only fails with `gold alone buys the best ['helm']`.
 **Keep the buffs mild.** Owning something that grows is the point; making the
 math easy is not.
 
+## Selling it back
+
+The shop was buy-only, so an outgrown sword sat in the rack forever as dead
+weight. `Save.sell()` gives back **half of what went in** — the price *and*
+anything poured into it at the forge, because a forged sword cost far more than
+its price tag and refunding only the tag would quietly punish the child who used
+the forge. The forge level goes with it, or selling and rebuying would launder a
+free upgrade.
+
+**Four things are never for sale**, each for its own reason:
+
+- **What you are wearing.** Sell the thing you are standing in and the next
+  battle starts worse, which is the one direction this game never goes. Take it
+  off first, deliberately.
+- **The free starter kit.** Worth nothing, and a five-year-old ending up with no
+  weapon at all is a bug wearing a feature's clothes.
+- **Worlds.** `unlockedWorlds` gates cards, map stops that say `needs:`, and set
+  perks. Selling one takes back content a hero may be standing on — nothing else
+  in the shop can do that.
+- **Gear found underground.** It cannot be bought back at any price, so selling
+  it would be the only irreversible button in the game.
+
+Everything else can be sold and bought again, which is what makes it safe to put
+in front of a child at all. **Selling always asks first** — it is the one shop
+button that takes something away — and the panel says the item can be bought
+again, because that is the fact that makes the answer easy.
+
+`save-test.html` holds all of it, including that a buy-and-sell round trip can
+never make money.
+
 ## Gear you cannot buy, and the Forge
 
 `FOUND` holds gear that only ever drops in the dungeon. Same shape as a `SHOP`
@@ -776,6 +806,20 @@ mechanic. Don't add one.
 Little hero gets rungs 1–2, big hero 3–5. Mental rotation — "left" meaning the
 *robot's* left — is the whole ladder, and it is worth its own rung.
 
+**The relative commands are 👣 ↺ ↻, and the first attempt got all three wrong.**
+They were 🔼 ↩️ ↪️ — and ↩️/↪️ are the *undo and redo* arrows, which every child
+who has used a tablet has been taught mean "go back". 🔼 was worse: it reads as
+"up", which is exactly the idea relative mode exists to unlearn, since forward
+is wherever the robot is pointing and not north. Footprints for a step, and the
+two open circle arrows for a turn, which are rotation and nothing else. The
+relative palette also carries **words** — rungs 3-5 are big-hero only and he
+reads confidently — while the absolute palette stays wordless, because its
+player is five.
+
+The robot's **facing chevron** is sized to be seen for the same reason:
+"forward" and "left" mean nothing until you can tell at a glance which way the
+robot is looking.
+
 **Everything is tapping.** A palette button appends a command; tapping a command
 in the strip takes it out. Drag-and-drop is fiddly on an iPad and hopeless at
 five. A 🔁 block is opened by tapping it (new commands drop inside, shown by a
@@ -948,6 +992,28 @@ yet; the Forge is a hub screen. Adding a type means the generator, the `ART`
 table in `dungeon/index.html`, and a branch in `renderCard()` — and the
 save-test's list of known types, which is what stops a typo becoming an
 invisible blank room.
+
+**A floor is furnished, not hollow.** It used to be dealt fights, one chest
+allowance, a shrine and a puzzle, and everything left over was `empty` — a room
+with literally nothing in it. On a big hero's **first** floor that was *nine of
+twenty-five*, and the shallow floors, the ones actually walked, were the
+emptiest of the lot. Everything spare is now a **`curio`**: something to look at
+that is neither a fight nor a chest. About two in five hold a few coins; the
+rest are just the underground being somewhere.
+
+They are deliberately **not another purse**. A descent already pays more per
+half hour than anything else on the site, so the answer to an empty room is
+something worth walking over to see, not more gold — `content.py` holds a curio
+to small change beside a chest. The fights and chests were left exactly as they
+were, so this change does one thing only. `save-test.html` fails if any floor
+anywhere has an `empty` room again.
+
+**A room's result survives the redraw.** `render()` ends by calling
+`renderCard()`, so a chest that set `card.innerHTML` to *"💰 45 gold"* had it
+replaced by *"Nothing left here"* on the very next frame — the reward for
+opening the chest was on screen for about a sixteenth of a second. `roomResult`
+holds what just happened until you leave the room, which fixes the shipped
+treasure room as well as the new curios.
 
 **A `puzzle` room is a stuck robot**, and it opens the real Robot Workshop the
 same way a monster room opens the real battle game — one level, the hero's own
@@ -1128,7 +1194,7 @@ geckodriver), then:
 | Script | Run it when | ~ |
 |---|---|---|
 | `smoke.py` | after any change | 1 min |
-| `run-save-test.py` | after touching `save.js` / `log.js` (611 + 65 assertions) | 10 s |
+| `run-save-test.py` | after touching `save.js` / `log.js` (629 + 65 assertions) | 10 s |
 | `tracks.py` | after touching a question generator | 1 min |
 | `content.py` | after touching content, prices, card odds, or the hub's claims | 30 s |
 | `playthrough.py` | before shipping | 3 min |
@@ -1182,6 +1248,11 @@ thing first and watching the message name the fault:
   back without one.
 - **The workshop can never out-earn battling**, checked against the real payout
   table in a half hour modelled in minutes.
+- **No dungeon floor has an empty room on it**, across all 9,600 generated —
+  which is what would notice a later tuning pass taking the furniture back out.
+- **Selling can never make money.** Buy, sell, buy again and you are down; the
+  worn item, the starter kit, a world and found gear all refuse; and a forged
+  item is worth its forging but does not carry the forging back.
 
 **Two timing flakes were seen and not explained.** `run-save-test.py` once
 reported *4 FAILED* and has not repeated it in twenty-plus runs; the runner
@@ -1388,6 +1459,24 @@ playthrough / upgrade.
   so their boss chests paid out cards the kids had held for weeks.
 - `foesFor()` ignored the map entirely: every stop fought whatever world you
   had last bought, which made the map's places cosmetic.
+
+**Round 6.1 — three things the kids' first contact with it turned up.** All
+asked for in one breath: *"We need to make reselling items an option. We need to
+make the dungeon more robust. Most rooms are completely empty. The icons that
+change direction in the robot game are really confusing."*
+
+- **Selling**, at half of what went in, with four things never for sale and a
+  confirmation on every sale. See "Selling it back".
+- **The empty rooms**, which were real and measured: nine of twenty-five on a
+  big hero's *first* floor. Everything spare is a curio now and no floor
+  anywhere has an `empty` room. Fights and chests untouched, so the change does
+  one thing only.
+- **The turn icons**, which were ↩️/↪️ — the undo and redo arrows. Now ↺/↻ with
+  words.
+
+And one bug found on the way, older than any of it: a chest's *"💰 45 gold"*
+line was wiped by the next redraw, so the reward for opening it was visible for
+about a frame. Fixed for the treasure rooms as well as the new curios.
 
 **Outstanding, in rough priority order:**
 

@@ -57,12 +57,15 @@
     pointer-events: none;
   }
   #bot .nose {
-    position: absolute; font-size: 15px; color: var(--accent);
-    text-shadow: 0 0 5px rgba(0,0,0,.8);
+    position: absolute; font-size: 17px; color: var(--accent);
+    text-shadow: 0 0 6px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,1);
     transition: transform .18s ease;
-    /* the chevron sits above the robot and swings round it, which is the only
-       readable way to show facing: a rotated 🤖 just looks broken */
-    transform: rotate(0deg) translateY(-15px);
+    /* The chevron sits ahead of the robot and swings round it, which is the
+       only readable way to show facing — a rotated 🤖 just looks broken. It
+       started at 15px and was easy to miss, which matters more here than
+       anywhere: "forward" and "left" mean nothing until you can see at a
+       glance which way the robot is looking. */
+    transform: rotate(0deg) translateY(-20px);
   }
   #board.shake { animation: shake .38s; }
   @keyframes shake {
@@ -126,6 +129,21 @@
     box-shadow: 0 3px 0 rgba(0,0,0,.42);
     color: #fff; cursor: pointer;
   }
+  /* A worded button says what it does underneath the glyph. Only the relative
+     commands get one — the absolute palette's player cannot read yet. */
+  .pal-btn.worded {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 7px 11px 6px; min-width: 74px;
+  }
+  .pal-btn .w {
+    font-family: var(--display); font-size: 12px; letter-spacing: .3px;
+    opacity: .92;
+  }
+  /* The turn glyphs are text, not emoji, so they take the accent colour and
+     can be drawn big enough to read as a rotation at a glance. */
+  .pal-btn[data-cmd="turnL"] .g, .pal-btn[data-cmd="turnR"] .g,
+  .tok.turn { color: var(--accent); font-weight: bold; }
+  .pal-btn[data-cmd="turnL"] .g, .pal-btn[data-cmd="turnR"] .g { font-size: 30px; }
   .pal-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.42); }
   .pal-btn:disabled { opacity: .38; }
   .pal-btn[data-cmd="rep"] {
@@ -543,12 +561,24 @@
   var ORDER = ['N', 'E', 'S', 'W'];
   var TURN = { N: 0, E: 90, S: 180, W: 270 };
 
+  /* The relative commands used to be 🔼 ↩️ ↪️, and all three were wrong.
+     ↩️ and ↪️ are the undo and redo arrows — every child who has used a tablet
+     has been taught they mean "go back", not "turn". And 🔼 reads as "up",
+     which is exactly the idea the relative mode exists to unlearn: forward is
+     wherever the robot happens to be pointing, not north.
+
+     So: footprints for a step, and the two open circle arrows for a turn,
+     which are rotation and nothing else. The relative palette also carries
+     words, because rungs 3-5 are big-hero only and he reads confidently. The
+     absolute palette stays wordless — its player is five. */
   var PAL = {
     abs: [['up', '⬆️'], ['left', '⬅️'], ['right', '➡️'], ['down', '⬇️']],
-    rel: [['fwd', '🔼'], ['turnL', '↩️'], ['turnR', '↪️']]
+    rel: [['fwd', '👣', 'Forward'],
+          ['turnL', '↺', 'Turn left'],
+          ['turnR', '↻', 'Turn right']]
   };
   var GLYPH = { up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️',
-                fwd: '🔼', turnL: '↩️', turnR: '↪️' };
+                fwd: '👣', turnL: '↺', turnR: '↻' };
   var ABS_DIR = { up: 'N', down: 'S', left: 'W', right: 'E' };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -822,7 +852,7 @@
     b.style.left = (state.x * 100 / m.w) + '%';
     b.style.top = (state.y * 100 / m.h) + '%';
     b.querySelector('.nose').style.transform =
-      'rotate(' + TURN[state.face] + 'deg) translateY(-17px)';
+      'rotate(' + TURN[state.face] + 'deg) translateY(-20px)';
   }
 
   function renderGems() {
@@ -861,17 +891,18 @@
     pal.innerHTML = '';
     PAL[state.pack.mode].forEach(function (pair) {
       var b = document.createElement('button');
-      b.className = 'pal-btn';
+      b.className = 'pal-btn' + (pair[2] ? ' worded' : '');
       b.dataset.cmd = pair[0];
-      b.textContent = pair[1];
+      b.innerHTML = '<span class="g">' + pair[1] + '</span>' +
+                    (pair[2] ? '<span class="w">' + pair[2] + '</span>' : '');
       b.addEventListener('click', function () { addToken(pair[0]); });
       pal.appendChild(b);
     });
     if (state.pack.rung >= 4) {
       var r = document.createElement('button');
-      r.className = 'pal-btn';
+      r.className = 'pal-btn worded';
       r.dataset.cmd = 'rep';
-      r.textContent = '🔁';
+      r.innerHTML = '<span class="g">🔁</span><span class="w">Repeat</span>';
       r.addEventListener('click', addRepeat);
       pal.appendChild(r);
     }
@@ -923,7 +954,7 @@
 
   function chip(tok, path) {
     var b = document.createElement('button');
-    b.className = 'tok';
+    b.className = 'tok' + (tok === 'turnL' || tok === 'turnR' ? ' turn' : '');
     b.textContent = GLYPH[tok];
     b.dataset.path = path.join('.');
     b.addEventListener('click', function (e) {

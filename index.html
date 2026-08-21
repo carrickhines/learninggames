@@ -73,6 +73,35 @@
   }
 
   /* ---------- Game cards ---------- */
+  /* The sell chip rides on an owned item's card. Small, off to one side, and
+     never where a thumb reaching for "wear it" lands. */
+  .sell-chip {
+    display: inline-block; margin-top: 7px;
+    font-family: var(--display); font-size: 13px; letter-spacing: .2px;
+    padding: 4px 10px; border-radius: 999px;
+    background: rgba(255,210,63,.16);
+    box-shadow: inset 0 0 0 1.5px rgba(255,210,63,.5);
+    color: var(--accent); cursor: pointer;
+  }
+  .sell-chip:active { transform: translateY(1px); }
+  /* This panel reuses the chest card, which is a gold slab with dark text on
+     it — so gold-on-gold for the price and white for the note both vanished.
+     Ink, at two weights. Screenshot, not an assertion: nothing in the suite
+     can see low contrast. */
+  .sell-what { font-family: var(--display); font-size: 21px; color: var(--ink);
+               margin-top: 4px; }
+  .sell-price { font-family: var(--display); font-size: 32px; font-weight: bold;
+                color: var(--ink); margin: 6px 0 2px; }
+  .sell-note { font-size: 15px; color: rgba(27,18,48,.78); max-width: 300px;
+               margin: 0 auto; line-height: 1.35; }
+  /* The ghost button is white-on-dark everywhere else; on this gold slab it
+     needs to be ink-on-gold or "Keep it" is the harder of the two to read —
+     which is the wrong way round for the button that changes nothing. */
+  #sellBox .ghost-btn {
+    color: var(--ink); background: rgba(27,18,48,.07);
+    box-shadow: inset 0 0 0 2px rgba(27,18,48,.32);
+  }
+
   .games { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
   .game-card {
     background: var(--panel);
@@ -861,7 +890,7 @@
       <h1>Shop</h1>
       <div class="purse-big" id="shopGold">🪙 0</div>
       <div class="subtitle">Spend what you've earned. Tap something you already
-        own to wear it.</div>
+        own to wear it — or sell it back for half.</div>
 
       <div id="shopRacks"></div>
 
@@ -872,6 +901,21 @@
       </div>
     </div>
   </section>
+
+  <!-- Selling asks first: it is the one shop button that takes something away. -->
+  <div id="sellBox" class="chest-overlay hidden">
+    <div class="chest-card">
+      <div class="chest-lid">💰</div>
+      <div class="chest-title">Sell it back?</div>
+      <div class="sell-what" id="sellWhat"></div>
+      <div class="sell-price" id="sellPrice">🪙 0</div>
+      <div class="sell-note" id="sellNote"></div>
+      <div class="btn-row" style="margin-top:16px">
+        <button id="sellYes">Sell it</button>
+        <button id="sellNo" class="ghost-btn">Keep it</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ================= SETTINGS ================= -->
   <section class="screen scrolls" id="settings">
@@ -1218,8 +1262,71 @@ function shopCard(it, me) {
     `<span class="price"></span>`;
   b.querySelector('.price').textContent = price;
 
+  // Anything owned and not being worn can go back to the shop for half of
+  // what went into it. Its own little button, not the card's tap: the card
+  // already means "wear this", and a child reaching for that must never sell
+  // by accident.
+  if (Save.canSell(it.id)) {
+    const sellBtn = document.createElement('span');
+    sellBtn.className = 'sell-chip';
+    sellBtn.textContent = `💰 Sell 🪙 ${Save.sellPrice(it.id)}`;
+    sellBtn.addEventListener('click', (e) => {
+      e.stopPropagation();          // not a tap on the card
+      Sound.click();
+      askSell(it);
+    });
+    b.appendChild(sellBtn);
+  }
+
   b.addEventListener('click', () => onShopTap(it, owned, worn));
   return b;
+}
+
+/* Selling is the only button in the shop that takes something away, so it
+   asks first. Everything it sells can be bought again, and the panel says so
+   — that is what makes it a safe thing to put in front of a five-year-old. */
+let sellPending = null;
+function askSell(it) {
+  sellPending = it;
+  const paid = Save.sellPrice(it.id);
+  const forged = Save.forgeSpent(it.id);
+  $('sellWhat').textContent = `${it.emoji} ${it.name}`;
+  $('sellPrice').textContent = `🪙 ${paid}`;
+  $('sellNote').textContent = forged
+    ? `That is half of the ${it.cost} you paid plus the ${forged} you forged ` +
+      `into it — and the forging goes with it. You can buy it again later.`
+    : `That is half of the ${it.cost} you paid. You can buy it again later.`;
+  $('sellBox').classList.remove('hidden');
+}
+
+function closeSell() {
+  sellPending = null;
+  $('sellBox').classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', wireSell);
+if (document.readyState !== 'loading') wireSell();
+function wireSell() {
+  const yes = $('sellYes'), no = $('sellNo');
+  if (!yes || yes.dataset.wired) return;
+  yes.dataset.wired = '1';
+  yes.addEventListener('click', () => {
+    const it = sellPending;
+    if (!it) return closeSell();
+    const paid = Save.sellPrice(it.id);
+    const result = Save.sell(it.id);
+    closeSell();
+    if (result === 'ok') {
+      Sound.coin();
+      shopFlash(`Sold ${it.name} for ${paid} gold.`);
+    } else {
+      Sound.denied();
+      shopFlash("That one isn't for sale.");
+    }
+    renderShop();
+    Hud.render();
+  });
+  no.addEventListener('click', () => { Sound.click(); closeSell(); });
 }
 
 function onShopTap(it, owned, worn) {

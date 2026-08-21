@@ -135,6 +135,16 @@ var Save = (function () {
       shrineChance: 0.55,           // a floor usually, not always, has one
       treasureGold: 45,             // per treasure room, multiplied by floor
       treasureCard: 0.18,           // and its chance of a card
+      /* What is left over after the fights, the chest and the shrine used to
+         be nothing at all: on a big hero's first floor, NINE of twenty-five
+         rooms held literally nothing, and the shallow floors — the ones they
+         actually walk — were the emptiest of the lot. Now the remainder is
+         dealt as curios: something to find that is not a fight and not a
+         chest. Most pay nothing, because the answer to an empty room is
+         something to look at, not another purse — a descent already pays more
+         per half hour than anything else on the site. */
+      curioCoinChance: 0.4,         // how many curios hold a few coins
+      curioCoins: 0.25,             // ...worth this much of a treasure room
       eliteCard: 0.60,              // an elite is the reliable card
       blessings: 3,                 // how many are offered at a shrine
       /* A floor usually holds one room that has to be thought at rather than
@@ -1623,6 +1633,13 @@ var Save = (function () {
     for (var r = 0; r < treasure && at < free.length; r++, at++) {
       rooms[free[at]] = { t: 'treasure', done: false };
     }
+    /* And everything still spare becomes a curio, so a floor is furnished
+       rather than mostly hollow. A room with a thing in it is a reason to
+       walk over there; a room with nothing in it is a corridor pretending
+       to be a room. */
+    for (; at < free.length; at++) {
+      rooms[free[at]] = { t: 'curio', done: false };
+    }
     return rooms;
   }
 
@@ -1766,6 +1783,69 @@ var Save = (function () {
       Math.round(opts.length * Math.min(1, (run.floor + 2) / 14))));
     var pick = opts[Math.floor(rng() * reach)] || opts[0];
     return { g: pick.g, t: pick.t, m: pick.m, label: pick.label };
+  }
+
+  /* What is in a curio room.
+
+     Deliberately mostly flavour. The complaint that made these exist was that
+     most rooms were empty, and the honest answer to an empty room is something
+     worth walking over to look at — not another chest. About two in five hold
+     a few coins; the rest are just the underground being somewhere rather than
+     a grid of nothing. */
+  var CURIOS = [
+    { emoji: '🍄', title: 'A ring of mushrooms',
+      line: 'They lean away from you, very slightly, all together.' },
+    { emoji: '🦴', title: 'Old bones',
+      line: 'Something big. Something a long time ago. Not today, anyway.' },
+    { emoji: '🕯️', title: 'A candle, still lit',
+      line: 'Somebody was here. The wax has barely run.' },
+    { emoji: '🕸️', title: 'A great web',
+      line: 'Empty. The hole in the middle is bigger than your head.' },
+    { emoji: '💧', title: 'A dripping ceiling',
+      line: 'Drip. Drip. Drip. It is almost a tune.' },
+    { emoji: '🪨', title: 'A carved stone',
+      line: 'Someone scratched a little map here. It is wrong now.' },
+    { emoji: '🐀', title: 'A rat',
+      line: 'It looks at you. You look at it. It leaves first.' },
+    { emoji: '🌱', title: 'A shoot',
+      line: 'Growing down here, with no sun at all. Stubborn thing.' },
+    { emoji: '🪞', title: 'A cracked mirror',
+      line: 'You wave. It waves back a moment late, which you decide to ignore.' },
+    { emoji: '📜', title: 'A torn note',
+      line: '"...and whatever you do, do not..." The rest is gone.' },
+    { emoji: '🔔', title: 'A small bell',
+      line: 'You ring it. Somewhere a long way off, something answers.' },
+    { emoji: '🥾', title: 'One boot',
+      line: 'Just the one. You decide not to wonder about the other.' }
+  ];
+
+  /* The curio in this room, or null if there isn't one. Seeded, so walking
+     back into a room shows the same thing it showed a minute ago. */
+  function dungeonCurio() {
+    var run = dungeonRun();
+    if (!run) return null;
+    var room = run.rooms[run.pos];
+    if (!room || room.t !== 'curio') return null;
+    var D = ECONOMY.dungeon;
+    var rng = rngFrom((run.seed >>> 0) ^ Math.imul(run.floor, 22111) ^ (run.pos * 41));
+    var pick = CURIOS[Math.floor(rng() * CURIOS.length)];
+    var coins = rng() < D.curioCoinChance
+      ? Math.max(1, Math.round(D.treasureGold * run.floor * D.curioCoins)) : 0;
+    return { emoji: pick.emoji, title: pick.title, line: pick.line,
+             coins: coins, done: !!room.done };
+  }
+
+  /* Look at it. Banks the coins if there were any, and marks the room seen. */
+  function dungeonCurioTake() {
+    var run = dungeonRun();
+    var c = dungeonCurio();
+    if (!run || !c || c.done) return null;
+    var paid = c.coins ? award(c.coins, Math.round(c.coins / 4))
+                       : { gold: 0, xp: 0, leveledTo: null };
+    run.gold += paid.gold;
+    run.rooms[run.pos].done = true;
+    write();
+    return { gold: paid.gold, leveledTo: paid.leveledTo };
   }
 
   /* The puzzle waiting in this room, or null if there isn't one.
@@ -2541,6 +2621,80 @@ var Save = (function () {
     return 'ok';
   }
 
+  /* ---------- Selling it back ---------------------------------------------
+
+     The shop was buy-only, so an outgrown sword sat in the rack forever as
+     dead weight. You get half of what you put in — the item AND anything
+     poured into it at the forge, because a forged sword cost more than its
+     price tag and refunding only the tag would quietly punish the child who
+     used the forge.
+
+     Four things are never for sale, each for its own reason:
+       - what you are wearing: sell the thing you are standing in and the
+         next battle starts worse, which is the one direction this game never
+         goes. Take it off first, deliberately.
+       - the free starter kit: worth nothing, and a five-year-old ending up
+         with no weapon at all is a bug wearing a feature's clothes.
+       - worlds: `unlockedWorlds` gates cards, map stops that say `needs:`,
+         and set perks. Selling one takes back content a hero may be standing
+         on. Nothing else in the shop can do that.
+       - gear found underground: it cannot be bought back at any price, so
+         selling it is the only irreversible button in the game.
+
+     Everything else can be sold and bought again, which is what makes it a
+     safe thing to put in front of a child at all. */
+  var SELL_RATE = 0.5;
+
+  /* What the forge has actually swallowed on this item so far. forgeCost()
+     only knows the NEXT rung, so the total has to be walked. */
+  function forgeSpent(id, p) {
+    var lvl = forgeLevel(id, p);
+    if (!lvl) return 0;
+    var it = item(id);
+    var base = Math.max(400, Math.round((it && it.cost ? it.cost : 3000) * 0.22));
+    var total = 0;
+    for (var l = 0; l < lvl; l++) total += Math.round(base * Math.pow(2.1, l));
+    return total;
+  }
+
+  /* Why this can't be sold, or '' if it can. */
+  function sellBlock(id) {
+    var p = me();
+    var it = item(id);
+    if (!p || !it) return 'nosuch';
+    if (foundItem(id)) return 'found';
+    if (!owns(id)) return 'notowned';
+    if (it.kind === 'world') return 'world';
+    if (it.kind === 'token') return 'token';
+    if (!it.cost) return 'starter';
+    if (p.inventory[it.kind] === id) return 'worn';
+    return '';
+  }
+
+  function canSell(id) { return sellBlock(id) === ''; }
+
+  /* What it would fetch. Returns 0 for anything that isn't for sale, so a
+     caller that forgets to check can't offer a price for the unsellable. */
+  function sellPrice(id) {
+    if (!canSell(id)) return 0;
+    var it = item(id);
+    return Math.max(1, Math.round((it.cost + forgeSpent(id)) * SELL_RATE));
+  }
+
+  function sell(id) {
+    var block = sellBlock(id);
+    if (block) return block;
+    var paid = sellPrice(id);
+    update(function (p) {
+      var at = p.inventory.owned.indexOf(id);
+      if (at !== -1) p.inventory.owned.splice(at, 1);
+      // the forge level goes with it; its gold is already in the refund
+      if (p.inventory.forge) delete p.inventory.forge[id];
+      p.gold += paid;
+    });
+    return 'ok';
+  }
+
   var SLOTS = ['weapon', 'armor', 'pet', 'trinket', 'helm', 'boots'];
 
   function equip(id) {
@@ -3109,7 +3263,15 @@ var Save = (function () {
     hasSet: hasSet,
     setsHeld: setsHeld,
     setContext: setContext,
+    sell: sell,
+    sellPrice: sellPrice,
+    canSell: canSell,
+    sellBlock: sellBlock,
+    forgeSpent: forgeSpent,
+    sellRate: SELL_RATE,
     dungeonPuzzle: dungeonPuzzle,
+    dungeonCurio: dungeonCurio,
+    dungeonCurioTake: dungeonCurioTake,
     ROBOT_CARDS: ROBOT_CARDS,
     robotProgress: robotProgress,
     robotSolve: robotSolve,

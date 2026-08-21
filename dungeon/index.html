@@ -214,6 +214,7 @@
     treasure: ['💰', 'treasure'],
     shrine:   ['✨', 'a shrine'],
     puzzle:   ['🤖', 'a stuck robot'],
+    curio:    ['👁️', 'something to see'],
     empty:    ['', '']
   };
 
@@ -339,6 +340,7 @@
   function enterRoom(to, from) {
     const run = Save.dungeonRun();
     const side = Save.dungeonSide(run.row);
+    roomResult = null;          // what happened back there stays back there
     const d = to - from;
     if (d === -side) { me.y = 88; me.x = 50; }
     else if (d === side) { me.y = 16; me.x = 50; }
@@ -400,6 +402,20 @@
     renderCard();
   }
 
+  /* What just happened in this room, held until you leave it.
+
+     Opening a chest used to set card.innerHTML to "💰 45 gold" and then call
+     render(), which ends by calling renderCard(), which immediately replaced it
+     with "Nothing left here". The reward for opening the chest was on screen
+     for one frame. Keeping the line here instead means it survives every
+     redraw until you walk out — and the curio rooms need exactly the same
+     thing, which is what made it worth fixing rather than working around. */
+  let roomResult = null;
+  function showResult(html) {
+    const run = Save.dungeonRun();
+    roomResult = run ? { pos: run.pos, html: html } : null;
+  }
+
   /* ---------- what you can do where you stand ---------- */
   function renderCard() {
     const run = Save.dungeonRun();
@@ -423,6 +439,16 @@
       return;
     }
 
+    if (roomResult && roomResult.pos === run.pos) {
+      card.innerHTML = roomResult.html;
+      const out = document.createElement('button');
+      out.className = 'btn ghost';
+      out.textContent = '🚪 Climb out';
+      out.onclick = () => finish('left');
+      card.appendChild(out);
+      return;
+    }
+
     if (near !== 'prop' || room.done) {
       card.innerHTML = room.done && room.t !== 'stairs'
         ? '<h3>Nothing left here</h3><p>Try another door.</p>'
@@ -443,7 +469,7 @@
       b.onclick = () => {
         const got = Save.dungeonLoot('treasure');
         Sound.coin();
-        card.innerHTML = `<h3>💰 ${got ? got.gold : 0} gold</h3><p>${lootLine(got)}</p>`;
+        showResult(`<h3>💰 ${got ? got.gold : 0} gold</h3><p>${lootLine(got)}</p>`);
         if (got && got.card) Hud.cardDrop(got.card);
         if (got && got.gear && got.gear.better) Hero.draw($('walker'));
         Hud.render();
@@ -452,6 +478,38 @@
       };
       card.appendChild(b);
       return;
+    }
+
+    /* Something to look at. Most of these pay nothing, and that is the point:
+       they exist because a floor of empty rooms is a grid pretending to be a
+       place. The reward for walking over is finding out what it is. */
+    if (room.t === 'curio') {
+      const c = Save.dungeonCurio();
+      if (c) {
+        card.innerHTML = `<h3>${c.emoji} ${c.title}</h3><p>${c.line}</p>`;
+        if (!c.done) {
+          const b = document.createElement('button');
+          b.className = 'btn';
+          b.textContent = 'Have a look';
+          b.onclick = () => {
+            const got = Save.dungeonCurioTake();
+            if (got && got.gold) {
+              Sound.coin();
+              showResult(`<h3>${c.emoji} ${c.title}</h3>` +
+                `<p>${c.line}</p><p>🪙 <b>${got.gold}</b> tucked underneath it.</p>`);
+            } else {
+              Sound.tap();
+              showResult(`<h3>${c.emoji} ${c.title}</h3>` +
+                `<p>${c.line}</p><p>Nothing to take. Worth the walk anyway.</p>`);
+            }
+            Hud.render();
+            render();
+            Hud.flush();
+          };
+          card.appendChild(b);
+        }
+        return;
+      }
     }
 
     /* A room that has to be thought at rather than fought. It opens the real

@@ -280,6 +280,80 @@ try:
           "expected %d" % (1000 - vest))
     check("shop: no JS errors", errs() == [], str(errs()))
 
+    # ---- selling it back ----
+    # The shop was buy-only, so an outgrown sword sat in the rack as dead
+    # weight. What matters in the UI is that the sell chip is its OWN button:
+    # tapping the card means "wear this", and a child reaching for that must
+    # never sell by accident.
+    d.execute_script("Save.award(20000, 0); Save.buy('sword'); Save.buy('axe');"
+                     "renderShop();")
+    time.sleep(0.3)
+    chips = d.execute_script(
+        "return Array.prototype.map.call(document.querySelectorAll('.sell-chip'),"
+        "function (c) { return c.parentNode.textContent; });")
+    check("shop: an outgrown weapon offers to be sold",
+          any("Sharp Sword" in c for c in chips), str(chips))
+    check("shop: the weapon being worn does not",
+          not any("Battle Axe" in c for c in chips), str(chips))
+    check("shop: nor does the free starter kit",
+          not any("Wooden Stick" in c for c in chips), str(chips))
+
+    # tapping the card still means "wear it", not "sell it"
+    gold_before = d.execute_script("return Save.me().gold;")
+    d.execute_script("""
+        var els = document.querySelectorAll('.shop-item');
+        for (var i = 0; i < els.length; i++)
+            if (els[i].textContent.indexOf('Sharp Sword') >= 0) { els[i].click(); return; }
+    """)
+    time.sleep(0.4)
+    check("shop: tapping the card wears it rather than selling it",
+          d.execute_script("return Save.me().inventory.weapon;") == "sword" and
+          d.execute_script("return Save.me().gold;") == gold_before)
+
+    # now sell the one that is spare (the axe, now that the sword is worn)
+    d.execute_script("renderShop();")
+    time.sleep(0.3)
+    d.execute_script("""
+        var els = document.querySelectorAll('.shop-item');
+        for (var i = 0; i < els.length; i++) {
+            var c = els[i].querySelector('.sell-chip');
+            if (c && els[i].textContent.indexOf('Battle Axe') >= 0) { c.click(); return; }
+        }
+    """)
+    time.sleep(0.4)
+    check("shop: selling asks first", d.execute_script(
+        "return !document.getElementById('sellBox').classList.contains('hidden');"))
+    gold_before = d.execute_script("return Save.me().gold;")
+    price = d.execute_script("return Save.sellPrice('axe');")
+    # backing out must cost nothing at all
+    click("#sellNo")
+    time.sleep(0.3)
+    check("shop: keeping it changes nothing",
+          d.execute_script("return Save.owns('axe');") and
+          d.execute_script("return Save.me().gold;") == gold_before)
+
+    d.execute_script("""
+        var els = document.querySelectorAll('.shop-item');
+        for (var i = 0; i < els.length; i++) {
+            var c = els[i].querySelector('.sell-chip');
+            if (c && els[i].textContent.indexOf('Battle Axe') >= 0) { c.click(); return; }
+        }
+    """)
+    time.sleep(0.3)
+    click("#sellYes")
+    time.sleep(0.4)
+    check("shop: selling pays out",
+          d.execute_script("return Save.me().gold;") == gold_before + price,
+          "%d vs %d" % (d.execute_script("return Save.me().gold;"), gold_before + price))
+    check("shop: and the item is gone", not d.execute_script("return Save.owns('axe');"))
+    check("shop: the rack redraws without it", d.execute_script(
+        "var els = document.querySelectorAll('.shop-item');"
+        "for (var i = 0; i < els.length; i++)"
+        "  if (els[i].textContent.indexOf('Battle Axe') >= 0)"
+        "    return !els[i].querySelector('.sell-chip');"
+        "return false;"))
+    check("shop: selling left no JS errors", errs() == [], str(errs()))
+
     print("\nCollection")
     click("#shopBackBtn")
     click("#cardsBtn")
@@ -789,6 +863,62 @@ try:
     check("dungeon: an unbeaten monster bars the doorways", d.execute_script(
         "return document.querySelectorAll('.door.shut').length > 0"
         "    && document.querySelectorAll('.door:not(.shut)').length === 0;"))
+    # ---- the rooms that used to be nothing ----
+    # A big hero's first floor held NINE rooms with literally nothing in them,
+    # out of twenty-five, and the shallow floors -- the ones actually walked --
+    # were the emptiest. Everything spare is a curio now.
+    hollow = d.execute_script("""
+        var worst = 0;
+        ['little', 'big'].forEach(function (row) {
+          for (var seed = 1; seed <= 60; seed++) {
+            for (var fl = 1; fl <= 4; fl++) {
+              var n = 0;
+              Save.dungeonFloor(seed * 131, fl, row).forEach(function (r) {
+                if (r.t === 'empty') n++;
+              });
+              if (n > worst) worst = n;
+            }
+          }
+        });
+        return worst;
+    """)
+    check("dungeon: no room on any floor is simply empty", hollow == 0,
+          "%d empty rooms on the worst floor" % hollow)
+
+    # and a curio has to actually show something when you walk to it
+    d.execute_script("Save.dungeonStart();")
+    at = d.execute_script(
+        "for (var t = 0; t < 40; t++) {"
+        "  Save.dungeonStart();"
+        "  var r = Save.dungeonRun();"
+        "  for (var i = 0; i < r.rooms.length; i++)"
+        "    if (r.rooms[i].t === 'curio') return i;"
+        "}"
+        "return -1;")
+    check("dungeon: a floor holds something to look at", at >= 0, str(at))
+    if at >= 0:
+        d.execute_script("var i = arguments[0];"
+                         "Save.update(function (p) { p.progress.dungeon.pos = i; });", at)
+        curio = d.execute_script("return Save.dungeonCurio();")
+        check("dungeon: the curio has something to say",
+              bool(curio and curio["title"] and curio["line"]), str(curio))
+        seen = d.execute_script("return Save.dungeonCurio();")
+        check("dungeon: and it is the same one when you walk back in",
+              seen and seen["title"] == curio["title"],
+              "%s vs %s" % (seen and seen["title"], curio["title"]))
+        g0 = d.execute_script("return Save.me().gold;")
+        took = d.execute_script("return Save.dungeonCurioTake();")
+        check("dungeon: looking at it marks the room seen", d.execute_script(
+            "var r = Save.dungeonRun(); return !!r.rooms[r.pos].done;"))
+        # most of these pay nothing, and that is the point: the answer to an
+        # empty room is something to look at, not another purse
+        check("dungeon: a curio never pays more than a chest",
+              d.execute_script("return Save.me().gold;") - g0 <=
+              d.execute_script("return Save.ECONOMY.dungeon.treasureGold;"),
+              str(d.execute_script("return Save.me().gold;") - g0))
+        check("dungeon: looking twice pays nothing more",
+              d.execute_script("return Save.dungeonCurioTake();") is None)
+
     check("dungeon: no JS errors", errs() == [], str(errs()))
 
     # --------------------------------------------------- the menus open tidy

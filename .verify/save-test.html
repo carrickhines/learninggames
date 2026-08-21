@@ -1590,17 +1590,87 @@ try {
      it. The only honest way to check generated content is to generate a great
      deal of it and assert the things that must hold every single time. */
 
+  /* ---- selling it back --------------------------------------------------
+     The shop was buy-only, so an outgrown sword sat in the rack forever. Half
+     of what went in comes back, and four things are never for sale. Each of
+     those four is here because letting it go would take something away that
+     could not be bought again. */
+  (function () {
+    fresh();
+    Save.update(function (p) { p.gold = 20000; });
+    Save.buy('sword');
+    ok('sell: you cannot sell the thing you are wearing',
+       Save.sellBlock('sword') === 'worn', Save.sellBlock('sword'));
+    Save.buy('axe');                       // buying equips, so the sword is spare
+    ok('sell: an outgrown weapon can go', Save.canSell('sword'));
+    ok('sell: it fetches half of what it cost',
+       Save.sellPrice('sword') === Math.round(Save.item('sword').cost * Save.sellRate),
+       String(Save.sellPrice('sword')));
+    ok('sell: the free starter kit is not for sale',
+       Save.sellBlock('stick') === 'starter', Save.sellBlock('stick'));
+    ok('sell: something you do not own is not for sale',
+       Save.sellBlock('flame') === 'notowned', Save.sellBlock('flame'));
+    /* Found gear cannot be bought back at any price, so selling it would be
+       the only irreversible button in the game. */
+    ok('sell: gear found underground is not for sale',
+       Save.sellBlock('f-gloom') === 'found', Save.sellBlock('f-gloom'));
+    /* A world gates cards, map stops that say `needs:`, and set perks. Selling
+       one takes back content a hero may be standing on. */
+    Save.buy('world-cave');
+    ok('sell: a world is never for sale', Save.sellBlock('world-cave') === 'world',
+       Save.sellBlock('world-cave'));
+
+    var before = Save.me().gold;
+    var price = Save.sellPrice('sword');
+    ok('sell: selling works', Save.sell('sword') === 'ok');
+    ok('sell: the gold arrives', Save.me().gold === before + price,
+       Save.me().gold + ' vs ' + (before + price));
+    ok('sell: the item is gone', !Save.owns('sword'));
+    ok('sell: and it can be bought again', Save.buy('sword') === 'ok');
+    ok('sell: selling never pays more than it cost',
+       Save.sellPrice('axe') < Save.item('axe').cost,
+       Save.sellPrice('axe') + ' vs ' + Save.item('axe').cost);
+
+    /* The forge is the trap here. A forged sword cost far more than its price
+       tag, so refunding only the tag would quietly punish the child who used
+       the forge — and the level has to go with it, or selling and rebuying
+       would launder a free upgrade. */
+    fresh();
+    Save.update(function (p) { p.gold = 200000; });
+    Save.buy('sword'); Save.buy('axe');
+    Save.forgeUp('sword'); Save.forgeUp('sword');
+    var spent = Save.forgeSpent('sword');
+    ok('sell: the forge spend is remembered', spent > 0, String(spent));
+    ok('sell: a forged item is worth its forging too',
+       Save.sellPrice('sword') ===
+       Math.round((Save.item('sword').cost + spent) * Save.sellRate),
+       String(Save.sellPrice('sword')));
+    var g = Save.me().gold, p2 = Save.sellPrice('sword');
+    Save.sell('sword');
+    ok('sell: the forged refund is paid', Save.me().gold === g + p2);
+    Save.buy('sword');
+    ok('sell: buying it back does not bring the forging with it',
+       Save.forgeSpent('sword') === 0, String(Save.forgeSpent('sword')));
+    /* Round-tripping must always lose money, or a bored child has an infinite
+       gold machine. */
+    var loop = Save.me().gold;
+    Save.buy('flame'); Save.sell('sword');
+    ok('sell: buying and selling can never make money', Save.me().gold < loop,
+       Save.me().gold + ' vs ' + loop);
+  })();
+
   var floorsChecked = 0, noStairs = [], noFight = [], badType = [], earlyElite = [];
-  var tooManyPuzzles = [], puzzleFloors = 0;
+  var tooManyPuzzles = [], puzzleFloors = 0, hollowFloors = [];
   var KNOWN = ['entrance', 'stairs', 'monster', 'elite', 'shrine', 'treasure',
-               'puzzle', 'empty'];
+               'puzzle', 'curio', 'empty'];
   ['little', 'big'].forEach(function (row) {
     for (var seed = 1; seed <= 400; seed++) {
       for (var fl = 1; fl <= 12; fl++) {
         var rooms = Save.dungeonFloor(seed * 7919, fl, row);
         floorsChecked++;
-        var stairs = 0, fights = 0, puzzles = 0;
+        var stairs = 0, fights = 0, puzzles = 0, hollow = 0;
         rooms.forEach(function (r) {
+          if (r.t === 'empty') hollow++;
           if (r.t === 'stairs') stairs++;
           if (r.t === 'monster' || r.t === 'elite') fights++;
           if (r.t === 'puzzle') puzzles++;
@@ -1613,6 +1683,8 @@ try {
         if (fights < 1) noFight.push(row + ' ' + seed + '/' + fl);
         if (puzzles > 1) tooManyPuzzles.push(row + ' ' + seed + '/' + fl + ': ' + puzzles);
         if (puzzles) puzzleFloors++;
+        if (hollow) hollowFloors.push(row + ' ' + seed + '/' + fl + ': ' + hollow +
+                                      ' of ' + rooms.length);
         if (rooms[0].t !== 'entrance') badType.push(row + ' ' + seed + '/' + fl + ': no entrance');
       }
     }
@@ -1632,6 +1704,14 @@ try {
      room type that almost never appears is a room type nobody has tested. */
   ok('dungeon: never more than one stuck robot on a floor',
      tooManyPuzzles.length === 0, tooManyPuzzles.slice(0, 3).join('; '));
+  /* A big hero's first floor used to hold NINE rooms with literally nothing in
+     them, out of twenty-five — and the shallow floors, the ones actually
+     walked, were the emptiest. Everything spare is dealt as a curio now, so a
+     floor is furnished rather than hollow. This is the check that says so, and
+     it is the one that would notice if a later tuning pass took the furniture
+     back out. */
+  ok('dungeon: no floor is a grid of empty rooms', hollowFloors.length === 0,
+     hollowFloors.slice(0, 3).join('; '));
   ok('dungeon: a stuck robot turns up on most floors, not all',
      puzzleFloors > floorsChecked * 0.5 && puzzleFloors < floorsChecked,
      puzzleFloors + ' of ' + floorsChecked + ' floors');

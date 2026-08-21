@@ -456,6 +456,19 @@ try:
           dungeon_day <= 3 * battle_day,
           "dungeon(f%d) %d/day vs battle %d/day" % (deep, dungeon_day, battle_day))
 
+    # The rooms that used to be empty are curios now. They exist because a
+    # floor of nothing is a grid pretending to be a place -- NOT because the
+    # descent needed another purse, since it is already the best-paying half
+    # hour on the site. So a curio has to stay small change: worth stooping
+    # for, never worth farming.
+    D = econ["dungeon"]
+    curio_avg = D["curioCoinChance"] * D["curioCoins"] * D["treasureGold"]
+    check("economy: a curio is small change beside a chest",
+          curio_avg <= 0.25 * D["treasureGold"],
+          "%.0f vs a %d chest" % (curio_avg, D["treasureGold"]))
+    check("economy: but a curio is worth stooping for now and then",
+          D["curioCoinChance"] > 0, "%.2f" % D["curioCoinChance"])
+
     # And the ladder has to survive the best of them, not just the baseline.
     best_day = max(battle_day, map_day, dungeon_day, robot_day)
     fast = days_to(sum(tier4.values()), best_day)
