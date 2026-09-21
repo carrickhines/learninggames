@@ -9,6 +9,8 @@ character.
 - **🤖 Robot Workshop** — write a plan, run it, find your own mistake
 - **⛏️ The Dungeon** — a floor that builds itself, walked in 2D; the fights are
   played in the two battle games and come back
+- **📝 The Practice Test** — not a game: a simulation of the MAP Growth test
+  they sit at school, adaptive and untimed, with no going back
 
 They were three separate repos with three separate bookmarks and no memory
 between sessions. They're now one site with a hub, a shared design system,
@@ -156,6 +158,12 @@ robot/index.html     the Robot Workshop: a grid, a robot, and a plan you
                      write before anything moves
 dungeon/index.html   a floor that builds itself; fights are played in the
                      battle games and come back here
+test/index.html      the Practice Test: a simulation of the MAP Growth test
+                     the kids sit at school — adaptive, untimed, no going back
+  test/test.css        its own light, sober surface; nothing of the arcade
+  test/draw.js         shapes, graphs, clocks, rulers, number lines, area grids
+  test/bank-math.js    the maths item bank, both grade bands, four areas each
+  test/bank-read.js    the reading item bank: passages, and word items
 .verify/            the test harness — see "Testing"
 ```
 
@@ -1034,6 +1042,134 @@ places you travel to — one is the journey you are on, the other is the one tha
 builds itself — and `smoke.py` keeps them on the same row, adjacent, above the
 utilities.
 
+# The Practice Test
+
+Both boys sit **NWEA MAP Growth** at school. Nothing else on this site is
+anything like it, and that is the problem this page exists to solve: the
+subject matter is familiar, the *shape* of the test is not.
+
+**It is deliberately not a game.** Light background, plain type, no starfield,
+no gold buttons, no hero chip, no hearts, no timer bar, no reward banners. A
+child who has practised in the arcade frame has practised the wrong thing. The
+only house rule it keeps is the 🔊 mute toggle top-right, which `smoke.py`
+enforces on every page.
+
+## What the real test is
+
+From NWEA's own Math and Reading fact sheets, the K–2 Common Core content
+sheet, and the *Student Introduction to MAP Testing* proctor script:
+
+| | MAP Growth **K–2** | MAP Growth **2–5** |
+|---|---|---|
+| Items | 43 scored per subject | 43 scored per subject |
+| Time | 25–40 min, untimed | 45–55 min, untimed |
+| Audio | **every item read aloud**, replayable | none |
+| Reading areas | Foundational skills · Language & writing · Literature & informational text · Vocabulary | Literary text · Informational text · Vocabulary |
+| Maths areas | Operations & algebraic thinking · Number & operations · Measurement & data · Geometry | the same four |
+| Other | pictures for answers | passages that **reappear with a different question**; a calculator on *some* maths items |
+
+Both: one item at a time, answer changeable until **Go On** and locked after,
+no skipping, no going back, and a difficulty that converges until most
+students finish **having got about half of them wrong**.
+
+**The real interface is public** at `practice.mapnwea.org`, username `grow`,
+password `grow` — about five questions, no score, no adaptation, but it is the
+genuine screen. Worth ten minutes before any real test day; it is the one thing
+this page can only approximate.
+
+## The adaptive engine
+
+A 1-parameter (Rasch) CAT on a RIT-like scale, which is what MAP is — not a
+difficulty counter with a chart on the end.
+
+- Each item carries `d`, its difficulty. `theta` is the running estimate.
+- `p = 1 / (1 + exp(-(theta - d) / LOGIT))`, `LOGIT` 10 RIT.
+- After each answer `theta += k * (correct - p)`, `k` decaying 10 → 3 across
+  the sitting: fast and jumpy early, settling late. That shape is the feel of
+  the real thing — a quick climb, then a long plateau where it hurts.
+- `theta` starts at the band's approximate autumn norm (K maths 140, K reading
+  136, grade 3 maths 191, reading 189).
+
+**It aims at 70% correct, not 50%.** `TARGET_P` sets the offset the selector
+adds to `theta`. The real test aims at 50% because that is where a test learns
+most, and the *"Just like the real test"* switch on the start screen puts it
+back. Both settings are checked: `content.py` simulates 300 children of known
+ability at each and asserts where they land.
+
+**Items are dealt round-robin across the instructional areas**, so all four are
+sampled however the child is doing, and each yields its own sub-estimate for
+the parent panel.
+
+**An item may be served up to three times; a passage question exactly once.**
+This is not a detail. Each area holds a dozen templates and the test draws
+eleven from it, so once-only leaves the selector with no choice by the end — it
+serves whatever is left, regardless of ability, which is the opposite of
+adaptive. Driving a full sitting showed exactly that. Most items are generators
+and hand back different numbers each time; `once` marks the ones that cannot
+repeat.
+
+**Selection and scoring take a context, not the page's `state`.** That is what
+lets `TEST.simulate()` run the *real* selector and the *real* update with no
+DOM, so `content.py` checks the engine rather than a copy of the engine living
+in the harness. Break `nextItem` or `scoreItem` and three checks fail.
+
+## What it never does
+
+- **No feedback, ever.** Not a tick, not a colour, not a sound that differs.
+  The real test tells you nothing until the end, and a child who has practised
+  with a green tick will be hunting for one on the day. `smoke.py` asserts the
+  question area never contains the words.
+- **No timer, no back button, no question counter.** Each of those would teach
+  something untrue, and each is the kind of thing a later helpful hand adds.
+  All three are asserted *absent*.
+- **No claim to be a real RIT score.** The end screen says so in words. A
+  made-up number that looks official is worse than no number.
+
+## The content
+
+Half of what MAP tests did not exist anywhere on this site: no geometry, no
+measurement, no data, no reading passages, no vocabulary in context. So
+`draw.js` draws shapes, bar graphs, pictographs, line plots, number lines,
+area grids, ten frames, clocks, rulers and angles, and `bank-read.js` carries
+18 authored passages.
+
+`bank-math.js` and `bank-read.js` port the *logic* of the games' `MAKERS` and
+`TRACKS[].make` rather than importing them — both live inside IIFEs and neither
+is reachable across pages, and a copy keeps the shipped games untouched.
+
+**A passage is reused across consecutive items** (`pid`, sticky per area),
+because the real test does exactly that and its proctor script warns students
+about it.
+
+**The authoring rule is the one Story Quest already follows:** the answer must
+be findable in the text, never guessable from genre convention, never a trick,
+never two defensible answers. Two items shipped past that rule and were caught
+by *looking at the screenshot* — "the tired old donkey plodded **slowly** up
+the hill", where `slowly` answers "how did it move?" every bit as well as
+`plodded` does, and an *"Although … anyway"* sentence with two contrast
+markers in it.
+
+## How it hangs off everything else
+
+- **Gold** — `Save.setContext('test')`, so no world multiplier (the same as the
+  Workshop and Story Quest). `ECONOMY.testAnswer` and `testDone`: about 180
+  gold for a 43-item sitting, against ~475 for the same half hour battling.
+  It is paid for **the work, not the score**, because paying for the score
+  would reward steering toward easy questions and the child cannot steer
+  anyway. `content.py` bounds it from both sides — it must not out-earn
+  battling, and it must be worth finishing.
+- **The parent record** — `Log.startSession({ game: 'test' })` with **the
+  instructional area as the track**, so Settings → Progress report shows
+  accuracy per MAP content area, weakest first, for free. The Rematch never
+  serves them (it filters on `math`), which matters because a drag-to-order
+  item cannot be rebuilt from a log line.
+- **Nothing is written to the save.** No schema change, no `v7`. Score history
+  over time is a later job, done unhurried with a fixture and `upgrade.py`.
+- **It is not on the map and not in the daily**, for the same reason the Robot
+  Workshop is not: both trails are 80 steps and appending is the only safe
+  move. It is also not a place you travel to — it is a thing a grown-up asks
+  you to do.
+
 # Difficulty modes
 
 Three modes in the two battle games, distinguished by **time pressure**:
@@ -1196,7 +1332,7 @@ geckodriver), then:
 | `smoke.py` | after any change | 1 min |
 | `run-save-test.py` | after touching `save.js` / `log.js` (629 + 65 assertions) | 10 s |
 | `tracks.py` | after touching a question generator | 1 min |
-| `content.py` | after touching content, prices, card odds, or the hub's claims | 30 s |
+| `content.py` | after touching content, prices, card odds, the test's item bank or adaptive engine, or the hub's claims | 2 min |
 | `playthrough.py` | before shipping | 3 min |
 | `upgrade.py` | **before every deploy** — see "Never lose a child's progress" | 40 s |
 | `shots.py [w h]` | when something new is drawn | 2 min |
@@ -1250,6 +1386,18 @@ thing first and watching the message name the fault:
   table in a half hour modelled in minutes.
 - **No dungeon floor has an empty room on it**, across all 9,600 generated —
   which is what would notice a later tuning pass taking the furniture back out.
+- **Every Practice Test item generates a well-formed question, 40 seeds each.**
+  A generator that throws or hands back an answer index off the end of its own
+  choices one time in fifty is invisible until a child meets it mid-test.
+- **Every test area covers its band's whole difficulty range.** A gap is not
+  cosmetic: the selector picks the nearest item, so a hole hands a climbing
+  child something far too easy or far too hard and the estimate stops moving.
+- **The adaptive engine really estimates ability** — 300 simulated children of
+  known ability per case, at both the gentle and the real-test setting, run
+  through the page's **own** selector and update rather than a copy of them
+  living in the harness.
+- **The test shows no verdict, has no timer, no back button and no counter**,
+  all asserted absent on both bands and both subjects.
 - **Selling can never make money.** Buy, sell, buy again and you are down; the
   worn item, the starter kit, a world and found gear all refuse; and a forged
   item is worth its forging but does not carry the forging back.
@@ -1381,6 +1529,15 @@ eat words. Use `git commit -F -` with a quoted heredoc.
   descent and the depth record. It is a weaker dare than a real roguelike and
   that is the correct trade for a five-year-old; don't "fix" it by adding
   stakes.
+- **The Practice Test never says whether an answer was right.** No tick, no
+  colour, no different sound — because the real test does not, and a child who
+  has practised with a green tick will be hunting for one on the day. For the
+  same reason there is no timer, no back button and no question counter. Do
+  not add any of them to be kind; the kindness is on the briefing screen,
+  which says out loud that it is meant to get too hard.
+- **The Practice Test's score is not a RIT score** and the end screen says so
+  in words. Do not relabel it, and do not tune the scale to make it look more
+  official — a made-up number that reads as real is worse than no number.
 - **There is no bottom to the dungeon.** Floors climb until the hero stops.
   Don't add a final floor — the record *is* the ending.
 
@@ -1444,7 +1601,8 @@ does not offer robot packs either. Both are one job, not two.
 
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
 8 robot packs (48 levels), 80 map steps per trail through 16 regions, 16 worlds,
-170 cards, 6 gear slots (44 pieces), and a dungeon with no bottom.** Suite: 611
+170 cards, 6 gear slots (44 pieces), a dungeon with no bottom, and a practice
+MAP test of ~200 items across two grade bands.** Suite: 611
 save checks, 65 log checks, ~200 smoke checks, plus tracks / content /
 playthrough / upgrade.
 
@@ -1477,6 +1635,48 @@ change direction in the robot game are really confusing."*
 And one bug found on the way, older than any of it: a chest's *"💰 45 gold"*
 line was wiped by the next redraw, so the reward for opening it was visible for
 about a frame. Fixed for the treasure rooms as well as the new curios.
+
+**Round 7 — the Practice Test**, asked for three days before the boys sat MAP
+Growth at school: *"I want to create a game that simulates the testing they will
+experience. I have no idea what either of the formats will be. My understanding
+is that MAPS testing is adaptive."* The format research was half the job; see
+"The Practice Test" above for what the real thing turned out to be.
+
+It is the first thing here that is deliberately **not** a game: no timer, no
+hearts, no feedback, no going back, and a light sober surface with nothing of
+the arcade on it. The engine is a real Rasch CAT rather than a difficulty
+counter, aimed at 70% correct with a switch that puts it back to the real
+test's 50%. Roughly 200 items across both grade bands and all four
+instructional areas, including geometry, measurement, data, reading passages
+and vocabulary in context — none of which existed anywhere on this site.
+
+**No save-schema change**, deliberately, three days before a deploy: results
+live in the parent record and nothing is written to the hero. Score history and
+a `v7` migration are a later, unhurried job.
+
+**Five faults found on the way, four of them only by looking at a screenshot:**
+
+- **Each area's bank was about the size of the draw from it**, so by the end
+  the selector had no choice left and served whatever remained regardless of
+  ability — adaptive in name only. Found by driving a full sitting and reading
+  the item list. Fixed by letting a generator repeat up to three times.
+- **The grade-3 reading bank ran thin below 180**, so a third grader reading at
+  a second-grade level was pushed up into material he could not do. Found by
+  the simulated-children check, not by eye.
+- **Two items had two defensible answers** — *"plodded **slowly**"* asked which
+  word said how the donkey moved, and an *"Although … anyway"* sentence had two
+  contrast markers. Both invisible in the data and obvious on screen.
+- **The angle figure was clipped**: the vertex sat in the corner of its own
+  viewBox, so an obtuse angle's second ray ran off the canvas and "obtuse" was
+  the one answer a child could not see.
+- **The speaker button stayed lit forever** on a device with no installed
+  voice, because `speechSynthesis` fires neither `onend` nor `onerror` there.
+
+And one older break, found because the new screenshots sat behind it:
+**`shots.py` had been dying on its first `battle()` call** — its `click()`
+never got the scroll-and-fallback fix `smoke.py` has, and its `load()` did not
+tap the row reveal, so half the tracks were `display:none`. Everything from
+`math-menu` onwards had silently not been captured for some time.
 
 **Outstanding, in rough priority order:**
 
@@ -1522,5 +1722,8 @@ there for a day looking like tuning and paying nobody, which is the same
 trap `loot: 'boss'` is still sitting in on 28 map options.
 The forge's own numbers — `STAR_SCALE`, `FORGE_STEP`, `FORGE_MAX` — sit beside
 `FOUND` rather than in `ECONOMY`, because they scale gear rather than pay it
-out. `RETIRE` (3, how many corrects retire a Rematch question) lives in
+out. The Practice Test pays through `testAnswer` and `testDone` in `ECONOMY`;
+everything about how hard it *aims* lives in `test/index.html` — `TARGET_P`
+(0.7, against the real test's 0.5), `LOGIT`, `MAX_USES`, `USE_COST`,
+`ITEMS_FULL` and the `NORM` table. `RETIRE` (3, how many corrects retire a Rematch question) lives in
 `shared/log.js`.

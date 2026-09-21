@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Practice Test">
+<title>Practice Test</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+
+<div id="app">
+
+  <div class="bar">
+    <span class="name" id="barName">—</span>
+    <span class="what" id="barWhat"></span>
+    <span class="spacer"></span>
+  </div>
+  <button id="muteBtn" class="sound-toggle" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+
+  <!-- ================= START ================= -->
+  <section class="screen show" id="start">
+    <div class="pad mid">
+      <h1>📝 Practice Test</h1>
+      <p class="soft">This works the way the test at school works. It is not a game, and
+        that is the point &mdash; so that the real one on the day is not a surprise.</p>
+
+      <h2>Which test?</h2>
+      <div class="stack">
+        <button class="pick" data-subject="reading">
+          <span class="ico">📖</span>
+          <span><b>Reading</b><span class="sub" id="subReading">43 questions</span></span>
+        </button>
+        <button class="pick" data-subject="math">
+          <span class="ico">🔢</span>
+          <span><b>Maths</b><span class="sub" id="subMath">43 questions</span></span>
+        </button>
+      </div>
+
+      <h2>Which level?</h2>
+      <div class="row">
+        <button class="pick" data-band="k" style="flex:1">
+          <span class="ico">🐣</span>
+          <span><b>Younger</b><span class="sub">Kindergarten &ndash; grade 2. Every question is read aloud.</span></span>
+        </button>
+        <button class="pick" data-band="g" style="flex:1">
+          <span class="ico">🦉</span>
+          <span><b>Older</b><span class="sub">Grade 2 &ndash; 5. You read it yourself.</span></span>
+        </button>
+      </div>
+
+      <label class="switch">
+        <input type="checkbox" id="realMode">
+        <span><b>Just like the real test</b>
+          <span class="sub">The real one is tuned so that most children get about
+            <b>half</b> of the questions wrong. Leave this off and it aims for about
+            seven out of ten instead.</span></span>
+      </label>
+
+      <div class="note" id="shortNote">
+        A whole test is 43 questions and takes half an hour or more, with no clock.
+        You can stop any time by closing the page &mdash; nothing is lost, and nothing
+        is scored until the end.
+      </div>
+
+      <div class="row" style="margin-top:18px">
+        <button class="primary" id="beginBtn">Start &rarr;</button>
+        <button id="shortBtn">Just a few questions</button>
+        <button id="homeBtn">&larr; Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BRIEFING ================= -->
+  <section class="screen" id="brief">
+    <div class="pad mid">
+      <h1>Before you start</h1>
+      <p><b>There is no clock.</b> Take as long as you like on every question.
+        Nobody is timing you and nothing runs out.</p>
+      <p><b>You cannot go back.</b> Once you press <b>Go On</b>, that question is
+        finished. You can change your mind as many times as you like before you press it.</p>
+      <p><b>Some questions will be too hard.</b> That is not a mistake and it is not
+        your fault &mdash; the test keeps making questions harder until it finds the
+        ones you cannot do yet. That is how it works out what you know. Getting some
+        wrong means it is working properly.</p>
+      <p><b>Answer every one.</b> If you do not know, get rid of the answers that are
+        definitely wrong and pick from what is left. A guess is better than nothing.</p>
+      <p class="soft small" id="audioNote" style="display:none">🔊 Every question will be
+        read out to you. Tap the speaker to hear it again as many times as you want.
+        Headphones are a good idea.</p>
+      <div class="row" style="margin-top:20px">
+        <button class="primary" id="readyBtn">I'm ready</button>
+        <button id="backBtn">&larr; Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= THE TEST ================= -->
+  <section class="screen" id="quiz">
+    <div class="qwrap">
+      <div class="qinner" id="qbody"></div>
+    </div>
+    <div class="foot">
+      <button class="primary" id="goBtn" disabled>Go On &rarr;</button>
+    </div>
+  </section>
+
+  <!-- ================= FINISHED ================= -->
+  <section class="screen" id="done">
+    <div class="pad mid">
+      <h1 id="doneTitle">Finished</h1>
+      <div class="bigscore"><span id="doneRight">0</span><span class="of"> right</span></div>
+      <p class="soft" style="text-align:center" id="doneLine"></p>
+
+      <h2>How far you climbed</h2>
+      <p class="small soft">Every time you got one right, the next question got harder.
+        This is the path the test took.</p>
+      <div class="climb" id="climb"></div>
+
+      <div id="goldLine" class="note" style="display:none"></div>
+
+      <div class="parent">
+        <h2>For grown-ups</h2>
+        <div id="parentBody"></div>
+      </div>
+
+      <div class="row" style="margin-top:20px">
+        <button class="primary" id="againBtn">Take another</button>
+        <button id="doneHomeBtn">&larr; Back to the map</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="../shared/sound.js"></script>
+<script src="../shared/save.js"></script>
+<script src="../shared/log.js"></script>
+<script src="draw.js"></script>
+<script src="bank-math.js"></script>
+<script src="bank-read.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ==================================================================
+     The adaptive engine.
+
+     MAP Growth is a computer-adaptive test on the RIT scale, which is a
+     Rasch (one-parameter) scale: an item has a difficulty, a child has an
+     ability, and the chance of getting it right depends only on the gap
+     between the two. That is small enough to implement honestly, so this
+     does, rather than faking "harder" and "easier" with a difficulty counter.
+
+     `theta` is the running estimate of the child's ability. After every
+     answer it moves toward what actually happened, by an amount that shrinks
+     as the test goes on -- fast and jumpy at the start, settling later. That
+     shape is what the real thing feels like: a quick climb to roughly the
+     right place, then a long plateau where every question is hard.
+     ================================================================== */
+
+  const ITEMS_FULL = 43;      // what the real test scores, per subject
+  const ITEMS_SHORT = 12;     // a taste, for a first sitting or a tired child
+
+  /* Where a child of that age typically starts, from NWEA's published norms.
+     Only the relative spacing matters to the engine; the number shown at the
+     end is labelled a practice estimate, never a RIT score. */
+  const NORM = {
+    k: { math: 140, reading: 136 },
+    g: { math: 191, reading: 189 }
+  };
+
+  /* How hard to aim. The real test picks items the child has a ~50% chance of
+     getting right, because that is where a test learns the most -- and it is
+     also why most children finish having got half of them wrong. Aiming at
+     70% instead is the same machinery pointed somewhere kinder; the switch on
+     the start screen puts it back. */
+  const TARGET_P = 0.7;
+  const LOGIT = 10;           // RIT units per logit, near enough for this
+  const OFFSET = -LOGIT * Math.log(TARGET_P / (1 - TARGET_P));
+
+  const AREAS = {
+    k: { math: ['oa', 'nbt', 'md', 'geo'], reading: ['found', 'lang', 'lit', 'vocab'] },
+    g: { math: ['oa', 'nbt', 'md', 'geo'], reading: ['lit', 'info', 'vocab'] }
+  };
+
+  const AREA_NAME = {
+    oa: 'Operations & algebraic thinking',
+    nbt: 'Number & operations',
+    md: 'Measurement & data',
+    geo: 'Geometry',
+    found: 'Foundational skills',
+    lang: 'Language & writing',
+    lit: 'Literature & informational text',
+    info: 'Informational text',
+    vocab: 'Vocabulary'
+  };
+  function areaName(band, a) {
+    if (band === 'g' && a === 'lit') return 'Literary text';
+    return AREA_NAME[a] || a;
+  }
+
+  const BANK = { math: BANK_MATH, reading: BANK_READ };
+
+  function poolFor(band, subject) {
+    return BANK[subject].filter((it) => it.b.indexOf(band) >= 0);
+  }
+
+  /* A seeded random, so one sitting is reproducible for the harness and two
+     sittings are not the same test. */
+  function rng(seed) {
+    let s = seed >>> 0 || 1;
+    return function () {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >> 17;
+      s ^= s << 5; s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  function chance(theta, d) { return 1 / (1 + Math.exp(-(theta - d) / LOGIT)); }
+
+  const state = {
+    band: null, subject: null, real: false, total: ITEMS_FULL,
+    theta: 0, floor: 0, ceil: 0,
+    n: 0, right: 0, history: [],
+    pool: [], used: {}, order: [], lastPid: {},
+    areaTheta: {}, areaSeen: {},
+    q: null, item: null, picked: null, started: 0,
+    R: null, log: []
+  };
+
+  /* How many times one item may be served in a sitting.
+
+     This matters more than it looks. Each area holds a dozen or so templates
+     and the test draws eleven items from it, so a strictly once-only rule
+     leaves the selector with no choice at all by the end -- it ends up
+     serving whatever is left regardless of ability, which is the opposite of
+     adaptive. Driving a full sitting showed exactly that: a child of known
+     ability finishing on items 30 RIT above where the estimate sat.
+
+     Most items are generators and hand back different numbers every time, so
+     seeing one twice is seeing a different question. The ones that cannot be
+     repeated -- a passage question, anything with a single fixed answer --
+     carry `once`. */
+  const MAX_USES = 3;
+  const USE_COST = 7;   // RIT-equivalent penalty for repeating a template
+
+  /* ---------- the engine proper ----------
+
+     Selection and scoring take a context rather than reading `state`, so the
+     live test and the harness's simulated children run the same code. A check
+     that re-implements the algorithm to test the algorithm only proves the
+     copy agrees with itself; breaking the real selector has to break the
+     check, and this is what makes that true. */
+
+  function newContext(band, subject, real, total) {
+    const pool = poolFor(band, subject);
+    const ds = pool.map((i) => i.d);
+    const areas = AREAS[band][subject];
+    const ctx = {
+      band, subject, real, total, pool,
+      theta: NORM[band][subject],
+      floor: Math.min.apply(null, ds) - 6,
+      ceil: Math.max.apply(null, ds) + 6,
+      n: 0, right: 0, history: [],
+      used: {}, lastPid: {}, areaTheta: {}, areaSeen: {},
+      order: areas.slice()
+    };
+    areas.forEach((a) => { ctx.areaTheta[a] = ctx.theta; });
+    return ctx;
+  }
+
+  /* Pick the next item: the area whose turn it is, and within it the item
+     closest to where we are aiming, preferring one not asked yet. */
+  function nextItem(ctx) {
+    const area = ctx.order[ctx.n % ctx.order.length];
+    const target = ctx.theta + (ctx.real ? 0 : OFFSET);
+    const uses = (it) => ctx.used[it.id] || 0;
+    const limit = (it) => (it.once || it.pid) ? 1 : MAX_USES;
+
+    let cands = ctx.pool.filter((it) => it.a === area && uses(it) < limit(it));
+    if (!cands.length) cands = ctx.pool.filter((it) => uses(it) < limit(it));
+    if (!cands.length) cands = ctx.pool;
+
+    /* Stay on a passage while it still has questions worth asking. The real
+       test does this and its proctor script warns students about it: "the
+       same passage appears again and again, but look carefully, because you
+       will see a different question for the same passage." Remembered per
+       area, because the areas take turns -- a single `lastPid` is always
+       about some other area by the time this one comes round again. */
+    const sticky = ctx.lastPid[area];
+    if (sticky) {
+      const same = cands.filter((it) => it.pid === sticky && Math.abs(it.d - target) <= 22);
+      if (same.length) cands = same;
+    }
+
+    let best = cands[0], bestScore = Infinity;
+    cands.forEach((it) => {
+      const score = Math.abs(it.d - target) + uses(it) * USE_COST;
+      if (score < bestScore) { bestScore = score; best = it; }
+    });
+    return best;
+  }
+
+  function takeItem(ctx) {
+    const it = nextItem(ctx);
+    ctx.used[it.id] = (ctx.used[it.id] || 0) + 1;
+    ctx.lastPid[it.a] = it.pid || null;
+    return it;
+  }
+
+  /* Move the estimate toward what actually happened, by an amount that
+     shrinks as the sitting goes on. */
+  function scoreItem(ctx, it, ok) {
+    const p = chance(ctx.theta, it.d);
+    const k = 10 - 7 * (ctx.n / ctx.total);     // 10 down to 3
+    ctx.theta += k * ((ok ? 1 : 0) - p);
+    ctx.theta = Math.max(ctx.floor, Math.min(ctx.ceil, ctx.theta));
+
+    const at = ctx.areaTheta[it.a];
+    ctx.areaTheta[it.a] = at + 6 * ((ok ? 1 : 0) - chance(at, it.d));
+    ctx.areaSeen[it.a] = (ctx.areaSeen[it.a] || 0) + 1;
+
+    ctx.n++;
+    if (ok) ctx.right++;
+    ctx.history.push(ctx.theta);
+  }
+
+  /* A child of known ability sitting the whole thing, with no page involved.
+     `rand` is injected so the harness can seed it. */
+  function simulate(band, subject, truth, real, total, rand) {
+    rand = rand || Math.random;
+    const ctx = newContext(band, subject, real, total || ITEMS_FULL);
+    for (let i = 0; i < ctx.total; i++) {
+      const it = takeItem(ctx);
+      scoreItem(ctx, it, rand() < chance(truth, it.d));
+    }
+    return ctx;
+  }
+
+  function serve() {
+    if (state.n >= state.total) return finish();
+    const it = takeItem(state);
+    state.item = it;
+    state.q = it.make(state.R);
+    state.picked = null;
+    state.started = Date.now();
+    render();
+  }
+
+  /* Score, move the estimate, and go on. Nothing is shown about whether it was
+     right: the real test gives no feedback at all, and a child who has
+     practised with a green tick will be looking for one on Thursday. */
+  function goOn() {
+    const ok = judge();
+    const it = state.item;
+    scoreItem(state, it, ok);
+
+    try {
+      Log.answer({
+        track: areaName(state.band, it.a),
+        q: String(state.q.stem || '').replace(/<[^>]+>/g, '').slice(0, 80),
+        given: describePick(),
+        right: describeAnswer(),
+        ok: ok,
+        ms: Date.now() - state.started
+      });
+    } catch (e) { /* the record is never allowed to break the test */ }
+
+    Sound.click();
+    serve();
+  }
+
+  /* ---------- scoring, one branch per item type ---------- */
+
+  function judge() {
+    const q = state.q, t = state.item.t || 'choice';
+    if (state.picked == null) return false;
+    if (t === 'multi') {
+      const want = q.answer.slice().sort().join(',');
+      const got = state.picked.slice().sort().join(',');
+      return want === got;
+    }
+    if (t === 'number') return parseInt(state.picked, 10) === q.answer;
+    if (t === 'order') {
+      for (let i = 0; i < state.picked.length; i++) {
+        if (q.cards[state.picked[i]].r !== i) return false;
+      }
+      return state.picked.length === q.cards.length;
+    }
+    return state.picked === q.answer;
+  }
+
+  function hasAnswer() {
+    const t = state.item.t || 'choice';
+    if (state.picked == null) return false;
+    if (t === 'multi') return state.picked.length > 0;
+    if (t === 'number') return String(state.picked).length > 0;
+    if (t === 'order') return state.picked.length === state.q.cards.length;
+    return true;
+  }
+
+  function plain(html) { return String(html).replace(/<[^>]+>/g, '').trim(); }
+
+  function describePick() {
+    const q = state.q, t = state.item.t || 'choice';
+    if (state.picked == null) return '';
+    if (t === 'number') return String(state.picked);
+    if (t === 'multi') return state.picked.map((i) => plain(q.choices[i].html)).join(' + ');
+    if (t === 'order') return state.picked.map((i) => plain(q.cards[i].html)).join(' > ');
+    if (t === 'hottext') return q.words[state.picked];
+    return plain(q.choices[state.picked].html);
+  }
+
+  function describeAnswer() {
+    const q = state.q, t = state.item.t || 'choice';
+    if (t === 'number') return String(q.answer);
+    if (t === 'multi') return q.answer.map((i) => plain(q.choices[i].html)).join(' + ');
+    if (t === 'order') return '';
+    if (t === 'hottext') return q.words[q.answer];
+    return plain(q.choices[q.answer].html);
+  }
+
+  /* ---------- rendering ---------- */
+
+  function render() {
+    const q = state.q, t = state.item.t || 'choice';
+    const out = [];
+
+    if (q.passage) {
+      out.push('<div class="passage"><h3>' + q.passage.title + '</h3>' + q.passage.html + '</div>');
+    }
+
+    out.push('<div class="stem">' +
+      (state.band === 'k' ? '<button class="say" id="sayBtn" aria-label="Read it again">🔊</button>' : '') +
+      '<span class="txt">' + q.stem + '</span></div>');
+
+    if (q.art) out.push('<div class="art">' + q.art + '</div>');
+    if (q.calc) out.push('<div class="calcbar"><button id="calcBtn">Calculator</button>' +
+                         '<div id="calcHost"></div></div>');
+
+    if (t === 'number') {
+      out.push('<div class="typed" id="typed"></div>');
+      out.push('<div class="keypad">' +
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => '<button data-key="' + n + '">' + n + '</button>').join('') +
+        '<button data-key="back">⌫</button><button data-key="0">0</button>' +
+        '<button data-key="clear">C</button></div>');
+    } else if (t === 'hottext') {
+      out.push('<div class="hottext">' + q.words.map((w, i) =>
+        '<span class="w" data-w="' + i + '">' + w + '</span>').join(' ') + '</div>');
+    } else if (t === 'order') {
+      out.push('<div class="order">' + q.cards.map((c, i) =>
+        '<div class="card" data-c="' + i + '"><span class="seq"></span>' + c.html + '</div>').join('') +
+        '</div><div class="order-hint">Tap them in order. Tap one again to take it out.</div>');
+    } else {
+      const cls = 'choices ' + (t === 'multi' ? 'multi ' : '') +
+                  (q.cols === 4 ? 'cols4' : q.cols === 2 ? 'cols2' : '');
+      out.push('<div class="' + cls + '">' + q.choices.map((c, i) =>
+        '<button class="opt' + (q.pic ? ' pic' : '') + '" data-o="' + i + '">' +
+        '<span class="mark">' + (t === 'multi' ? '' : String.fromCharCode(65 + i)) + '</span>' +
+        '<span>' + c.html + '</span></button>').join('') + '</div>');
+    }
+
+    $('qbody').innerHTML = out.join('');
+    document.querySelector('.qwrap').scrollTop = 0;
+    wire();
+    $('goBtn').disabled = true;
+    if (state.band === 'k') speak(q.say || plain(q.stem));
+  }
+
+  function wire() {
+    const t = state.item.t || 'choice';
+
+    if ($('sayBtn')) $('sayBtn').addEventListener('click', () => {
+      speak(state.q.say || plain(state.q.stem));
+    });
+    if ($('calcBtn')) $('calcBtn').addEventListener('click', toggleCalc);
+
+    if (t === 'number') {
+      [].forEach.call(document.querySelectorAll('.keypad button'), (b) => {
+        b.addEventListener('click', () => {
+          const k = b.dataset.key;
+          let v = state.picked == null ? '' : String(state.picked);
+          if (k === 'clear') v = '';
+          else if (k === 'back') v = v.slice(0, -1);
+          else if (v.length < 5) v += k;
+          state.picked = v;
+          $('typed').textContent = v;
+          $('goBtn').disabled = !hasAnswer();
+          Sound.click();
+        });
+      });
+      return;
+    }
+
+    if (t === 'hottext') {
+      [].forEach.call(document.querySelectorAll('.hottext .w'), (w) => {
+        w.addEventListener('click', () => {
+          [].forEach.call(document.querySelectorAll('.hottext .w'), (x) => x.classList.remove('on'));
+          w.classList.add('on');
+          state.picked = +w.dataset.w;
+          $('goBtn').disabled = false;
+          Sound.click();
+        });
+      });
+      return;
+    }
+
+    if (t === 'order') {
+      if (state.picked == null) state.picked = [];
+      [].forEach.call(document.querySelectorAll('.order .card'), (c) => {
+        c.addEventListener('click', () => {
+          const i = +c.dataset.c;
+          const at = state.picked.indexOf(i);
+          if (at >= 0) state.picked.splice(at, 1); else state.picked.push(i);
+          [].forEach.call(document.querySelectorAll('.order .card'), (x) => {
+            const k = state.picked.indexOf(+x.dataset.c);
+            x.classList.toggle('on', k >= 0);
+            x.querySelector('.seq').textContent = k >= 0 ? (k + 1) : '';
+          });
+          $('goBtn').disabled = !hasAnswer();
+          Sound.click();
+        });
+      });
+      return;
+    }
+
+    [].forEach.call(document.querySelectorAll('.opt'), (b) => {
+      b.addEventListener('click', () => {
+        const i = +b.dataset.o;
+        if (t === 'multi') {
+          if (state.picked == null) state.picked = [];
+          const at = state.picked.indexOf(i);
+          if (at >= 0) state.picked.splice(at, 1); else state.picked.push(i);
+          b.classList.toggle('on', state.picked.indexOf(i) >= 0);
+          b.querySelector('.mark').textContent = state.picked.indexOf(i) >= 0 ? '✓' : '';
+        } else {
+          state.picked = i;
+          [].forEach.call(document.querySelectorAll('.opt'), (x) => x.classList.remove('on'));
+          b.classList.add('on');
+        }
+        $('goBtn').disabled = !hasAnswer();
+        Sound.click();
+      });
+    });
+  }
+
+  /* The on-screen calculator, which the real test offers on some maths items
+     and not others -- so it has to be missing most of the time, which is
+     itself a thing worth meeting before the day. */
+  let calcOpen = false, calcVal = '';
+  function toggleCalc() {
+    calcOpen = !calcOpen;
+    const host = $('calcHost');
+    if (!calcOpen) { host.innerHTML = ''; return; }
+    calcVal = '';
+    const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−',
+                  'C', '0', '=', '+'];
+    host.innerHTML = '<div class="calc"><div class="out" id="calcOut">0</div><div class="keys">' +
+      keys.map((k) => '<button data-ck="' + k + '">' + k + '</button>').join('') + '</div></div>';
+    [].forEach.call(host.querySelectorAll('button'), (b) => {
+      b.addEventListener('click', () => {
+        const k = b.dataset.ck;
+        if (k === 'C') calcVal = '';
+        else if (k === '=') {
+          try {
+            const expr = calcVal.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-');
+            if (/^[0-9+\-*/. ]+$/.test(expr)) {
+              const v = Function('"use strict";return (' + expr + ')')();
+              calcVal = (Math.round(v * 1000) / 1000) + '';
+            }
+          } catch (e) { calcVal = ''; }
+        } else calcVal += k;
+        $('calcOut').textContent = calcVal || '0';
+        Sound.click();
+      });
+    });
+  }
+
+  /* ---------- audio ----------
+     Every question on the real K-2 test is read aloud and the child can
+     replay it. Browser speech is a poor stand-in for a recorded human voice
+     -- which is exactly why language/voice.js exists -- but the thing being
+     practised here is the mechanic: put the headphones on, listen, tap the
+     speaker to hear it again. */
+  let sayTimer = null;
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    if (Sound.isMuted()) return;
+    const btn = $('sayBtn');
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.85;
+      u.pitch = 1.05;
+      if (btn) {
+        const stop = () => {
+          clearTimeout(sayTimer);
+          btn.classList.remove('playing');
+        };
+        btn.classList.add('playing');
+        u.onend = stop;
+        u.onerror = stop;
+        /* A device with no voice installed fires neither onend nor onerror,
+           and the button sits lit for the rest of the test looking like it is
+           still talking. Seen in the very first screenshot pass. Clear it on a
+           timer sized to the sentence, whatever the speech engine does. */
+        clearTimeout(sayTimer);
+        sayTimer = setTimeout(stop, 2000 + text.length * 90);
+      }
+      speechSynthesis.speak(u);
+    } catch (e) {
+      if (btn) btn.classList.remove('playing');   // the text is still on screen
+    }
+  }
+
+  /* ---------- the end ---------- */
+
+  function finish() {
+    const pct = Math.round((state.right / state.total) * 100);
+    $('doneRight').textContent = state.right + ' / ' + state.total;
+    $('doneTitle').textContent = 'All done';
+
+    $('doneLine').textContent =
+      pct >= 85 ? 'That was a very strong run — it never really found your ceiling.'
+      : pct >= 55 ? 'That is right about where the test wants you: hard enough to learn something.'
+      : 'It pushed you hard. That is what it is supposed to do — the questions got harder every time you got one right.';
+
+    drawClimb();
+
+    /* Pay for the work. No world multiplier (Save.setContext('test') is
+       neither 'math' nor 'language'), so this can never be inflated by
+       standing in Ember Peak, and a 43-question sitting is half an hour of
+       real effort -- it cannot out-earn battling however it is played. */
+    let paid = null;
+    try {
+      Save.setContext('test');
+      const per = Save.ECONOMY.testAnswer, done = Save.ECONOMY.testDone;
+      const a = Save.award(per.gold * state.right, per.xp * state.right);
+      const b = state.total === ITEMS_FULL ? Save.award(done.gold, done.xp) : { gold: 0, xp: 0 };
+      paid = { gold: a.gold + b.gold, xp: a.xp + b.xp };
+    } catch (e) { /* never let the payout break the end screen */ }
+    if (paid && paid.gold) {
+      $('goldLine').style.display = '';
+      $('goldLine').innerHTML = '🪙 <b>' + paid.gold + ' gold</b> and ' + paid.xp +
+        ' XP for the work — waiting for you back on the map.';
+    }
+
+    try { Log.endSession({ won: true, gold: paid ? paid.gold : 0 }); } catch (e) {}
+
+    renderParent();
+    show('done');
+  }
+
+  function drawClimb() {
+    const h = state.history;
+    if (!h.length) return;
+    const lo = Math.min.apply(null, h) - 4, hi = Math.max.apply(null, h) + 4;
+    const w = 600, ht = 90;
+    const pts = h.map((v, i) => {
+      const x = (i / Math.max(1, h.length - 1)) * (w - 16) + 8;
+      const y = ht - 8 - ((v - lo) / Math.max(1, hi - lo)) * (ht - 16);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    $('climb').innerHTML =
+      '<svg viewBox="0 0 ' + w + ' ' + ht + '" preserveAspectRatio="none" ' +
+      'style="width:100%;height:100%" xmlns="http://www.w3.org/2000/svg">' +
+      '<polyline points="' + pts + '" fill="none" stroke="#1d63c4" stroke-width="3" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+
+  function renderParent() {
+    const areas = state.order.slice().sort();
+    const lo = state.band === 'k' ? 100 : 145;
+    const hi = state.band === 'k' ? 195 : 235;
+    const bars = areas.map((a) => {
+      const v = Math.round(state.areaTheta[a]);
+      const pctv = Math.max(2, Math.min(100, ((v - lo) / (hi - lo)) * 100));
+      return '<div class="a"><div class="lab"><span>' + areaName(state.band, a) +
+             '</span><span class="soft">' + v + '</span></div>' +
+             '<div class="track"><span class="fill" style="width:' + pctv.toFixed(0) + '%"></span></div></div>';
+    }).join('');
+
+    $('parentBody').innerHTML =
+      '<p><b>Practice estimate: ' + Math.round(state.theta) + '</b> &nbsp;' +
+      '<span class="small soft">(' + state.right + ' of ' + state.total + ' correct)</span></p>' +
+      '<p class="small"><b>This is not a RIT score.</b> It is an estimate produced at home ' +
+      'from a small bank of questions written for this practice, on a scale chosen to sit ' +
+      'roughly where NWEA\'s does. Treat the shape of it — which areas came out lower than ' +
+      'the others — rather than the number.</p>' +
+      '<div class="areas">' + bars + '</div>' +
+      '<p class="small soft">A typical autumn starting point is about ' +
+      NORM[state.band][state.subject] + ' for this age group.</p>' +
+      '<p class="small">The real interface is at <b>practice.mapnwea.org</b> ' +
+      '(username <b>grow</b>, password <b>grow</b>) — about five questions, no score, ' +
+      'but it is the actual screen they will see.</p>' +
+      '<p class="small">Every answer here is in Settings &rarr; Progress report, ' +
+      'filed under Practice Test by content area.</p>';
+  }
+
+  /* ---------- screens and start-up ---------- */
+
+  function show(id) {
+    [].forEach.call(document.querySelectorAll('.screen'), (s) => s.classList.remove('show'));
+    $(id).classList.add('show');
+  }
+
+  let chosen = { subject: null, band: null };
+
+  function paintSubs() {
+    /* What the child is about to meet, not how big the bank is -- the bank
+       size means nothing to either of them and 59 sitting next to "43
+       questions" just looks like a contradiction. */
+    $('subReading').textContent = chosen.band === 'k'
+      ? '43 questions. Letters, sounds, words, and short stories read to you.'
+      : '43 questions. Passages to read, and what words mean.';
+    $('subMath').textContent = chosen.band === 'k'
+      ? '43 questions. Counting, adding, shapes, measuring and charts.'
+      : '43 questions. Times tables, fractions, shapes, measuring and charts.';
+  }
+
+  function paintPicks() {
+    [].forEach.call(document.querySelectorAll('[data-subject]'), (b) =>
+      b.classList.toggle('on', b.dataset.subject === chosen.subject));
+    [].forEach.call(document.querySelectorAll('[data-band]'), (b) =>
+      b.classList.toggle('on', b.dataset.band === chosen.band));
+    /* Nothing starts until both are chosen. A Start button that silently does
+       nothing is worse than one that is plainly not ready yet. */
+    const ready = !!(chosen.subject && chosen.band);
+    $('beginBtn').disabled = !ready;
+    $('shortBtn').disabled = !ready;
+    paintSubs();
+  }
+
+  function begin(total) {
+    if (!chosen.subject || !chosen.band) return;
+    const ctx = newContext(chosen.band, chosen.subject, $('realMode').checked, total);
+    Object.keys(ctx).forEach((k) => { state[k] = ctx[k]; });
+    state.R = rng((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+
+    /* Shuffle which area goes first, so two sittings in a row do not open on
+       the same kind of question. */
+    for (let i = state.order.length - 1; i > 0; i--) {
+      const j = Math.floor(state.R() * (i + 1));
+      const t = state.order[i]; state.order[i] = state.order[j]; state.order[j] = t;
+    }
+
+    $('barWhat').textContent = (state.subject === 'math' ? 'Maths' : 'Reading') +
+      ' · ' + (state.band === 'k' ? 'Younger' : 'Older');
+    $('audioNote').style.display = state.band === 'k' ? '' : 'none';
+
+    try {
+      Log.startSession({ game: 'test', track: state.subject, mode: state.band });
+    } catch (e) {}
+
+    show('brief');
+  }
+
+  function boot() {
+    const me = Save.me();
+    if (!me) { location.href = '../index.html'; return; }
+    $('barName').textContent = me.name;
+    chosen.band = me.row === 'big' ? 'g' : 'k';
+    paintPicks();
+
+    paintSubs();
+  }
+
+  [].forEach.call(document.querySelectorAll('[data-subject]'), (b) =>
+    b.addEventListener('click', () => { Sound.click(); chosen.subject = b.dataset.subject; paintPicks(); }));
+  [].forEach.call(document.querySelectorAll('[data-band]'), (b) =>
+    b.addEventListener('click', () => { Sound.click(); chosen.band = b.dataset.band; paintPicks(); }));
+
+  $('beginBtn').addEventListener('click', () => { Sound.click(); begin(ITEMS_FULL); });
+  $('shortBtn').addEventListener('click', () => { Sound.click(); begin(ITEMS_SHORT); });
+  $('homeBtn').addEventListener('click', () => { location.href = '../index.html'; });
+  $('backBtn').addEventListener('click', () => { Sound.click(); show('start'); });
+  $('readyBtn').addEventListener('click', () => { Sound.click(); show('quiz'); serve(); });
+  $('goBtn').addEventListener('click', goOn);
+  $('againBtn').addEventListener('click', () => { Sound.click(); show('start'); });
+  $('doneHomeBtn').addEventListener('click', () => { location.href = '../index.html'; });
+
+  function renderMute() {
+    $('muteBtn').textContent = Sound.isMuted() ? '🔇' : '🔊';
+    $('muteBtn').classList.toggle('muted', Sound.isMuted());
+  }
+  $('muteBtn').addEventListener('click', () => {
+    Sound.toggle();
+    renderMute();
+    if (Sound.isMuted() && 'speechSynthesis' in window) speechSynthesis.cancel();
+  });
+  renderMute();
+
+  boot();
+
+  /* Test seam: the harness drives the real page and needs to see the engine.
+     Assigning it on the last line doubles as a boot check -- if window.TEST is
+     missing, the script threw on its way down, and a throw during parse leaves
+     nothing for a window.onerror trap installed after load to catch. */
+  window.TEST = {
+    state, BANK, AREAS, NORM, OFFSET, LOGIT, TARGET_P,
+    ITEMS_FULL, ITEMS_SHORT, poolFor, chance, rng, nextItem, judge, serve,
+    newContext, takeItem, scoreItem, simulate,
+    begin, areaName, render,
+    /* Put one named item on screen, whatever the engine would have chosen.
+       The screenshot suite needs to see every item type at iPad size, and
+       waiting for the adaptive selector to happen to serve a line plot is not
+       a test strategy. */
+    showItem: function (id, seed) {
+      const it = BANK.math.concat(BANK.reading).filter((x) => x.id === id)[0];
+      if (!it) return null;
+      state.item = it;
+      state.band = it.b.indexOf('k') >= 0 ? 'k' : 'g';
+      state.R = rng(seed || 7);
+      state.q = it.make(state.R);
+      state.picked = null;
+      show('quiz');
+      render();
+      return it;
+    },
+    pick: function (i) { state.picked = i; $('goBtn').disabled = !hasAnswer(); },
+    answerRight: function () {
+      const q = state.q, t = state.item.t || 'choice';
+      state.picked = t === 'number' ? String(q.answer)
+        : t === 'multi' ? q.answer.slice()
+        : t === 'order' ? q.cards.map((c, i) => i).sort((a, b) => q.cards[a].r - q.cards[b].r)
+        : q.answer;
+      $('goBtn').disabled = false;
+    },
+    answerWrong: function () {
+      const q = state.q, t = state.item.t || 'choice';
+      if (t === 'number') state.picked = String(q.answer + 1);
+      else if (t === 'multi') {
+        /* Not the empty set: hasAnswer() would reject it and Go On would stay
+           disabled, so the harness would hang rather than answer wrongly. A
+           single wrong tick is a real wrong answer. */
+        const outside = q.choices.map((c, i) => i).filter((i) => q.answer.indexOf(i) < 0);
+        state.picked = outside.length ? [outside[0]] : [q.answer[0]];
+      } else if (t === 'order') {
+        state.picked = q.cards.map((c, i) => i).sort((a, b) => q.cards[b].r - q.cards[a].r);
+      } else state.picked = (q.answer === 0 ? 1 : 0);
+      $('goBtn').disabled = !hasAnswer();
+    },
+    go: goOn
+  };
+})();
+</script>
+</body>
+</html>

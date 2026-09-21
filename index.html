@@ -724,6 +724,18 @@
         </a>
       </div>
 
+      <!-- Not a game, and filed apart from them on purpose: no timer, no
+           hearts, no feedback until the end, and a screen that deliberately
+           does not look like the rest of the site. -->
+      <div class="group-label">Practice for school</div>
+      <div class="btn-row">
+        <a class="game-card" id="testCard" href="test/index.html" style="max-width:none">
+          <span class="emoji">📝</span>Practice Test
+          <span class="sub">The MAP test at school, but at home — adaptive, untimed, no going back</span>
+          <span class="who-for">Reading &amp; Maths</span>
+        </a>
+      </div>
+
       <div class="btn-row" style="margin-top:22px">
         <button id="shopBtn">🛒 Shop</button>
         <button id="forgeBtn">🔨 Forge</button>
@@ -2057,7 +2069,8 @@ $('cardsBackBtn').addEventListener('click', () => { Sound.click(); goHome(); });
    Written for a parent skimming it on a phone: the headline numbers, then
    where he's struggling, then what he actually got wrong. */
 const GAME_NAME = { math: 'Math RPG', language: 'Language RPG',
-                    story: 'Story Quest', robot: 'Robot Workshop' };
+                    story: 'Story Quest', robot: 'Robot Workshop',
+                    test: 'Practice Test' };
 
 function renderParent() {
   const me = Save.me();

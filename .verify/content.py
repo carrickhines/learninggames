@@ -771,6 +771,168 @@ try:
     check("map: every stop names a real difficulty", not badmode, str(badmode[:4]))
     check("map: there are stops to check", len(stops) > 50, "%d stops" % len(stops))
 
+    # =================== The Practice Test ===================
+    # Everything here is new content in a new shape, so almost none of it is
+    # covered by anything above. The three that matter most:
+    #
+    #  - every generator is run many times with different seeds, because a
+    #    generator that throws or returns a malformed question one time in
+    #    fifty is invisible until a child meets it mid-test;
+    #  - every area must cover its band's whole difficulty range, because the
+    #    selector silently stops climbing when it runs out of harder items and
+    #    the test just quietly stops adapting;
+    #  - the engine must actually estimate ability, which is only provable by
+    #    simulating children whose ability we already know.
+    print("")
+    print("The Practice Test")
+    d.get("file://" + os.path.join(ROOT, "test/index.html"))
+    time.sleep(1.4)
+    check("test: the page boots", js("!!window.TEST"))
+
+    # ---- every item, generated over and over ----
+    # 40 seeds each. `make` is the only code in the bank that runs, and a
+    # question with no right answer, two right answers, or an answer index off
+    # the end of the choices is the failure mode this catches.
+    bad = js("""(function () {
+      var out = [], all = TEST.BANK.math.concat(TEST.BANK.reading);
+      all.forEach(function (it) {
+        for (var s = 1; s <= 40; s++) {
+          var q;
+          try { q = it.make(TEST.rng(s * 7919 + 13)); }
+          catch (e) { out.push(it.id + ' threw: ' + e.message); return; }
+          var t = it.t || 'choice';
+          if (!q || !q.stem) { out.push(it.id + ' has no stem'); return; }
+          if (t === 'number') {
+            if (typeof q.answer !== 'number' || !isFinite(q.answer)) {
+              out.push(it.id + ' answer is not a number: ' + q.answer); return; }
+          } else if (t === 'order') {
+            if (!q.cards || q.cards.length < 3) { out.push(it.id + ' too few cards'); return; }
+            var ranks = q.cards.map(function (c) { return c.r; }).sort();
+            for (var i = 0; i < ranks.length; i++) {
+              if (ranks[i] !== i) { out.push(it.id + ' ranks are not 0..n-1'); return; }
+            }
+          } else if (t === 'hottext') {
+            if (!q.words || q.answer < 0 || q.answer >= q.words.length) {
+              out.push(it.id + ' hottext answer ' + q.answer + ' not in the sentence'); return; }
+          } else if (t === 'multi') {
+            if (!q.choices || !q.answer || !q.answer.length) { out.push(it.id + ' no answers'); return; }
+            if (q.answer.length < 2) { out.push(it.id + ' multi with one answer'); return; }
+            if (q.answer.length >= q.choices.length) { out.push(it.id + ' every option is right'); return; }
+            for (var k = 0; k < q.answer.length; k++) {
+              if (q.answer[k] < 0 || q.answer[k] >= q.choices.length) {
+                out.push(it.id + ' answer index off the end'); return; }
+            }
+          } else {
+            if (!q.choices || q.choices.length < 2) { out.push(it.id + ' too few choices'); return; }
+            if (!(q.answer >= 0 && q.answer < q.choices.length)) {
+              out.push(it.id + ' answer ' + q.answer + ' of ' + q.choices.length); return; }
+            /* Compare the raw markup, not the stripped text: a shape option
+               is an <svg> whose text content is the empty string, so
+               stripping tags reported every geometry item as four identical
+               options. */
+            var seen = {}, dupe = false;
+            q.choices.forEach(function (c) {
+              var k = String(c.html);
+              if (seen[k]) dupe = true; seen[k] = 1;
+            });
+            if (dupe) { out.push(it.id + ' has two identical options'); return; }
+          }
+        }
+      });
+      return out;
+    }())""")
+    check("test: every item generates a well-formed question, 40 seeds each",
+          not bad, "; ".join(bad[:4]))
+
+    ids = js("TEST.BANK.math.concat(TEST.BANK.reading).map(function (i) { return i.id; })")
+    check("test: item ids are unique", len(set(ids)) == len(ids),
+          str([i for i in ids if ids.count(i) > 1][:4]))
+    check("test: there are items to check", len(ids) > 150, "%d items" % len(ids))
+
+    # ---- every area covers its band's range ----
+    # A gap is not a cosmetic problem. The selector picks the item nearest the
+    # target difficulty, so a hole means a climbing child is handed something
+    # far too easy or far too hard, and the estimate stops moving.
+    RANGE = {"k": (112, 178), "g": (158, 222)}
+    gaps = []
+    for band, (lo, hi) in RANGE.items():
+        for subj in ("math", "reading"):
+            areas = d.execute_script(
+                "return TEST.AREAS[arguments[0]][arguments[1]]", band, subj)
+            for a in areas:
+                ds = sorted(d.execute_script(
+                    "var b=arguments[0],s=arguments[1],a=arguments[2];"
+                    "return TEST.BANK[s].filter(function (i) {"
+                    "  return i.a === a && i.b.indexOf(b) >= 0; })"
+                    "  .map(function (i) { return i.d; });", band, subj, a))
+                if not ds:
+                    gaps.append("%s/%s/%s is empty" % (band, subj, a))
+                    continue
+                prev = lo
+                for x in ds:
+                    if lo <= prev and x <= hi and x - prev > 12:
+                        gaps.append("%s/%s/%s %d->%d" % (band, subj, a, prev, x))
+                    prev = max(prev, x)
+                if hi - prev > 12:
+                    gaps.append("%s/%s/%s stops at %d" % (band, subj, a, prev))
+    check("test: every area covers its band with no gap to fall into",
+          not gaps, "; ".join(gaps[:4]))
+
+    # ---- the engine really estimates ability ----
+    # Simulate children whose true ability we chose, answering by the same
+    # Rasch curve the engine assumes, and check the estimate lands near the
+    # truth. Without this the whole thing could be a difficulty counter with a
+    # chart on the end and nothing would notice.
+    # TEST.simulate is the page's OWN selector and its OWN update, with no DOM
+    # -- not a copy of the algorithm living in this file. That matters: a
+    # check that re-implements the thing it is checking only ever proves the
+    # copy agrees with itself. Break nextItem or scoreItem in index.html and
+    # these three fail.
+    sim = js("""(function () {
+      var out = {};
+      [['k','math',140],['k','math',165],['k','reading',145],
+       ['g','math',190],['g','math',215],['g','reading',180]].forEach(function (c) {
+        var key = c[0] + '/' + c[1] + '/' + c[2];
+        var sum = 0, sumRight = 0, sumReal = 0, N = 300;
+        for (var r = 0; r < N; r++) {
+          var a = TEST.simulate(c[0], c[1], c[2], false, TEST.ITEMS_FULL);
+          sum += a.theta; sumRight += a.right;
+          sumReal += TEST.simulate(c[0], c[1], c[2], true, TEST.ITEMS_FULL).right;
+        }
+        out[key] = { est: sum / N, pct: sumRight / N / TEST.ITEMS_FULL,
+                     realPct: sumReal / N / TEST.ITEMS_FULL, truth: c[2] };
+      });
+      return out;
+    }())""")
+    off = ["%s est %.0f" % (k, v["est"]) for k, v in sim.items()
+           if abs(v["est"] - v["truth"]) > 8]
+    check("test: the estimate lands within 8 of a known ability, 300 runs each",
+          not off, "; ".join(off))
+    kind = ["%s %.0f%%" % (k, v["pct"] * 100) for k, v in sim.items()
+            if not 0.60 <= v["pct"] <= 0.80]
+    check("test: the gentler setting lands near seven right in ten",
+          not kind, "; ".join(kind))
+    hard = ["%s %.0f%%" % (k, v["realPct"] * 100) for k, v in sim.items()
+            if not 0.42 <= v["realPct"] <= 0.62]
+    check("test: 'just like the real test' lands near half, the way MAP does",
+          not hard, "; ".join(hard))
+
+    # ---- and it cannot become a way to earn ----
+    # A sitting is 43 untimed questions: 35 minutes for the older one, and the
+    # child cannot steer toward easy questions even if he wants to. Held to the
+    # same minutes-based model the Workshop is.
+    e3 = js("Save.ECONOMY")
+    test_gold = e3["testAnswer"]["gold"] * 30 + e3["testDone"]["gold"]
+    test_per_half_hour = test_gold * (30.0 / 35.0)
+    battle_half_hour = (e3["correct"]["gold"] * 15 + e3["foeDefeated"]["gold"] * 4
+                        + e3["runWon"]["gold"]) * 5
+    check("test: a sitting pays well under a half hour of battling",
+          test_per_half_hour < battle_half_hour * 0.5,
+          "%d vs %d" % (test_per_half_hour, battle_half_hour))
+    check("test: but it pays enough to be worth finishing",
+          test_per_half_hour > battle_half_hour * 0.15,
+          "%d vs %d" % (test_per_half_hour, battle_half_hour))
+
 finally:
     d.quit()
 

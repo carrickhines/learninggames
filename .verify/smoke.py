@@ -196,11 +196,14 @@ try:
     check("hub: the hero card shows the name", text("#hcName") == "Tester")
     check("hub: the hero starts at level 1", "Level 1" in text("#hcLevel"))
     check("hub: the hero starts broke", text("#hcGold") == "🪙 0")
+    # Scoped to the .games grid on purpose. The Practice Test card wears the
+    # same styling but is deliberately not one of the games, and sits in its
+    # own row below them.
     check("hub: all four games are linked",
-          len(d.find_elements(By.CSS_SELECTOR, ".game-card")) == 4)
+          len(d.find_elements(By.CSS_SELECTOR, ".games .game-card")) == 4)
     check("hub: the Robot Workshop is one of them",
           any("robot/index.html" in (a.get_attribute("href") or "")
-              for a in d.find_elements(By.CSS_SELECTOR, ".game-card")))
+              for a in d.find_elements(By.CSS_SELECTOR, ".games .game-card")))
     check("hub: no JS errors", errs() == [], str(errs()))
 
     print("\nThe map")
@@ -993,7 +996,8 @@ try:
     load("index.html")
     d.execute_script("Save.reset(); Save.createProfile('Sam', 'S');")
     for page in ("index.html", "math/index.html", "language/index.html",
-                 "story/index.html", "dungeon/index.html", "robot/index.html"):
+                 "story/index.html", "dungeon/index.html", "robot/index.html",
+                 "test/index.html"):
         load(page)
         box = d.execute_script("""
             var b = document.getElementById('muteBtn');
@@ -1052,6 +1056,110 @@ try:
         check("%s: a full row of hearts clears the foe" % game, not box["onFoe"])
         check("%s: all ten hearts are drawn" % game, box["hearts"] == 10,
               "%d hearts" % box["hearts"])
+
+    # ------------------------------------------------------ the Practice Test
+    # Most of what makes this page right is what is NOT on it. A timer, a back
+    # button, a question counter or a tick after each answer would each, on
+    # their own, teach the child something untrue about Thursday -- and every
+    # one of them is the sort of thing that gets added later by someone being
+    # helpful. So they are asserted absent.
+    print("\nThe Practice Test")
+    load("index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Rowan', '🦊');")
+    load("index.html")
+    card = d.execute_script("""
+        var a = document.getElementById('testCard');
+        if (!a) return null;
+        var games = document.querySelector('.games').getBoundingClientRect();
+        var r = a.getBoundingClientRect();
+        return { href: a.getAttribute('href'), below: r.top >= games.bottom - 2 };
+    """)
+    check("test: the hub has a Practice Test card", card is not None)
+    if card:
+        check("test: it points at the test page", card["href"] == "test/index.html",
+              str(card["href"]))
+        check("test: it sits apart from the four games", card["below"], str(card))
+
+    load("test/index.html")
+    check("test: the page boots", d.execute_script("return !!window.TEST"))
+    check("test: no JS errors on load", not errs(), str(errs()))
+
+    check("test: nothing starts until a subject is chosen",
+          d.execute_script("return document.getElementById('beginBtn').disabled"))
+
+    for band, subject in (("k", "math"), ("k", "reading"),
+                          ("g", "math"), ("g", "reading")):
+        load("test/index.html")
+        d.execute_script(
+            "var b = arguments[0], s = arguments[1];"
+            "document.querySelector('[data-band=\"' + b + '\"]').click();"
+            "document.querySelector('[data-subject=\"' + s + '\"]').click();"
+            "document.getElementById('shortBtn').click();"
+            "document.getElementById('readyBtn').click();", band, subject)
+        time.sleep(0.5)
+        name = band + "/" + subject
+        shape = d.execute_script("""
+            return { onQuiz: document.getElementById('quiz').classList.contains('show'),
+                     stem: !!document.querySelector('.stem'),
+                     go: document.getElementById('goBtn').disabled,
+                     speaker: !!document.getElementById('sayBtn'),
+                     timer: !!document.querySelector('.timer, .bar.super, #timerBar'),
+                     back: !!document.querySelector('#backBtn:not([hidden])')
+                           && document.getElementById('quiz').contains(
+                                document.getElementById('backBtn')) };
+        """)
+        check("test (%s): a question is on screen" % name,
+              shape["onQuiz"] and shape["stem"], str(shape))
+        check("test (%s): Go On is dead until something is chosen" % name, shape["go"])
+        check("test (%s): there is no timer" % name, not shape["timer"])
+        check("test (%s): there is no way back" % name, not shape["back"])
+        # Every K-2 item on the real test is read aloud and replayable; the
+        # older band reads it himself and must NOT get the crutch.
+        check("test (%s): the speaker is there for the younger band only" % name,
+              shape["speaker"] == (band == "k"), str(shape["speaker"]))
+
+        # Answering enables Go On, and nothing about right or wrong is shown.
+        d.execute_script("TEST.answerRight();")
+        time.sleep(0.15)
+        after = d.execute_script("""
+            return { go: document.getElementById('goBtn').disabled,
+                     verdict: /correct|wrong|right!|well done|try again/i
+                              .test(document.getElementById('qbody').textContent) };
+        """)
+        check("test (%s): choosing an answer wakes Go On" % name, not after["go"])
+        check("test (%s): the page never says whether it was right" % name,
+              not after["verdict"])
+
+        # Play the rest of the short sitting out to the end screen.
+        done = d.execute_script("""
+            var g = 0;
+            while (TEST.state.n < TEST.state.total && g++ < 60) {
+              TEST.answerRight(); TEST.go();
+            }
+            return { done: document.getElementById('done').classList.contains('show'),
+                     right: TEST.state.right, n: TEST.state.n,
+                     gold: Save.me().gold };
+        """)
+        check("test (%s): it finishes on the end screen" % name, done["done"], str(done))
+        check("test (%s): a perfect short sitting is scored as one" % name,
+              done["right"] == done["n"] and done["n"] == 12, str(done))
+        check("test (%s): the work is paid for" % name, done["gold"] > 0, str(done))
+
+    # The parent record files it by content area, so a grown-up opening the
+    # progress report sees "Practice Test · Geometry" and not "test · undefined".
+    load("index.html")
+    rows = d.execute_script("return Log.byTrack()")
+    test_rows = [r for r in rows if r["game"] == "test"]
+    check("test: it reaches the parent record", len(test_rows) > 0)
+    check("test: filed under a readable content area, not a code",
+          all(r["track"] and " " in r["track"] or r["track"] in ("Geometry", "Vocabulary")
+              for r in test_rows),
+          str([r["track"] for r in test_rows][:4]))
+    # A drag-to-order item cannot be rebuilt from a log line, so the Rematch
+    # must never try: it only ever serves maths.
+    check("test: the Rematch never serves a test question",
+          d.execute_script("return Log.due('math').filter("
+                           "function (o) { return o.game === 'test'; }).length") == 0)
 
 
 finally:

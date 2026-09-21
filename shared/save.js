@@ -49,6 +49,21 @@ var Save = (function () {
     robotPar:     { gold: 8,  xp: 6 },   // paid on top, for the shortest program
     packDone:     { gold: 30, xp: 30 },  // a pack of six, same as a quest
 
+    /* ---- The Practice Test ----
+       A sitting is 43 questions with no clock: half an hour or more of real,
+       unrewarded-in-the-moment effort, and the only thing on the site that
+       gives no feedback at all until the end. It is paid for the work rather
+       than for the score, because paying for the score would push a child
+       toward the easy questions and the whole point is that they should not
+       be able to steer.
+
+       Deliberately well under battling: a full sitting comes to roughly 180
+       gold against ~475 for the same half hour in a battle run, and like the
+       Workshop it takes no world multiplier (Save.setContext('test') is
+       neither 'math' nor 'language'). content.py holds it there. */
+    testAnswer:   { gold: 2,  xp: 1 },
+    testDone:     { gold: 120, xp: 80 },  // finishing all 43, once per sitting
+
     // Wrong answers cost nothing. Progress only ever goes up — the games are
     // already punishing enough with lost hearts.
 

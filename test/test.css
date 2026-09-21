@@ -1,0 +1,428 @@
+/* ==========================================================================
+   Practice Test — its own surface, on purpose.
+
+   Every other page on this site is a dark twilight arcade with gold buttons,
+   HP pips and a reward banner waiting to fire. Thursday's screen is a white
+   box with a question in it and nothing else, and a child who has practised
+   in the arcade frame has practised the wrong thing. So this page borrows
+   type and spacing from tokens.css and none of the rest of the house style.
+
+   Two rules the palette exists to keep:
+
+   - Nothing here is ever green or red. There is no per-question feedback in
+     an adaptive test -- the child answers, presses Go On, and the next
+     question arrives with no idea how the last one went. A colour that
+     implied a verdict would be the single most misleading thing on the page.
+   - One accent, used only for "this is the answer you have chosen".
+   ========================================================================== */
+
+:root {
+  --t-page: #e9ecf1;        /* the desk the paper sits on */
+  --t-card: #ffffff;
+  --t-ink: #16202e;
+  --t-ink-soft: #55637a;
+  --t-line: #c9d1de;
+  --t-line-soft: #e4e9f0;
+  --t-pick: #1d63c4;        /* the one accent: your chosen answer */
+  --t-pick-soft: #e8f0fc;
+  --t-go: #2f6f3e;          /* the Go On button, a sober green-grey */
+  --t-go-dark: #24552f;
+  --t-chrome: #34435c;      /* the proctor bar along the top */
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--t-page);
+  color: var(--t-ink);
+  font-family: var(--body);
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The frame. Deliberately square-ish and plain where #app elsewhere is a
+   rounded, glowing card. */
+#app {
+  position: relative;
+  max-width: 900px;
+  min-height: 100%;
+  margin: 0 auto;
+  background: var(--t-card);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 0 1px var(--t-line);
+}
+
+/* ---------- The proctor bar ----------
+   The real test carries a strip along the top with the student's name on it.
+   It is also the only place the site's own chrome is allowed to appear. */
+.bar {
+  flex: 0 0 auto;
+  background: var(--t-chrome);
+  color: #fff;
+  padding: 10px 62px 10px 16px;   /* right padding clears the mute toggle */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  letter-spacing: .3px;
+}
+.bar .name { font-weight: bold; }
+.bar .what { opacity: .75; }
+.bar .spacer { flex: 1; }
+
+/* The mute toggle is a site-wide rule -- top-right, round, not a gold slab --
+   and smoke.py checks it on every page including this one. */
+.sound-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.28);
+  cursor: pointer;
+}
+.sound-toggle.muted { opacity: .55; }
+
+/* ---------- Screens ---------- */
+.screen { display: none; flex: 1 1 auto; flex-direction: column; }
+.screen.show { display: flex; }
+.pad { padding: 22px 20px 26px; }
+.mid { max-width: 620px; margin: 0 auto; width: 100%; }
+
+h1 {
+  font-family: var(--display);
+  font-size: 30px;
+  margin: 6px 0 4px;
+}
+h2 {
+  font-family: var(--display);
+  font-size: 21px;
+  margin: 22px 0 8px;
+}
+p { line-height: 1.55; margin: 10px 0; }
+.soft { color: var(--t-ink-soft); }
+.small { font-size: 14px; }
+
+/* Plain, squared-off buttons. Nothing gold, nothing with a 3D lip. */
+button {
+  font-family: var(--body);
+  font-size: 17px;
+  padding: 12px 18px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: #f4f6fa;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+button:active { background: #e8ecf3; }
+button.primary {
+  background: var(--t-go);
+  border-color: var(--t-go-dark);
+  color: #fff;
+  font-weight: bold;
+}
+button.primary:active { background: var(--t-go-dark); }
+button[disabled] { opacity: .4; cursor: default; }
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- Start screen ---------- */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 18px;
+}
+.pick .ico { font-size: 28px; }
+.pick .sub { display: block; font-size: 13px; color: var(--t-ink-soft); }
+.pick.on { border-color: var(--t-pick); background: var(--t-pick-soft); }
+
+.note {
+  border-left: 4px solid var(--t-line);
+  padding: 2px 0 2px 14px;
+  margin: 16px 0;
+  color: var(--t-ink-soft);
+  font-size: 15px;
+}
+
+/* A real-test switch, for a child who wants it as hard as Thursday. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  margin-top: 14px;
+  cursor: pointer;
+}
+.switch input { width: 20px; height: 20px; }
+.switch .sub { display: block; font-size: 13px; color: var(--t-ink-soft); }
+
+/* ---------- The question ---------- */
+#quiz { display: none; }
+#quiz.show { display: flex; }
+
+.qwrap {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 20px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.qinner { max-width: 660px; margin: 0 auto; }
+
+/* The passage. The proctor script warns students it will reappear with a
+   different question, so it is styled to be recognised again. */
+.passage {
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+.passage h3 {
+  font-family: var(--display);
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.passage p { margin: 8px 0; line-height: 1.6; }
+
+.stem {
+  font-size: 20px;
+  line-height: 1.45;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.stem .txt { flex: 1; }
+
+/* The speaker. Every K-2 item is read aloud and the child may replay it, so
+   this is a control he has to practise using, not decoration. */
+.say {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  font-size: 22px;
+  border-radius: 50%;
+  padding: 0;
+  background: var(--t-pick-soft);
+  border-color: var(--t-pick);
+}
+.say.playing { background: var(--t-pick); color: #fff; }
+
+/* Artwork above the choices: shapes, graphs, counters, number lines. */
+.art { margin: 4px 0 18px; text-align: center; }
+.art svg { max-width: 100%; height: auto; }
+.counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  font-size: 34px;
+  line-height: 1.1;
+}
+.counters.groups { gap: 22px; }
+.counters .grp { display: flex; gap: 4px; }
+
+/* ---------- Answers ---------- */
+.choices { display: grid; gap: 10px; }
+.choices.cols2 { grid-template-columns: 1fr 1fr; }
+.choices.cols4 { grid-template-columns: repeat(4, 1fr); }
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 13px 15px;
+  font-size: 18px;
+  line-height: 1.35;
+  background: #fff;
+}
+.opt .mark {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--t-line);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--t-ink-soft);
+  background: #f7f9fc;
+}
+.choices.multi .opt .mark { border-radius: 5px; }
+.opt.on { border-color: var(--t-pick); background: var(--t-pick-soft); }
+.opt.on .mark { background: var(--t-pick); border-color: var(--t-pick); color: #fff; }
+.opt .big { font-size: 40px; line-height: 1.1; }
+.opt.pic { flex-direction: column; text-align: center; gap: 6px; padding: 14px 8px; }
+.opt.pic .mark { position: absolute; }
+.opt.pic { position: relative; }
+.opt.pic .mark { top: 8px; left: 8px; }
+
+/* Tap the word inside the sentence. */
+.hottext { font-size: 20px; line-height: 2.1; }
+.hottext .w {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+  cursor: pointer;
+}
+.hottext .w:hover { border-color: var(--t-line); }
+.hottext .w.on { background: var(--t-pick); color: #fff; }
+
+/* Tap the cards into order. */
+.order { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.order .card {
+  position: relative;
+  width: 118px;
+  padding: 14px 8px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+  font-size: 15px;
+  cursor: pointer;
+}
+.order .card .big { font-size: 38px; display: block; }
+.order .card.on { border-color: var(--t-pick); background: var(--t-pick-soft); }
+.order .card .seq {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--t-pick);
+  color: #fff;
+  font-size: 14px;
+  line-height: 26px;
+  display: none;
+}
+.order .card.on .seq { display: block; }
+.order-hint { text-align: center; color: var(--t-ink-soft); font-size: 14px; margin-top: 12px; }
+
+/* Type a number. */
+.typed {
+  font-family: var(--display);
+  font-size: 34px;
+  text-align: center;
+  border: 2px solid var(--t-line);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 58px;
+  background: #fbfcfe;
+  letter-spacing: 3px;
+}
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 300px;
+  margin: 14px auto 0;
+}
+.keypad button { font-size: 24px; font-family: var(--display); padding: 14px 0; }
+
+/* The calculator, which the real test offers on some math items and not
+   others -- so it has to be conspicuously absent most of the time. */
+.calcbar { margin-bottom: 12px; }
+.calcbar button { font-size: 14px; padding: 8px 12px; }
+.calc {
+  max-width: 280px;
+  margin: 10px 0 16px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f7f9fc;
+}
+.calc .out {
+  font-family: var(--display);
+  font-size: 26px;
+  text-align: right;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid var(--t-line);
+  border-radius: 6px;
+  min-height: 42px;
+  overflow: hidden;
+}
+.calc .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.calc .keys button { font-size: 17px; padding: 10px 0; }
+
+/* ---------- The foot: one button, bottom right, and nothing else ----------
+   No back control. No skip. No timer. No question counter. That is the whole
+   point of the screen. */
+.foot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--t-line-soft);
+  padding: 12px 20px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  background: #fafbfd;
+}
+.foot .primary { min-width: 150px; font-size: 18px; }
+
+/* ---------- Finished ---------- */
+.bigscore {
+  font-family: var(--display);
+  font-size: 56px;
+  text-align: center;
+  margin: 10px 0 0;
+}
+.bigscore .of { font-size: 20px; color: var(--t-ink-soft); }
+
+.climb {
+  height: 90px;
+  margin: 18px 0 6px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.areas { margin-top: 10px; }
+.areas .a { margin: 12px 0; }
+.areas .a .lab { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 4px; }
+.areas .a .track { height: 12px; border-radius: 6px; background: var(--t-line-soft); overflow: hidden; }
+/* display:block matters: a bare <span> is inline, so height and width
+   percentages do nothing and every area bar renders empty. */
+.areas .a .fill { display: block; height: 100%; background: var(--t-pick); border-radius: 6px; }
+
+.parent {
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  padding: 2px 16px 14px;
+  margin-top: 20px;
+  background: #fbfcfe;
+}
+
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  h1 { font-size: 25px; }
+  .stem { font-size: 18px; }
+  .opt { font-size: 17px; padding: 12px; }
+  .choices.cols4 { grid-template-columns: repeat(2, 1fr); }
+  .order .card { width: 46%; }
+}

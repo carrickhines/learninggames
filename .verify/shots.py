@@ -13,6 +13,7 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import ElementNotInteractableException
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -50,7 +51,20 @@ def shot(name):
 
 
 def click(sel):
-    d.find_element(By.CSS_SELECTOR, sel).click()
+    """Scroll the container ourselves, then fall back to a scripted click.
+
+    Firefox's driver refuses to click an element inside a scrolling container
+    it cannot scroll into view by its own rules, which is what the maths menu
+    became once it grew to nineteen tracks in two rows. smoke.py has had this
+    helper for a while; this file still had the naive one and had been dying
+    on the first battle() call since -- everything from math-menu onwards was
+    simply never being captured."""
+    el = d.find_element(By.CSS_SELECTOR, sel)
+    d.execute_script("arguments[0].scrollIntoView({block: 'center'});", el)
+    try:
+        el.click()
+    except ElementNotInteractableException:
+        d.execute_script("arguments[0].click();", el)
 
 
 NO_ANIM = """
@@ -67,6 +81,11 @@ def load(relpath):
     # advancing the animation clock after a window resize, which would
     # otherwise freeze fade-ins and pop-ins at their first frame.
     d.execute_script(NO_ANIM)
+    # A menu opens on this hero's own row with the other put away, so half the
+    # tracks this file wants to photograph are display:none until the reveal
+    # is tapped -- and an element that is not displayed cannot be clicked.
+    d.execute_script("var b = document.getElementById('showAllBtn');"
+                     "if (b && /Show/.test(b.textContent)) b.click();")
     time.sleep(0.4)
 
 
@@ -483,5 +502,48 @@ try:
     d.find_element(By.CSS_SELECTOR, "#runBtn").click()
     time.sleep(2.4)
     shot("robot-solved")
+
+    # ---- the Practice Test ----
+    # Almost everything on this page is drawn from scratch: shapes, bar
+    # graphs, clocks, rulers, number lines, area grids, ten frames. None of it
+    # existed anywhere on the site before, and nothing in the suite can see
+    # that a figure is too small to read, clipped at its own edge, or drawn so
+    # that two of the four options are both defensible. Those are the three
+    # faults the first screenshot pass actually found, so these get looked at.
+    load("test/index.html")
+    d.execute_script(NO_ANIM)
+    shot("test-start")
+
+    d.execute_script("document.querySelector('[data-subject=\"math\"]').click();"
+                     "document.querySelector('[data-band=\"g\"]').click();"
+                     "document.getElementById('beginBtn').click();")
+    time.sleep(0.4)
+    shot("test-brief")
+
+    for item in ("k-md-bargraph", "k-md-clockhour", "k-geo-name2d", "k-md-order3",
+                 "k-oa-make10", "g-md-ruler", "g-md-lineplot", "g-md-arearect",
+                 "g-geo-symmetry", "g-geo-angle", "g-nbt-fracline", "g-nbt-multten",
+                 "g-vocab-hottext", "gl-race-q3"):
+        d.execute_script("TEST.showItem(arguments[0], 11)", item)
+        time.sleep(0.3)
+        d.execute_script(NO_ANIM)
+        shot("test-item-" + item)
+
+    # the end screen, where the climb chart and the per-area bars live
+    d.execute_script("""
+        document.getElementById('start').classList.add('show');
+        document.querySelector('[data-subject="math"]').click();
+        document.querySelector('[data-band="g"]').click();
+        document.getElementById('shortBtn').click();
+        document.getElementById('readyBtn').click();
+        var g = 0;
+        while (TEST.state.n < TEST.state.total && g++ < 40) {
+          if (Math.random() < 0.7) TEST.answerRight(); else TEST.answerWrong();
+          TEST.go();
+        }
+    """)
+    time.sleep(0.8)
+    d.execute_script(NO_ANIM)
+    shot("test-done")
 finally:
     d.quit()
