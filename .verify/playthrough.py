@@ -1023,6 +1023,67 @@ try:
           d.execute_script("return (Save.me().cards['r-scout'] || 0);") == card_before + 1,
           str(d.execute_script("return (Save.me().cards['r-scout'] || 0);")))
 
+    print("\nA whole practice test")
+    # smoke.py sits a twelve-question taster and content.py simulates the
+    # engine with no page at all. Neither of those is a child sitting the real
+    # 43-item thing through the real DOM, one rendered question at a time --
+    # which is the only way to catch a renderer that throws on the twenty-ninth
+    # item, or a Go On button that stops enabling half way down.
+    load("test/index.html")
+    d.execute_script("Save.reset(); Save.createProfile('Rex', '🦖');"
+                     "Save.update(function (p) { p.row = 'big'; });")
+    load("test/index.html")
+    d.execute_script("document.querySelector('[data-band=\"g\"]').click();"
+                     "document.querySelector('[data-subject=\"math\"]').click();"
+                     "document.getElementById('beginBtn').click();"
+                     "document.getElementById('readyBtn').click();")
+    time.sleep(0.6)
+
+    # Answer the first half right and the second half wrong, so the estimate
+    # has to climb and then come back down. A difficulty that only ever went
+    # up would pass a "does it adapt?" check that only ever answered right.
+    walk = d.execute_script("""
+        var seen = [], guard = 0;
+        while (TEST.state.n < TEST.state.total && guard++ < 120) {
+          var it = TEST.state.item;
+          var shown = document.querySelector('.stem');
+          seen.push({ d: it.d, area: it.a, theta: TEST.state.theta,
+                      rendered: !!shown && shown.textContent.trim().length > 0,
+                      ready: document.getElementById('goBtn').disabled });
+          if (TEST.state.n < 20) TEST.answerRight(); else TEST.answerWrong();
+          if (document.getElementById('goBtn').disabled) return { stuck: it.id };
+          TEST.go();
+        }
+        return { seen: seen, right: TEST.state.right, n: TEST.state.n,
+                 done: document.getElementById('done').classList.contains('show'),
+                 gold: Save.me().gold, errs: window.__errs || [] };
+    """)
+    check("test: no question left Go On stuck off", "stuck" not in walk, str(walk))
+    if "stuck" not in walk:
+        check("test: all 43 questions were asked", walk["n"] == 43, str(walk["n"]))
+        check("test: every one of them rendered something to read",
+              all(s["rendered"] for s in walk["seen"]),
+              str([i for i, s in enumerate(walk["seen"]) if not s["rendered"]][:4]))
+        check("test: Go On was dead on arrival every time",
+              all(s["ready"] for s in walk["seen"]))
+        climbed = max(s["theta"] for s in walk["seen"][:20]) - walk["seen"][0]["theta"]
+        fell = max(s["theta"] for s in walk["seen"]) - walk["seen"][-1]["theta"]
+        check("test: answering right made it harder", climbed > 8, "%.1f RIT" % climbed)
+        check("test: answering wrong made it easier again", fell > 8, "%.1f RIT" % fell)
+        early = sum(s["d"] for s in walk["seen"][14:20]) / 6.0
+        late = sum(s["d"] for s in walk["seen"][-6:]) / 6.0
+        check("test: and the questions themselves followed", early - late > 6,
+              "%.0f then %.0f" % (early, late))
+        areas = {}
+        for s in walk["seen"]:
+            areas[s["area"]] = areas.get(s["area"], 0) + 1
+        check("test: all four content areas were sampled", len(areas) == 4, str(areas))
+        check("test: none of them was starved", min(areas.values()) >= 10, str(areas))
+        check("test: it ended on the end screen", walk["done"])
+        check("test: it paid for the sitting", walk["gold"] > 0, str(walk["gold"]))
+        check("test: no JS errors across the whole sitting",
+              not walk["errs"], str(walk["errs"]))
+
     print("\nProgress survives")
     before = gold()
     load("index.html")
