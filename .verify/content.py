@@ -692,6 +692,35 @@ try:
     check("robot: every pack names a card that exists",
           all(c in known for c in pack_cards),
           str([c for c in pack_cards if c not in known]))
+    # ---- two monsters, one face ----
+    # The Cards screen groups by where a card came from and draws an uncaught
+    # one as a SILHOUETTE with its name replaced by "???". So two cards on the
+    # same shelf sharing an emoji are indistinguishable while either is still
+    # missing: a child had caught the Inky Squid and read the uncaught Deep
+    # Kraken beside it -- also a 🦑 -- as a second Inky Squid he had somehow
+    # lost. Sunny Meadow had two such pairs, so every hero met this on day one.
+    #
+    # Per shelf, not site-wide: the same face in two different worlds is fine,
+    # because they never appear beside each other and both show their name once
+    # caught. The shelf is the thing the child actually looks at.
+    d.get("file://" + os.path.join(ROOT, "index.html"))
+    time.sleep(0.8)
+    d.execute_script("Save.reset(); Save.createProfile('CardTester', '🧪');")
+    all_cards = js("Save.allCards()")
+    shelves = {}
+    for c in all_cards:
+        shelves.setdefault(c["from"], {}).setdefault(c["emoji"], []).append(c["name"])
+    clashes = []
+    for place, faces in shelves.items():
+        for emoji, names in faces.items():
+            if len(names) > 1:
+                clashes.append("%s %s: %s" % (place, emoji, " / ".join(names)))
+    check("cards: no two cards on a shelf share a face",
+          not clashes, "; ".join(sorted(clashes)[:4]))
+    check("cards: every card has a face at all",
+          all(c["emoji"] for c in all_cards),
+          str([c["id"] for c in all_cards if not c["emoji"]][:4]))
+
     check("robot: no two packs award the same card",
           len(set(pack_cards)) == len(pack_cards), str(pack_cards))
 

@@ -166,7 +166,17 @@ var Save = (function () {
 
      Every foe `id` is also its collectible card id, so it must stay unique
      across the site. `r` is the card's rarity: 1 common, 2 rare, 3 legendary.
-     Each world's last foe is its boss and is always legendary. */
+     Each world's last foe is its boss and is always legendary.
+
+     No two cards on the same shelf may share an `emoji`. The Cards screen
+     groups by where a card came from and draws an uncaught one as a silhouette
+     with its name replaced by "???" — so two monsters in one world with the
+     same face are indistinguishable while either is still missing. A child
+     reported exactly this: he had caught the Inky Squid and read the uncaught
+     Deep Kraken beside it, also a 🦑, as a second Inky Squid he had somehow
+     lost. Sunny Meadow had two such pairs, so every hero met it on day one.
+     content.py checks this now; the emoji is cosmetic and safe to change,
+     unlike the id. */
 
   var WORLDS = [
     {
@@ -176,8 +186,8 @@ var Save = (function () {
         math: [
           { id: 'm-slime',  name: 'Slime',   emoji: '🟢', hp: 3, scale: 0.80, r: 1 },
           { id: 'm-bat',    name: 'Bat',     emoji: '🦇', hp: 4, scale: 1.05, r: 1 },
-          { id: 'm-ghost',  name: 'Ghost',   emoji: '👻', hp: 4, scale: 0.92, r: 2 },
-          { id: 'm-dragon', name: 'Dragon',  emoji: '🐉', hp: 5, scale: 1.16, r: 3 }
+          { id: 'm-ghost',  name: 'Ghost',   emoji: '💀', hp: 4, scale: 0.92, r: 2 },
+          { id: 'm-dragon', name: 'Dragon',  emoji: '🐲', hp: 5, scale: 1.16, r: 3 }
         ],
         language: [
           { id: 'l-slime',  name: 'Slow Slime',     emoji: '🐌', hp: 3, scale: 0.90, r: 1 },
@@ -196,7 +206,7 @@ var Save = (function () {
           { id: 'm-crab',   name: 'Rock Crab',    emoji: '🦀', hp: 4, scale: 0.95, r: 1 },
           { id: 'm-spider', name: 'Cave Spider',  emoji: '🕷️', hp: 4, scale: 0.90, r: 1 },
           { id: 'm-golem',  name: 'Gem Golem',    emoji: '🗿', hp: 5, scale: 1.05, r: 2 },
-          { id: 'm-kraken', name: 'Deep Kraken',  emoji: '🦑', hp: 6, scale: 1.10, r: 3 }
+          { id: 'm-kraken', name: 'Deep Kraken',  emoji: '🐙', hp: 6, scale: 1.10, r: 3 }
         ],
         language: [
           { id: 'l-bug',    name: 'Grumble Bug',  emoji: '🐛', hp: 4, scale: 0.90, r: 1 },
@@ -514,7 +524,7 @@ var Save = (function () {
     // the two little-hero games; kept after the quests so every quest above
     // still lines up with QUESTS by index
     { id: 's-order',   name: 'Story Sorter',  emoji: '🃏' },
-    { id: 's-finish',  name: 'Storyteller',   emoji: '🌱' }
+    { id: 's-finish',  name: 'Storyteller',   emoji: '📖' }
   ];
 
   /* The Robot Workshop has no combat either, so like Story Quest each pack
