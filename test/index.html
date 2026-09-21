@@ -229,7 +229,7 @@
   const state = {
     band: null, subject: null, real: false, total: ITEMS_FULL,
     theta: 0, floor: 0, ceil: 0,
-    n: 0, right: 0, history: [],
+    n: 0, right: 0, history: [], seen: [],
     pool: [], used: {}, order: [], lastPid: {},
     areaTheta: {}, areaSeen: {},
     q: null, item: null, picked: null, started: 0,
@@ -269,7 +269,7 @@
       theta: NORM[band][subject],
       floor: Math.min.apply(null, ds) - 6,
       ceil: Math.max.apply(null, ds) + 6,
-      n: 0, right: 0, history: [],
+      n: 0, right: 0, history: [], seen: [],
       used: {}, lastPid: {}, areaTheta: {}, areaSeen: {},
       order: areas.slice()
     };
@@ -331,6 +331,7 @@
     ctx.n++;
     if (ok) ctx.right++;
     ctx.history.push(ctx.theta);
+    ctx.seen.push(it);
   }
 
   /* A child of known ability sitting the whole thing, with no page involved.

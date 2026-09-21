@@ -1131,11 +1131,20 @@ Half of what MAP tests did not exist anywhere on this site: no geometry, no
 measurement, no data, no reading passages, no vocabulary in context. So
 `draw.js` draws shapes, bar graphs, pictographs, line plots, number lines,
 area grids, ten frames, clocks, rulers and angles, and `bank-read.js` carries
-18 authored passages.
+30 authored passages.
 
 `bank-math.js` and `bank-read.js` port the *logic* of the games' `MAKERS` and
 `TRACKS[].make` rather than importing them — both live inside IIFEs and neither
 is reachable across pages, and a copy keeps the shipped games untouched.
+
+**Five answer formats, and the mix is enforced.** Tap one of four, tap every
+one that applies, type a number, put three things in order, tap a word inside a
+sentence — because the real test is not four buttons over and over. The first
+version of the bank came out **248 multiple-choice out of 258** and passed
+every other check here: a child could have sat a whole 43-question practice and
+met a type-in once. `content.py` now counts what a *sitting actually serves*
+rather than what the bank contains, because a format the selector never reaches
+is the same as not having it.
 
 **A passage is reused across consecutive items** (`pid`, sticky per area),
 because the real test does exactly that and its proctor script warns students
@@ -1602,7 +1611,7 @@ does not offer robot packs either. Both are one job, not two.
 Current shape: **19 maths tracks, 15 language tracks, 16 quests + 2 mini games,
 8 robot packs (48 levels), 80 map steps per trail through 16 regions, 16 worlds,
 170 cards, 6 gear slots (44 pieces), a dungeon with no bottom, and a practice
-MAP test of ~200 items across two grade bands.** Suite: 611
+MAP test of 290 items across two grade bands.** Suite: 611
 save checks, 65 log checks, ~200 smoke checks, plus tracks / content /
 playthrough / upgrade.
 

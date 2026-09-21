@@ -917,6 +917,38 @@ try:
     check("test: 'just like the real test' lands near half, the way MAP does",
           not hard, "; ".join(hard))
 
+    # ---- and the child meets more than one kind of question ----
+    # The real test asks you to type a number, to tap every one that applies
+    # and to put things in order, not just to pick one of four. The first
+    # version of this bank came out 248 multiple-choice out of 258, which
+    # passed every other check here -- a child could sit the whole thing and
+    # meet a type-in once. This counts what a sitting ACTUALLY serves rather
+    # than what the bank contains, because a rare format that the selector
+    # never happens to reach is the same as not having it.
+    mix = js("""(function () {
+      var out = {};
+      [['k','math'],['k','reading'],['g','math'],['g','reading']].forEach(function (c) {
+        var tally = {}, N = 200, other = 0;
+        for (var r = 0; r < N; r++) {
+          var ctx = TEST.simulate(c[0], c[1], TEST.NORM[c[0]][c[1]] + 10, false,
+                                  TEST.ITEMS_FULL);
+          ctx.seen.forEach(function (it) {
+            var t = it.t || 'choice';
+            tally[t] = (tally[t] || 0) + 1;
+            if (t !== 'choice') other++;
+          });
+        }
+        out[c[0] + '/' + c[1]] = { perSitting: other / N, kinds: Object.keys(tally).length };
+      });
+      return out;
+    }())""")
+    thin = ["%s %.1f" % (k, v["perSitting"]) for k, v in mix.items() if v["perSitting"] < 3]
+    check("test: a sitting serves at least three non-multiple-choice questions",
+          not thin, "; ".join(thin))
+    onekind = ["%s %d" % (k, v["kinds"]) for k, v in mix.items() if v["kinds"] < 3]
+    check("test: and at least three different answer formats turn up",
+          not onekind, "; ".join(onekind))
+
     # ---- and it cannot become a way to earn ----
     # A sitting is 43 untimed questions: 35 minutes for the older one, and the
     # child cannot steer toward easy questions even if he wants to. Held to the

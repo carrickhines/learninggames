@@ -1324,5 +1324,203 @@ var BANK_READ = (function () {
              choices: q.choices, answer: q.answer, cols: 4 };
   } });
 
+
+  /* ======================================================================
+     The other answer formats, on the reading side.
+
+     Same reason as the maths bank: a test made entirely of four buttons
+     teaches nothing about the formats a child will actually meet. Sequencing
+     in particular is a real reading skill -- putting the events of a story
+     back in order is exactly what the K-2 test asks -- and "tap the word in
+     the sentence" is the format that cannot be got right by guessing between
+     four options.
+     ====================================================================== */
+
+  // ---- put them in order ----
+
+  item({ id: 'k-found-order-abc', b: 'k', a: 'found', d: 128, t: 'order', make: function (R) {
+    var start = ri(R, 0, 22);
+    var three = [ALPHA[start], ALPHA[start + ri(R, 1, 2)], ALPHA[start + 3]];
+    var sorted = three.slice().sort();
+    var order = shuffle(R, [0, 1, 2]);
+    return {
+      stem: 'Tap the letters in <b>alphabet order</b>.',
+      say: 'Tap the letters in alphabet order.',
+      cards: order.map(function (i) {
+        return { html: '<span class="big">' + three[i] + '</span>', r: sorted.indexOf(three[i]) };
+      })
+    };
+  } });
+
+  /* Everyday sequences with exactly one sensible order -- the same authoring
+     rule Story Order in Story Quest follows, because two steps a child could
+     defensibly swap makes the item unanswerable rather than hard. */
+  var K_SEQ = [
+    ['\ud83e\uddf4 Squeeze the toothpaste', '\ud83e\udea5 Brush your teeth', '\ud83d\udca7 Rinse the brush'],
+    ['\ud83c\udf31 Plant the seed', '\ud83d\udca6 Water it', '\ud83c\udf3b The flower opens'],
+    ['\ud83e\udd5a Crack the egg', '\ud83c\udf73 Cook it in the pan', '\ud83c\udf7d\ufe0f Eat your breakfast'],
+    ['\ud83d\udc5f Put on your shoes', '\ud83d\udeaa Open the door', '\ud83c\udf33 Walk to the park'],
+    ['\u270f\ufe0f Draw the picture', '\ud83c\udfa8 Colour it in', '\ud83d\udccc Put it on the wall']
+  ];
+
+  item({ id: 'k-lit-order-story', b: 'k', a: 'lit', d: 142, t: 'order', make: function (R) {
+    var steps = pick(R, K_SEQ);
+    var order = shuffle(R, [0, 1, 2]);
+    return {
+      stem: 'Tap them in the order they happen.',
+      say: 'Tap them in the order they happen. Which one is first?',
+      cards: order.map(function (i) { return { html: steps[i], r: i }; })
+    };
+  } });
+
+  item({ id: 'g-lit-order-events', b: 'g', a: 'lit', d: 194, t: 'order', make: function (R) {
+    var s = pick(R, [
+      { t: 'Ravi found a stray kitten under the hedge. He carried it home in his coat, ' +
+           'and his mother rang every house on the street until she found its owner.',
+        e: ['Ravi found the kitten.', 'He carried it home.', 'His mother rang the neighbours.'] },
+      { t: 'The tent blew over in the night. In the morning they dried everything on the ' +
+           'fence, and by lunchtime they had put it back up in a more sheltered spot.',
+        e: ['The tent blew over.', 'They dried everything out.', 'They put the tent back up.'] },
+      { t: 'Ellie practised the same four bars for a week. At the concert she played them ' +
+           'without a single mistake, and afterwards her teacher shook her hand.',
+        e: ['Ellie practised for a week.', 'She played at the concert.',
+            'Her teacher shook her hand.'] }
+    ]);
+    var order = shuffle(R, [0, 1, 2]);
+    return {
+      stem: 'Read it, then tap the events in the order they happened.<br><br>' + s.t,
+      cards: order.map(function (i) { return { html: s.e[i], r: i }; })
+    };
+  } });
+
+  // ---- tap the word in the sentence ----
+
+  item({ id: 'k-lang-hot-cap', b: 'k', a: 'lang', d: 168, t: 'hottext', make: function (R) {
+    var s = pick(R, [
+      { s: 'on friday we went to the beach.', want: 'friday' },
+      { s: 'my dog rosie can do tricks.', want: 'rosie' },
+      { s: 'we drove all the way to london.', want: 'london' },
+      { s: 'i think tom left his coat here.', want: 'tom' },
+      { s: 'in december it snowed for a week.', want: 'december' }
+    ]);
+    var words = s.s.split(' ');
+    var idx = -1, i;
+    for (i = 0; i < words.length; i++) if (words[i].replace(/[.,]/g, '') === s.want) idx = i;
+    return {
+      stem: 'Tap the word that should start with a <b>capital letter</b>.',
+      say: 'Tap the word that should start with a capital letter. ' + s.s,
+      words: words, answer: idx
+    };
+  } });
+
+  item({ id: 'k-found-hot-sight', b: 'k', a: 'found', d: 148, t: 'hottext', make: function (R) {
+    var s = pick(R, [
+      { s: 'The cat sat on the big red mat.', want: 'big' },
+      { s: 'We went to the park after lunch.', want: 'park' },
+      { s: 'My little sister has a blue bike.', want: 'blue' },
+      { s: 'The dog ran fast down the hill.', want: 'fast' }
+    ]);
+    var words = s.s.split(' ');
+    var idx = -1, i;
+    for (i = 0; i < words.length; i++) if (words[i].replace(/[.,]/g, '') === s.want) idx = i;
+    return {
+      stem: 'Tap the word <b>' + s.want + '</b>.',
+      say: 'Tap the word ' + s.want + '. The sentence says: ' + s.s,
+      words: words, answer: idx
+    };
+  } });
+
+  item({ id: 'g-info-hot-signal', b: 'g', a: 'info', d: 196, t: 'hottext', make: function (R) {
+    var s = pick(R, [
+      { s: 'The river flooded because heavy rain fell for three days.', want: 'because',
+        ask: 'Tap the word that signals a <b>cause</b>.' },
+      { s: 'Wood floats, whereas most metals sink straight to the bottom.', want: 'whereas',
+        ask: 'Tap the word that signals a <b>contrast</b>.' },
+      { s: 'The ice melted, therefore the water level rose.', want: 'therefore',
+        ask: 'Tap the word that signals a <b>result</b>.' },
+      { s: 'Finally, the seeds are covered with a thin layer of soil.', want: 'Finally',
+        ask: 'Tap the word that signals the <b>last step</b>.' }
+    ]);
+    var words = s.s.split(' ');
+    var idx = -1, i;
+    for (i = 0; i < words.length; i++) if (words[i].replace(/[.,;]/g, '') === s.want) idx = i;
+    return { stem: s.ask, words: words, answer: idx };
+  } });
+
+  item({ id: 'g-lit-hot-feeling', b: 'g', a: 'lit', d: 182, t: 'hottext', make: function (R) {
+    var s = pick(R, [
+      { s: 'She trudged up the last flight of stairs and dropped her bag.', want: 'trudged',
+        ask: 'Tap the word that shows she was <b>tired</b>.' },
+      { s: 'He beamed at the pile of presents on the table.', want: 'beamed',
+        ask: 'Tap the word that shows he was <b>delighted</b>.' },
+      { s: 'Nell scowled at the broken model and said nothing at all.', want: 'scowled',
+        ask: 'Tap the word that shows she was <b>cross</b>.' },
+      { s: 'They crept along the corridor, hardly daring to breathe.', want: 'crept',
+        ask: 'Tap the word that shows they were <b>nervous</b>.' }
+    ]);
+    var words = s.s.split(' ');
+    var idx = -1, i;
+    for (i = 0; i < words.length; i++) if (words[i].replace(/[.,]/g, '') === s.want) idx = i;
+    return { stem: s.ask, words: words, answer: idx };
+  } });
+
+  // ---- tap every one that applies ----
+
+  item({ id: 'k-vocab-multi-cat', b: 'k', a: 'vocab', d: 146, t: 'multi', make: function (R) {
+    var c = pick(R, CATS);
+    var good = shuffle(R, c['in']).slice(0, 2), bad = shuffle(R, c.out).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (x, i) { if (c['in'].indexOf(x) >= 0) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the ones that are ' + c.name + '.',
+      say: sayWith('Tap all the ones that are ' + c.name + '.',
+                   all.map(function (x) { return x[1]; })),
+      choices: all.map(function (x) {
+        return { html: '<span class="big">' + x[0] + '</span>' + x[1] };
+      }),
+      answer: ans, cols: 4, pic: true
+    };
+  } });
+
+  item({ id: 'k-found-multi-sound', b: 'k', a: 'found', d: 162, t: 'multi', make: function (R) {
+    var f = pick(R, SOUNDS);
+    var good = shuffle(R, f.words).slice(0, 2);
+    var others = shuffle(R, SOUNDS.filter(function (x) { return x.l !== f.l; })).slice(0, 2);
+    var bad = others.map(function (o) { return pick(R, o.words); });
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (w, i) { if (good.indexOf(w) >= 0) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the pictures that start with the same sound as <b>' +
+            good[0][1] + '</b>.',
+      say: sayWith('Tap all the pictures that start with the same sound as ' + good[0][1] + '.',
+                   all.map(function (w) { return w[1]; })),
+      choices: all.map(function (w) {
+        return { html: '<span class="big">' + w[0] + '</span>' + w[1] };
+      }),
+      answer: ans, cols: 4, pic: true
+    };
+  } });
+
+  item({ id: 'g-vocab-multi-syn', b: 'g', a: 'vocab', d: 198, t: 'multi', make: function (R) {
+    var sets = [
+      { w: 'enormous', yes: ['huge', 'gigantic', 'massive'], no: ['tiny', 'narrow', 'gentle'] },
+      { w: 'quickly', yes: ['rapidly', 'swiftly', 'fast'], no: ['slowly', 'quietly', 'carefully'] },
+      { w: 'unhappy', yes: ['miserable', 'glum', 'sad'], no: ['cheerful', 'sleepy', 'polite'] },
+      { w: 'brave', yes: ['fearless', 'bold', 'courageous'], no: ['timid', 'clumsy', 'honest'] }
+    ];
+    var s = pick(R, sets);
+    var good = shuffle(R, s.yes).slice(0, 2), bad = shuffle(R, s.no).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (x, i) { if (s.yes.indexOf(x) >= 0) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the words that mean nearly the same as <b>' + s.w + '</b>.',
+      choices: all.map(function (x) { return { html: x }; }),
+      answer: ans, cols: 2
+    };
+  } });
+
   return ITEMS;
 })();

@@ -1266,5 +1266,279 @@ var BANK_MATH = (function () {
     return { stem: s.q + ' … what?', choices: q.choices, answer: q.answer, cols: 4 };
   } });
 
+
+  /* ======================================================================
+     The other answer formats.
+
+     The real test is not four buttons over and over: it asks you to type a
+     number, to tap every one that applies, and to put things in order. The
+     first pass of this bank came out 248 multiple-choice items out of 258, so
+     a child could sit a whole 43-question practice and meet a type-in once,
+     which teaches him nothing about the formats. These exist to raise that
+     proportion, not to add difficulty -- each is pitched at the same rungs the
+     choice items already cover.
+     ====================================================================== */
+
+  // ---- type the number ----
+
+  item({ id: 'k-nbt-count20-num', b: 'k', a: 'nbt', d: 138, t: 'number', make: function (R) {
+    var e = pick(R, THINGS), n = ri(R, 11, 20);
+    return { stem: 'Count them. Type how many.', say: 'Count them, and type how many there are.',
+             art: D.counters(n, e), answer: n };
+  } });
+
+  item({ id: 'k-oa-add10-num', b: 'k', a: 'oa', d: 146, t: 'number', make: function (R) {
+    var a = ri(R, 2, 6), b = ri(R, 2, 10 - a);
+    return { stem: a + ' + ' + b + ' = ?', say: 'What is ' + a + ' plus ' + b + '?',
+             answer: a + b };
+  } });
+
+  item({ id: 'k-oa-sub20-num', b: 'kg', a: 'oa', d: 176, t: 'number', make: function (R) {
+    var a = ri(R, 12, 20), b = ri(R, 3, 9);
+    return { stem: a + ' \u2212 ' + b + ' = ?', say: 'What is ' + a + ' take away ' + b + '?',
+             answer: a - b };
+  } });
+
+  item({ id: 'k-md-cubes-num', b: 'k', a: 'md', d: 160, t: 'number', make: function (R) {
+    var n = ri(R, 4, 9);
+    return {
+      stem: 'How many cubes long is the stick? Type the number.',
+      say: 'How many cubes long is the stick?',
+      art: '<div style="display:inline-block">' +
+           '<div style="height:16px;width:' + (n * 30) + 'px;background:#f3c98b;' +
+           'border:2px solid #16202e;border-radius:4px"></div>' +
+           '<div class="counters" style="gap:0;font-size:26px;justify-content:flex-start">' +
+           new Array(n + 1).join('\ud83d\udfe6') + '</div></div>',
+      answer: n
+    };
+  } });
+
+  item({ id: 'k-geo-corners-num', b: 'k', a: 'geo', d: 150, t: 'number', make: function (R) {
+    var sh = pick(R, ['triangle', 'square', 'pentagon', 'hexagon', 'octagon']);
+    return { stem: 'How many corners? Type the number.',
+             say: 'How many corners does this shape have?',
+             art: D.shape(sh, { size: 120 }), answer: D.sidesOf(sh) };
+  } });
+
+  item({ id: 'g-geo-sides-num', b: 'g', a: 'geo', d: 168, t: 'number', make: function (R) {
+    var sh = pick(R, ['pentagon', 'hexagon', 'octagon', 'trapezoid', 'rhombus']);
+    return { stem: 'How many sides does this shape have?', art: D.shape(sh, { size: 118 }),
+             answer: D.sidesOf(sh) };
+  } });
+
+  item({ id: 'g-nbt-add2d-num', b: 'g', a: 'nbt', d: 168, t: 'number', make: function (R) {
+    var a = ri(R, 27, 79), b = ri(R, 16, 48);
+    return { stem: a + ' + ' + b + ' = ?', answer: a + b };
+  } });
+
+  item({ id: 'g-nbt-sub3d-num', b: 'g', a: 'nbt', d: 196, t: 'number', make: function (R) {
+    var a = ri(R, 320, 905), b = ri(R, 118, 289);
+    return { stem: a + ' \u2212 ' + b + ' = ?', answer: a - b };
+  } });
+
+  item({ id: 'g-oa-facts-num', b: 'g', a: 'oa', d: 182, t: 'number', make: function (R) {
+    var a = ri(R, 3, 9), b = ri(R, 3, 9);
+    return { stem: a + ' \u00d7 ' + b + ' = ?', answer: a * b };
+  } });
+
+  item({ id: 'g-oa-div-num', b: 'g', a: 'oa', d: 194, t: 'number', make: function (R) {
+    var b = ri(R, 3, 9), ans = ri(R, 3, 9);
+    return { stem: (b * ans) + ' \u00f7 ' + b + ' = ?', answer: ans };
+  } });
+
+  item({ id: 'g-md-perim-num', b: 'g', a: 'md', d: 198, t: 'number', make: function (R) {
+    var w = ri(R, 4, 11), h = ri(R, 3, 9);
+    return { stem: 'What is the <b>perimeter</b> of this rectangle, in cm?',
+             art: D.labelledRect(w, h, 'cm'), answer: 2 * (w + h) };
+  } });
+
+  item({ id: 'g-md-area-num', b: 'g', a: 'md', d: 208, t: 'number', make: function (R) {
+    var w = ri(R, 4, 12), h = ri(R, 3, 9);
+    return { stem: 'What is the <b>area</b> of this rectangle, in square metres?',
+             art: D.labelledRect(w, h, 'm'), answer: w * h, calc: true };
+  } });
+
+  // ---- tap every one that applies ----
+
+  item({ id: 'k-nbt-multi-more', b: 'k', a: 'nbt', d: 152, t: 'multi', make: function (R) {
+    var cut = ri(R, 5, 9);
+    var over = shuffle(R, [cut + 1, cut + 2, cut + 4, cut + 6]).slice(0, 2);
+    var under = shuffle(R, [cut - 1, cut - 2, cut - 3, cut - 4]
+      .filter(function (n) { return n > 0; })).slice(0, 2);
+    var all = shuffle(R, over.concat(under));
+    var ans = [];
+    all.forEach(function (n, i) { if (n > cut) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the numbers bigger than ' + cut + '.',
+      say: 'Tap all the numbers that are bigger than ' + cut + '.',
+      choices: all.map(function (n) { return { html: big(n) }; }),
+      answer: ans, cols: 4
+    };
+  } });
+
+  item({ id: 'k-oa-multi-ten', b: 'kg', a: 'oa', d: 170, t: 'multi', make: function (R) {
+    var good = shuffle(R, [[1, 9], [2, 8], [3, 7], [4, 6], [5, 5]]).slice(0, 2);
+    var bad = shuffle(R, [[2, 9], [3, 8], [4, 5], [6, 3], [7, 5]]).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (p, i) { if (p[0] + p[1] === 10) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the pairs that make 10.',
+      say: 'Tap all the pairs that add up to ten.',
+      choices: all.map(function (p) { return { html: big(p[0] + ' + ' + p[1]) }; }),
+      answer: ans, cols: 2
+    };
+  } });
+
+  /* Every bar starts at the same left edge, one per row, with the stick to
+     beat drawn the same way directly above them. The first version centred
+     each bar inside its own half-width option box, which made a length
+     comparison into an eyeballing exercise -- the one thing a measurement
+     item must not be. Caught on screen, not by any assertion. */
+  item({ id: 'k-md-multi-longer', b: 'k', a: 'md', d: 158, t: 'multi', make: function (R) {
+    var ref = ri(R, 6, 8);
+    var over = shuffle(R, [ref + 2, ref + 3, ref + 5]).slice(0, 2);
+    var under = shuffle(R, [ref - 2, ref - 3, ref - 4]).slice(0, 2);
+    var all = shuffle(R, over.concat(under));
+    var ans = [];
+    all.forEach(function (v, i) { if (v > ref) ans.push(i); });
+    var bar = function (v, fill) {
+      return '<span style="display:inline-block;vertical-align:middle;height:20px;width:' +
+             (v * 16) + 'px;background:' + fill +
+             ';border:2px solid #16202e;border-radius:4px"></span>';
+    };
+    return {
+      stem: 'Tap <b>all</b> the sticks that are <b>longer</b> than the orange one.',
+      say: 'Tap all the sticks that are longer than the orange one.',
+      /* 53px is exactly what an option's own padding, tick box and gap come
+         to, so the orange bar starts on the same pixel as the blue ones. */
+      art: '<div style="text-align:left;padding-left:53px">' + bar(ref, '#f3c98b') + '</div>',
+      choices: all.map(function (v) { return { html: bar(v, '#bcd3f2') }; }),
+      answer: ans
+    };
+  } });
+
+  item({ id: 'g-oa-multi-equal', b: 'g', a: 'oa', d: 194, t: 'multi', make: function (R) {
+    var target = pick(R, [12, 18, 24, 36]);
+    var pairs = [];
+    for (var a = 2; a <= 12; a++) if (target % a === 0 && target / a <= 12) pairs.push([a, target / a]);
+    var good = shuffle(R, pairs).slice(0, 2);
+    var bad = [];
+    while (bad.length < 2) {
+      var x = ri(R, 2, 9), y = ri(R, 2, 9);
+      if (x * y !== target) bad.push([x, y]);
+    }
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (p, i) { if (p[0] * p[1] === target) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the ones that equal <b>' + target + '</b>.',
+      choices: all.map(function (p) { return { html: big(p[0] + ' \u00d7 ' + p[1]) }; }),
+      answer: ans, cols: 2
+    };
+  } });
+
+  item({ id: 'g-nbt-multi-half', b: 'g', a: 'nbt', d: 208, t: 'multi', make: function (R) {
+    var good = shuffle(R, [[2, 4], [3, 6], [4, 8], [5, 10], [6, 12]]).slice(0, 2);
+    var bad = shuffle(R, [[1, 3], [2, 5], [3, 4], [2, 6], [4, 6]]).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (f, i) { if (f[0] * 2 === f[1]) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the fractions that are the same as <b>1/2</b>.',
+      choices: all.map(function (f) { return { html: big(f[0] + '/' + f[1]) }; }),
+      answer: ans, cols: 4
+    };
+  } });
+
+  item({ id: 'g-md-multi-unit', b: 'g', a: 'md', d: 180, t: 'multi', make: function (R) {
+    var sets = [
+      { unit: 'litres', yes: ['a bucket of water', 'a carton of juice', 'a full bath'],
+        no: ['a bag of flour', 'the length of a room', 'a bar of chocolate'] },
+      { unit: 'kilograms', yes: ['a sack of potatoes', 'a large dog', 'a suitcase'],
+        no: ['a jug of milk', 'the height of a door', 'a glass of water'] },
+      { unit: 'centimetres', yes: ['a pencil', 'the width of a book', 'your hand'],
+        no: ['a bottle of lemonade', 'a bag of sand', 'a bucket of water'] }
+    ];
+    var s = pick(R, sets);
+    var good = shuffle(R, s.yes).slice(0, 2), bad = shuffle(R, s.no).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (x, i) { if (s.yes.indexOf(x) >= 0) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the things you would measure in <b>' + s.unit + '</b>.',
+      choices: all.map(function (x) { return { html: x }; }),
+      answer: ans, cols: 2
+    };
+  } });
+
+  item({ id: 'g-geo-multi-right', b: 'g', a: 'geo', d: 202, t: 'multi', make: function (R) {
+    var good = shuffle(R, ['square', 'rectangle', 'rightTriangle']).slice(0, 2);
+    var bad = shuffle(R, ['circle', 'rhombus', 'pentagon', 'hexagon']).slice(0, 2);
+    var all = shuffle(R, good.concat(bad));
+    var ans = [];
+    all.forEach(function (sh, i) { if (good.indexOf(sh) >= 0) ans.push(i); });
+    return {
+      stem: 'Tap <b>all</b> the shapes that have a <b>right angle</b>.',
+      choices: all.map(function (sh) { return { html: D.shape(sh, { size: 78 }) }; }),
+      answer: ans, cols: 4, pic: true
+    };
+  } });
+
+  // ---- put them in order ----
+
+  item({ id: 'g-nbt-order-frac', b: 'g', a: 'nbt', d: 212, t: 'order', make: function (R) {
+    var set = pick(R, [
+      [[1, 4], [1, 2], [3, 4]], [[1, 3], [1, 2], [2, 3]],
+      [[1, 8], [1, 4], [1, 2]], [[2, 6], [1, 2], [5, 6]]
+    ]);
+    var vals = set.map(function (f) { return f[0] / f[1]; });
+    var sorted = vals.slice().sort(function (a, b) { return a - b; });
+    var order = shuffle(R, set.map(function (f, i) { return i; }));
+    return {
+      stem: 'Tap the fractions in order, <b>smallest first</b>.',
+      cards: order.map(function (i) {
+        return { html: '<span class="big">' + set[i][0] + '/' + set[i][1] + '</span>',
+                 r: sorted.indexOf(vals[i]) };
+      })
+    };
+  } });
+
+  item({ id: 'g-md-order-time', b: 'g', a: 'md', d: 188, t: 'order', make: function (R) {
+    var base = ri(R, 1, 8);
+    var uniq = [base * 60 + 5, base * 60 + 35, (base + 1) * 60 + 15];
+    var sorted = uniq.slice().sort(function (a, b) { return a - b; });
+    var order = shuffle(R, [0, 1, 2]);
+    var fmt = function (t) {
+      var h = Math.floor(t / 60), m = t % 60;
+      return h + ':' + (m < 10 ? '0' + m : m);
+    };
+    return {
+      stem: 'Tap the times in order, <b>earliest first</b>.',
+      cards: order.map(function (i) {
+        return { html: '<span class="big">' + fmt(uniq[i]) + '</span>',
+                 r: sorted.indexOf(uniq[i]) };
+      })
+    };
+  } });
+
+  item({ id: 'g-md-order-len', b: 'g', a: 'md', d: 200, t: 'order', make: function (R) {
+    var set = pick(R, [
+      [['5 cm', 5], ['50 mm', 5.0001], ['1 m', 100]],
+      [['2 m', 200], ['30 cm', 30], ['90 mm', 9]],
+      [['1 kg', 1000], ['250 g', 250], ['600 g', 600]],
+      [['2 litres', 2000], ['500 ml', 500], ['1500 ml', 1500]]
+    ]);
+    var vals = set.map(function (x) { return x[1]; });
+    var sorted = vals.slice().sort(function (a, b) { return a - b; });
+    var order = shuffle(R, [0, 1, 2]);
+    return {
+      stem: 'Tap them in order, <b>smallest first</b>.',
+      cards: order.map(function (i) {
+        return { html: '<span class="big">' + set[i][0] + '</span>', r: sorted.indexOf(vals[i]) };
+      })
+    };
+  } });
+
   return ITEMS;
 })();
